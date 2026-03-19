@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keel"
+version = "0.1.0"
+description = "Shared Django platform layer for DockLabs products"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+authors = [{name = "Daniel O'Keefe"}]
+dependencies = [
+    "Django>=5.2",
+]
+
+[project.optional-dependencies]
+sso = ["django-allauth>=65.0"]
+foia = ["anthropic>=0.40"]
+
+[tool.setuptools.packages.find]
+include = ["keel*"]
