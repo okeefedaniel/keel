@@ -1,7 +1,7 @@
 """Entry point for the DockLabs nightly test suite.
 
 Usage:
-    # Run everything (unit tests + smoke tests, all products)
+    # Run everything (unit tests + smoke tests + UI audit, all products)
     python -m keel.testing
 
     # Smoke tests only against local instances
@@ -12,6 +12,9 @@ Usage:
 
     # Unit tests only
     python -m keel.testing --unit-only
+
+    # UI consistency audit only
+    python -m keel.testing --ui-only
 
     # Specific products
     python -m keel.testing --products lookout harbor
@@ -28,6 +31,7 @@ import sys
 from .config import PRODUCTS
 from .result import TestResult
 from .smoke import run_smoke_tests
+from .ui_audit import run_ui_audit
 from .unit_runner import run_django_tests
 
 
@@ -42,11 +46,15 @@ def main():
     )
     parser.add_argument(
         '--smoke-only', action='store_true',
-        help='Run only smoke tests (skip unit tests)',
+        help='Run only smoke tests (skip unit tests and UI audit)',
     )
     parser.add_argument(
         '--unit-only', action='store_true',
-        help='Run only Django unit tests (skip smoke tests)',
+        help='Run only Django unit tests (skip smoke tests and UI audit)',
+    )
+    parser.add_argument(
+        '--ui-only', action='store_true',
+        help='Run only the UI consistency audit',
     )
     parser.add_argument(
         '--live', action='store_true',
@@ -72,11 +80,19 @@ def main():
 
     # --- Run tests ---
 
-    if not args.smoke_only:
-        run_django_tests(T, product_names=products)
+    if args.ui_only:
+        # UI audit uses product display names, not config keys
+        run_ui_audit(T)
+    else:
+        if not args.smoke_only:
+            run_django_tests(T, product_names=products)
 
-    if not args.unit_only:
-        run_smoke_tests(T, product_names=products, live=args.live)
+        if not args.unit_only:
+            run_smoke_tests(T, product_names=products, live=args.live)
+
+        # UI audit runs as part of the full suite (unless --smoke-only or --unit-only)
+        if not args.smoke_only and not args.unit_only:
+            run_ui_audit(T)
 
     # --- Output ---
 
