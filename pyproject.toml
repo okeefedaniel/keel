@@ -21,3 +21,6 @@ alerts = ["requests>=2.30"]  # for webhook notifications
 
 [tool.setuptools.packages.find]
 include = ["keel*"]
+
+[tool.setuptools.package-data]
+keel = ["static/**/*"]
