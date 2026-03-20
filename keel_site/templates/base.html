@@ -69,6 +69,11 @@
               <li><span class="dropdown-item-text text-muted">{{ user.email }}</span></li>
               <li><hr class="dropdown-divider"></li>
               <li>
+                <a class="dropdown-item" href="{% url 'password_change' %}">
+                  <i class="bi bi-shield-lock me-1"></i>Change Password
+                </a>
+              </li>
+              <li>
                 <form method="post" action="{% url 'logout' %}">
                   {% csrf_token %}
                   <button type="submit" class="dropdown-item">
