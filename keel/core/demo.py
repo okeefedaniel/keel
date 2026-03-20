@@ -45,6 +45,8 @@ ROLE_DISPLAY = {
     # Harbor
     'grants_manager': {'label': 'Grants Manager', 'icon': 'bi-cash-stack', 'color': 'success'},
     'reviewer': {'label': 'Reviewer', 'icon': 'bi-clipboard-check', 'color': 'info'},
+    # Manifest
+    'signer': {'label': 'Signer', 'icon': 'bi-pen', 'color': 'primary'},
 }
 
 
