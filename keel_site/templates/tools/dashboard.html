@@ -42,10 +42,40 @@
         <div class="card-body">
           <h6 class="card-title"><i class="bi bi-stack me-1"></i>Full Test Suite</h6>
           <p class="card-text text-muted" style="font-size: 0.85rem;">
-            Unit tests + smoke tests + UI audit across all products. Takes a few minutes.
+            Unit tests + smoke tests + UI audit + security audit across all products. Takes a few minutes.
           </p>
           <button class="btn btn-primary btn-sm run-btn" data-tool="full">
             <i class="bi bi-play-fill me-1"></i>Run Full Suite
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security Audit -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100 border-warning">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-shield-lock me-1 text-warning"></i>Security Audit</h6>
+          <p class="card-text text-muted" style="font-size: 0.85rem;">
+            Scan all products for security vulnerabilities — secrets exposure, XSS, CSRF, SQL injection, misconfigurations.
+          </p>
+          <button class="btn btn-warning btn-sm run-btn" data-tool="security">
+            <i class="bi bi-play-fill me-1"></i>Run Security Audit
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100 border-danger">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-shield-exclamation me-1 text-danger"></i>Security Audit + Auto-Fix</h6>
+          <p class="card-text text-muted" style="font-size: 0.85rem;">
+            Run security audit and automatically fix safe issues (missing settings, DEBUG flags). Critical findings reported to dashboard.
+          </p>
+          <button class="btn btn-danger btn-sm run-btn" data-tool="security-fix">
+            <i class="bi bi-play-fill me-1"></i>Audit &amp; Fix
           </button>
         </div>
       </div>
@@ -176,6 +206,8 @@ const TOOL_LABELS = {
   'smoke-live': 'Smoke Tests (Live)',
   'smoke': 'Smoke Tests (Local)',
   'unit': 'Unit Tests',
+  'security': 'Security Audit',
+  'security-fix': 'Security Audit + Auto-Fix',
   'full': 'Full Test Suite'
 };
 

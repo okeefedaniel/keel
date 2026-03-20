@@ -71,6 +71,10 @@ def run_tool(request):
         cmd.extend(['--smoke-only', '--live'])
     elif tool == 'unit':
         cmd.append('--unit-only')
+    elif tool == 'security':
+        cmd.extend(['--security-only', '--notify-dashboard'])
+    elif tool == 'security-fix':
+        cmd.extend(['--security-only', '--auto-fix', '--notify-dashboard'])
     # else: full suite
 
     if products:
