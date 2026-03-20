@@ -9,7 +9,7 @@ class ProductAccessInline(admin.TabularInline):
     model = ProductAccess
     fk_name = 'user'
     extra = 1
-    fields = ('product', 'role', 'is_active', 'granted_at')
+    fields = ('product', 'role', 'is_active', 'is_beta_tester', 'granted_at')
     readonly_fields = ('granted_at',)
 
 
@@ -36,7 +36,7 @@ class AgencyAdmin(admin.ModelAdmin):
 
 @admin.register(ProductAccess)
 class ProductAccessAdmin(admin.ModelAdmin):
-    list_display = ('user', 'product', 'role', 'is_active', 'granted_at')
+    list_display = ('user', 'product', 'role', 'is_active', 'is_beta_tester', 'granted_at')
     list_filter = ('product', 'role', 'is_active')
     search_fields = ('user__email', 'user__username')
     raw_id_fields = ('user', 'granted_by')

@@ -185,6 +185,10 @@ class ProductAccess(models.Model):
         help_text=_('Product-specific role (e.g., program_officer, admin).'),
     )
     is_active = models.BooleanField(default=True)
+    is_beta_tester = models.BooleanField(
+        default=False,
+        help_text=_('Beta testers can submit feedback directly from within the product.'),
+    )
     granted_at = models.DateTimeField(auto_now_add=True)
     granted_by = models.ForeignKey(
         KeelUser, on_delete=models.SET_NULL,
