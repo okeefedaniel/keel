@@ -3,12 +3,51 @@
 
 {% block title %}Notifications{% endblock %}
 
+{% block extra_css %}
+<style>
+  .keel-notif {
+    position: relative;
+    transition: background-color .2s ease, border-color .2s ease;
+    border-left: 3px solid transparent;
+  }
+  .keel-notif.keel-notif--unread {
+    border-left-color: var(--bs-primary, #0d6efd);
+    background-color: rgba(var(--bs-primary-rgb, 13,110,253), .04);
+  }
+  .keel-notif.keel-notif--unread .keel-notif__title {
+    font-weight: 600;
+  }
+  .keel-notif:not(.keel-notif--unread) .keel-notif__title {
+    font-weight: normal;
+    color: #6c757d;
+  }
+  .keel-notif:not(.keel-notif--unread) .keel-notif__message {
+    opacity: .65;
+  }
+  .keel-notif__dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--bs-primary, #0d6efd);
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+  .keel-notif-empty {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: #adb5bd;
+  }
+  .keel-notif-empty i { font-size: 2.5rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Notifications
+    <h2 class="mb-0">Notifications
       {% if unread_count %}
-        <span class="badge bg-danger notification-badge">{{ unread_count }}</span>
+        <span class="badge bg-danger rounded-pill ms-1" style="font-size: .55em; vertical-align: middle;">{{ unread_count }}</span>
       {% endif %}
     </h2>
     <div class="d-flex gap-2">
@@ -34,7 +73,7 @@
     </li>
     <li class="nav-item">
       <a class="nav-link {% if filter_status == 'unread' %}active{% endif %}"
-         href="?status=unread">Unread</a>
+         href="?status=unread">Unread{% if unread_count %} <span class="badge bg-secondary rounded-pill">{{ unread_count }}</span>{% endif %}</a>
     </li>
     <li class="nav-item">
       <a class="nav-link {% if filter_status == 'read' %}active{% endif %}"
@@ -43,40 +82,47 @@
   </ul>
 
   {% if notifications %}
-  <div class="list-group">
+  <div class="list-group list-group-flush">
     {% for notification in notifications %}
-    <div class="list-group-item list-group-item-action {% if not notification.is_read %}list-group-item-light border-start border-primary border-3{% endif %}"
+    <div class="list-group-item list-group-item-action keel-notif {% if not notification.is_read %}keel-notif--unread{% endif %}"
          id="notif-{{ notification.pk }}">
-      <div class="d-flex w-100 justify-content-between align-items-start">
-        <div class="flex-grow-1">
+      <div class="d-flex w-100 gap-3 align-items-start">
+        <!-- Unread dot -->
+        <div style="width: 8px; padding-top: 2px;">
+          {% if not notification.is_read %}<span class="keel-notif__dot"></span>{% endif %}
+        </div>
+        <!-- Content -->
+        <div class="flex-grow-1 min-width-0">
           {% if notification.link %}
-          <a href="{{ notification.link }}" class="text-decoration-none"
+          <a href="{{ notification.link }}" class="text-decoration-none stretched-link"
              hx-post="{% url 'keel_notifications:mark_read' notification.pk %}"
              hx-swap="none">
-            <h6 class="mb-1">
+            <span class="keel-notif__title d-block mb-0">
               {% notification_priority_icon notification.priority %}
               {{ notification.title }}
-            </h6>
+            </span>
           </a>
           {% else %}
-          <h6 class="mb-1">
+          <span class="keel-notif__title d-block mb-0">
             {% notification_priority_icon notification.priority %}
             {{ notification.title }}
-          </h6>
+          </span>
           {% endif %}
-          <p class="mb-1 text-muted small">{{ notification.message }}</p>
+          <small class="keel-notif__message text-muted d-block mt-1">{{ notification.message }}</small>
         </div>
-        <div class="text-end ms-3" style="min-width: 100px">
+        <!-- Meta -->
+        <div class="text-end text-nowrap ms-2" style="position: relative; z-index: 2;">
           <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
           {% if not notification.is_read %}
           <form method="post" action="{% url 'keel_notifications:mark_read' notification.pk %}"
-                class="mt-1" hx-post="{% url 'keel_notifications:mark_read' notification.pk %}"
+                class="mt-1"
+                hx-post="{% url 'keel_notifications:mark_read' notification.pk %}"
                 hx-swap="none"
-                hx-on::after-request="document.getElementById('notif-{{ notification.pk }}').classList.remove('list-group-item-light', 'border-start', 'border-primary', 'border-3')">
+                hx-on::after-request="var el=document.getElementById('notif-{{ notification.pk }}');el.classList.remove('keel-notif--unread');el.querySelector('.keel-notif__dot')?.remove();">
             {% csrf_token %}
-            <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1"
-                    title="Mark as read">
-              <i class="bi bi-check"></i>
+            <button type="submit" class="btn btn-sm py-0 px-1 text-muted" title="Mark as read"
+                    style="font-size: .75rem;">
+              <i class="bi bi-check2"></i>
             </button>
           </form>
           {% endif %}
@@ -110,9 +156,9 @@
   {% endif %}
 
   {% else %}
-  <div class="empty-state">
-    <i class="bi bi-bell-slash d-block"></i>
-    <p>No notifications{% if filter_status %} ({{ filter_status }}){% endif %}.</p>
+  <div class="keel-notif-empty">
+    <i class="bi bi-bell-slash d-block mb-2"></i>
+    <p class="mb-0">No notifications{% if filter_status %} ({{ filter_status }}){% endif %}.</p>
   </div>
   {% endif %}
 </div>
