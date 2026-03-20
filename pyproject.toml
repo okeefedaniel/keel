@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keel"
-version = "0.2.0"
+version = "0.3.0"
 description = "Shared Django platform layer for DockLabs products"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,4 +23,4 @@ alerts = ["requests>=2.30"]  # for webhook notifications
 include = ["keel*"]
 
 [tool.setuptools.package-data]
-"keel.core" = ["static/**/*"]
+"keel.core" = ["static/**/*", "templatetags/**/*"]
