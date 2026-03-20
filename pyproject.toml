@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keel"
-version = "0.5.1"
+version = "0.6.0"
 description = "Shared Django platform layer for DockLabs products"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -18,9 +18,11 @@ dependencies = [
 sso = ["django-allauth>=65.0"]
 foia = ["anthropic>=0.40"]
 alerts = ["requests>=2.30"]  # for webhook notifications
+sms = ["twilio>=9.0"]  # for SMS notifications
 
 [tool.setuptools.packages.find]
 include = ["keel*"]
 
 [tool.setuptools.package-data]
 "keel.core" = ["static/**/*", "templates/**/*", "templatetags/**/*", "management/**/*"]
+"keel.notifications" = ["templates/**/*", "templatetags/**/*"]

@@ -1,0 +1,9 @@
+{{ title }}
+
+{{ message }}
+{% if absolute_link %}
+View details: {{ absolute_link }}
+{% endif %}
+---
+This notification was sent by {{ site_name }}.
+You can manage your notification preferences in your account settings.

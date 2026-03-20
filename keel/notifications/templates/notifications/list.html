@@ -1,0 +1,119 @@
+{% extends base_template|default:"base.html" %}
+{% load keel_notifications %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Notifications
+      {% if unread_count %}
+        <span class="badge bg-danger notification-badge">{{ unread_count }}</span>
+      {% endif %}
+    </h2>
+    <div class="d-flex gap-2">
+      {% if unread_count %}
+      <form method="post" action="{% url 'keel_notifications:mark_all_read' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-check-all me-1"></i>Mark all read
+        </button>
+      </form>
+      {% endif %}
+      <a href="{% url 'keel_notifications:preferences' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-gear me-1"></i>Preferences
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link {% if not filter_status %}active{% endif %}"
+         href="?">All</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if filter_status == 'unread' %}active{% endif %}"
+         href="?status=unread">Unread</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if filter_status == 'read' %}active{% endif %}"
+         href="?status=read">Read</a>
+    </li>
+  </ul>
+
+  {% if notifications %}
+  <div class="list-group">
+    {% for notification in notifications %}
+    <div class="list-group-item list-group-item-action {% if not notification.is_read %}list-group-item-light border-start border-primary border-3{% endif %}"
+         id="notif-{{ notification.pk }}">
+      <div class="d-flex w-100 justify-content-between align-items-start">
+        <div class="flex-grow-1">
+          {% if notification.link %}
+          <a href="{{ notification.link }}" class="text-decoration-none"
+             hx-post="{% url 'keel_notifications:mark_read' notification.pk %}"
+             hx-swap="none">
+            <h6 class="mb-1">
+              {% notification_priority_icon notification.priority %}
+              {{ notification.title }}
+            </h6>
+          </a>
+          {% else %}
+          <h6 class="mb-1">
+            {% notification_priority_icon notification.priority %}
+            {{ notification.title }}
+          </h6>
+          {% endif %}
+          <p class="mb-1 text-muted small">{{ notification.message }}</p>
+        </div>
+        <div class="text-end ms-3" style="min-width: 100px">
+          <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+          {% if not notification.is_read %}
+          <form method="post" action="{% url 'keel_notifications:mark_read' notification.pk %}"
+                class="mt-1" hx-post="{% url 'keel_notifications:mark_read' notification.pk %}"
+                hx-swap="none"
+                hx-on::after-request="document.getElementById('notif-{{ notification.pk }}').classList.remove('list-group-item-light', 'border-start', 'border-primary', 'border-3')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1"
+                    title="Mark as read">
+              <i class="bi bi-check"></i>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if notifications.has_other_pages %}
+  <nav class="mt-4">
+    <ul class="pagination justify-content-center">
+      {% if notifications.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ notifications.previous_page_number }}{% if filter_status %}&status={{ filter_status }}{% endif %}">Previous</a>
+      </li>
+      {% endif %}
+      {% for num in notifications.paginator.page_range %}
+      <li class="page-item {% if notifications.number == num %}active{% endif %}">
+        <a class="page-link" href="?page={{ num }}{% if filter_status %}&status={{ filter_status }}{% endif %}">{{ num }}</a>
+      </li>
+      {% endfor %}
+      {% if notifications.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ notifications.next_page_number }}{% if filter_status %}&status={{ filter_status }}{% endif %}">Next</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-bell-slash d-block"></i>
+    <p>No notifications{% if filter_status %} ({{ filter_status }}){% endif %}.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

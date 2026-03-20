@@ -1,37 +1,27 @@
 """Shared notification infrastructure for DockLabs products.
 
-Provides three reusable helpers that all products duplicate:
+**MIGRATION NOTE (Keel v0.6.0):** This module is the backward-compatible
+low-level API. For new code, prefer ``keel.notifications.notify()`` which
+provides event-driven dispatch with user preferences and multi-channel
+support. These helpers are still used internally by the channel dispatchers.
+
+Provides three reusable helpers:
 
 1. ``build_absolute_url(path)`` — Railway-aware URL builder
 2. ``send_notification_email(...)`` — HTML+text multipart email sender
 3. ``create_notification(...)`` — In-app notification record creator
 
-Products keep their domain-specific notification triggers (e.g.,
-``notify_foia_request_received``) in their own ``notifications.py``,
-but call these helpers instead of reimplementing the plumbing.
-
 Usage:
+    # NEW (preferred) — event-driven with preferences:
+    from keel.notifications import notify
+    notify(event='application_submitted', actor=request.user,
+           context={'application': app}, link=f'/applications/{app.pk}/')
+
+    # LEGACY (still works) — direct low-level:
     from keel.core.notifications import (
         build_absolute_url, send_notification_email, create_notification,
     )
-
-    # In-app notification
-    create_notification(
-        recipient=user,
-        title='New Assignment',
-        message='You have been assigned as reviewer.',
-        link='/reviews/123/',
-        priority='high',
-    )
-
-    # Email notification
-    url = build_absolute_url('/reviews/123/')
-    send_notification_email(
-        recipient_email=user.email,
-        subject='New Assignment',
-        template_name='emails/assignment.html',
-        context={'user': user, 'url': url},
-    )
+    create_notification(recipient=user, title='...', message='...', link='/')
 
 Requires KEEL_NOTIFICATION_MODEL in settings (e.g., 'core.Notification').
 Falls back to KEEL_AUDIT_LOG_MODEL's app label + '.Notification' if not set.
