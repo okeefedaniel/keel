@@ -7,6 +7,7 @@ from .models import Agency, Invitation, KeelUser, ProductAccess
 
 class ProductAccessInline(admin.TabularInline):
     model = ProductAccess
+    fk_name = 'user'
     extra = 1
     fields = ('product', 'role', 'is_active', 'granted_at')
     readonly_fields = ('granted_at',)
