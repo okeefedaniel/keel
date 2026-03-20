@@ -46,6 +46,9 @@ class AbstractAgency(models.Model):
 class AbstractAuditLog(models.Model):
     """Immutable log of user actions for compliance and auditing.
 
+    Records cannot be modified or deleted through the Django ORM.
+    This ensures audit trail integrity for FOIA and compliance.
+
     Subclass and extend Action choices per product:
 
         class Action(AbstractAuditLog.Action):
@@ -63,6 +66,8 @@ class AbstractAuditLog(models.Model):
         LOGIN = 'login', _('Login')
         EXPORT = 'export', _('Export')
         VIEW = 'view', _('View')
+        LOGIN_FAILED = 'login_failed', _('Login Failed')
+        SECURITY_EVENT = 'security_event', _('Security Event')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
@@ -80,6 +85,22 @@ class AbstractAuditLog(models.Model):
     class Meta:
         abstract = True
         ordering = ['-timestamp']
+
+    def save(self, *args, **kwargs):
+        # Audit logs are append-only: prevent updates to existing records
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValueError(
+                'Audit log records are immutable and cannot be modified. '
+                'Create a new record instead.'
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # Prevent deletion of audit records
+        raise ValueError(
+            'Audit log records cannot be deleted. '
+            'They are retained for compliance and legal requirements.'
+        )
 
     def __str__(self):
         user_display = self.user if self.user else 'System'

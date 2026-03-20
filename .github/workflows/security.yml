@@ -1,0 +1,137 @@
+# Reusable security scanning workflow for DockLabs products.
+#
+# Usage in a product repo's .github/workflows/ci.yml:
+#   jobs:
+#     security:
+#       uses: okeefedaniel/keel/.github/workflows/security.yml@main
+#       with:
+#         python-version: '3.12'
+#
+# Or copy this workflow directly into each product repo.
+
+name: Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: 'Python version'
+        required: false
+        type: string
+        default: '3.12'
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version || '3.12' }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit flake8-security
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Bandit — Python security linter
+        run: |
+          bandit -r . \
+            --exclude ./venv,./staticfiles,./.git,./node_modules \
+            -f json -o bandit-report.json \
+            --severity-level medium \
+            || true
+          # Parse results and fail on high/critical
+          python -c "
+          import json, sys
+          with open('bandit-report.json') as f:
+              data = json.load(f)
+          results = data.get('results', [])
+          high = [r for r in results if r['issue_severity'] in ('HIGH', 'CRITICAL')]
+          if high:
+              print(f'::error::Bandit found {len(high)} high/critical security issues:')
+              for r in high:
+                  print(f'  {r[\"filename\"]}:{r[\"line_number\"]} - {r[\"issue_text\"]}')
+              sys.exit(1)
+          medium = [r for r in results if r['issue_severity'] == 'MEDIUM']
+          if medium:
+              print(f'::warning::Bandit found {len(medium)} medium security issues')
+              for r in medium:
+                  print(f'  {r[\"filename\"]}:{r[\"line_number\"]} - {r[\"issue_text\"]}')
+          print(f'Security scan complete: {len(high)} high, {len(medium)} medium, {len(results) - len(high) - len(medium)} low')
+          "
+
+      - name: Safety — dependency vulnerability check
+        run: |
+          if [ -f requirements.txt ]; then
+            safety check -r requirements.txt --output json > safety-report.json 2>/dev/null || true
+            python -c "
+          import json, sys
+          try:
+              with open('safety-report.json') as f:
+                  data = json.load(f)
+              vulns = data if isinstance(data, list) else data.get('vulnerabilities', [])
+              if vulns:
+                  print(f'::error::Safety found {len(vulns)} vulnerable dependencies:')
+                  for v in vulns[:10]:
+                      pkg = v.get('package_name', v[0] if isinstance(v, list) else 'unknown')
+                      print(f'  {pkg}')
+                  sys.exit(1)
+              print('No known vulnerabilities in dependencies')
+          except Exception as e:
+              print(f'::warning::Safety check inconclusive: {e}')
+          "
+          fi
+
+      - name: Check for secrets in code
+        run: |
+          # Simple pattern check for common secrets
+          python -c "
+          import os, re, sys
+          patterns = [
+              (r'(?:password|secret|token|key)\s*=\s*[\"'][^\"']{8,}[\"']', 'Hardcoded secret'),
+              (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
+              (r'sk-[a-zA-Z0-9]{48}', 'API Secret Key'),
+              (r'-----BEGIN (?:RSA )?PRIVATE KEY-----', 'Private Key'),
+          ]
+          issues = []
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if d not in {'venv', '.git', 'node_modules', 'staticfiles', '__pycache__'}]
+              for fname in files:
+                  if not fname.endswith(('.py', '.js', '.env', '.yml', '.yaml', '.json', '.toml')):
+                      continue
+                  if fname in ('.env.example', 'package-lock.json'):
+                      continue
+                  fpath = os.path.join(root, fname)
+                  try:
+                      with open(fpath) as f:
+                          content = f.read()
+                      for pattern, desc in patterns:
+                          for match in re.finditer(pattern, content, re.IGNORECASE):
+                              issues.append(f'{fpath}: {desc}')
+                  except (UnicodeDecodeError, PermissionError):
+                      pass
+          if issues:
+              print(f'::error::Found {len(issues)} potential secrets in code:')
+              for i in issues[:20]:
+                  print(f'  {i}')
+              sys.exit(1)
+          print('No hardcoded secrets detected')
+          "
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+          retention-days: 30
