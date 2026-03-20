@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}FOIA Export{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <h3 class="mb-2" style="color: var(--ct-dark-blue);">
+        <i class="bi bi-file-earmark-lock me-2"></i>Export to Admiralty
+      </h3>
+      <p class="text-muted mb-4">
+        Export all audit log activity for <strong>{{ product_name|title }}</strong> within a date range.
+        The output is formatted for direct import into Admiralty's FOIA document store.
+      </p>
+
+      {% if error %}
+      <div class="alert alert-danger py-2">
+        <small>{{ error }}</small>
+      </div>
+      {% endif %}
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <form method="post">
+            {% csrf_token %}
+
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="date_from">From</label>
+                <input type="date" name="date_from" id="date_from" class="form-control" required
+                       value="{{ request.POST.date_from }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="date_to">To</label>
+                <input type="date" name="date_to" id="date_to" class="form-control" required
+                       value="{{ request.POST.date_to }}">
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label">Export Format</label>
+              <div class="d-flex gap-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="format" value="json" id="fmt-json" checked>
+                  <label class="form-check-label" for="fmt-json">
+                    JSON <small class="text-muted">(Admiralty import)</small>
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="format" value="csv" id="fmt-csv">
+                  <label class="form-check-label" for="fmt-csv">
+                    CSV <small class="text-muted">(spreadsheet)</small>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-download me-1"></i>Export Audit Records
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="mt-4 p-3 border rounded" style="background: var(--ct-pale-blue, #f8f9fa);">
+        <h6 style="color: var(--ct-dark-blue);"><i class="bi bi-info-circle me-1"></i>What gets exported?</h6>
+        <ul class="mb-0" style="font-size: 0.85rem;">
+          <li>All user actions (logins, creates, updates, deletes, approvals)</li>
+          <li>Timestamps, user identity, and IP addresses</li>
+          <li>Entity types, IDs, and field-level change details</li>
+          <li>The export itself is logged in the audit trail</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
