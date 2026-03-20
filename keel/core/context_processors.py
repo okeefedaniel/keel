@@ -33,16 +33,29 @@ def site_context(request):
     }
 
     if hasattr(request, 'user') and request.user.is_authenticated:
-        # Use the related_name from AbstractNotification; products should
-        # ensure their Notification model's related_name resolves here.
-        # The %(app_label)s_notifications pattern means we need to try
-        # the most common related manager names.
-        for attr in ('notifications', 'core_notifications'):
-            manager = getattr(request.user, attr, None)
-            if manager is not None:
+        # Try to resolve the notification count via the configured model
+        # first (most reliable), then fall back to related manager names.
+        model_path = getattr(settings, 'KEEL_NOTIFICATION_MODEL', None)
+        if model_path:
+            try:
+                from django.apps import apps
+                NotifModel = apps.get_model(model_path)
                 context['unread_notification_count'] = (
-                    manager.filter(is_read=False).count()
+                    NotifModel.objects.filter(
+                        recipient=request.user, is_read=False,
+                    ).count()
                 )
-                break
+            except (LookupError, Exception):
+                pass
+        else:
+            # Fallback: try common related manager names from
+            # AbstractNotification's %(app_label)s_notifications pattern.
+            for attr in ('notifications', 'core_notifications'):
+                manager = getattr(request.user, attr, None)
+                if manager is not None:
+                    context['unread_notification_count'] = (
+                        manager.filter(is_read=False).count()
+                    )
+                    break
 
     return context
