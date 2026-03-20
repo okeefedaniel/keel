@@ -1,12 +1,75 @@
 """Shared template tags for DockLabs products.
 
-Provides sortable table headers that work with SortableListMixin.
+Provides sortable table headers, notification helpers, and common filters.
 """
 from django import template
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
 register = template.Library()
+
+
+# =========================================================================
+# Filters
+# =========================================================================
+
+@register.filter
+def dict_get(dictionary, key):
+    """Look up a dictionary key in a template.
+
+    Usage:
+        {{ my_dict|dict_get:key_var }}
+    """
+    if isinstance(dictionary, dict):
+        return dictionary.get(key)
+    return None
+
+
+@register.filter
+def unread_count(user):
+    """Return the unread notification count for a user.
+
+    Usage:
+        {{ request.user|unread_count }}
+    """
+    if not user or not user.is_authenticated:
+        return 0
+    for attr in ('notifications', 'core_notifications'):
+        manager = getattr(user, attr, None)
+        if manager is not None:
+            return manager.filter(is_read=False).count()
+    return 0
+
+
+@register.filter
+def role_badge(role):
+    """Map a user role to a Bootstrap badge CSS class.
+
+    Usage:
+        <span class="badge {{ user.role|role_badge }}">{{ user.get_role_display }}</span>
+    """
+    mapping = {
+        'admin': 'bg-danger',
+        'system_admin': 'bg-danger',
+        'agency_admin': 'bg-warning text-dark',
+        'legislative_aid': 'bg-primary',
+        'stakeholder': 'bg-info',
+        'relationship_manager': 'bg-primary',
+        'foia_officer': 'bg-success',
+        'foia_attorney': 'bg-warning text-dark',
+        'analyst': 'bg-secondary',
+        'program_officer': 'bg-success',
+        'fiscal_officer': 'bg-info',
+        'grants_manager': 'bg-success',
+        'reviewer': 'bg-info',
+        'applicant': 'bg-secondary',
+    }
+    return mapping.get(role, 'bg-secondary')
+
+
+# =========================================================================
+# Tags
+# =========================================================================
 
 
 @register.simple_tag(takes_context=True)

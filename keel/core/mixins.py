@@ -1,8 +1,14 @@
 """Reusable view mixins shared across DockLabs products."""
+import csv
+import logging
 from urllib.parse import quote
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models.expressions import BaseExpression
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.http import require_POST
+
+logger = logging.getLogger(__name__)
 
 
 class AgencyStaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -98,3 +104,94 @@ class SortableListMixin:
         ctx['filter_params'] = self._build_params({'sort', 'dir', 'page'})
         ctx['pagination_params'] = self._build_params({'page'})
         return ctx
+
+
+class BulkActionMixin:
+    """Add bulk-action support to a ListView.
+
+    Handles the pattern: select IDs → validate → execute → audit.
+
+    Subclasses define ``bulk_actions`` as a dict mapping action names to
+    handler methods.
+
+    Usage:
+        class ApplicationListView(BulkActionMixin, ListView):
+            model = Application
+            bulk_actions = {
+                'approve': 'bulk_approve',
+                'export_csv': 'bulk_export_csv',
+            }
+            bulk_id_param = 'ids'  # POST param with comma-separated IDs
+
+            def bulk_approve(self, queryset):
+                count = queryset.update(status='approved')
+                return self.bulk_success(f'{count} applications approved.')
+
+            def bulk_export_csv(self, queryset):
+                return self.bulk_csv_response(
+                    queryset, 'applications.csv',
+                    [('ID', 'pk'), ('Title', 'title'), ('Status', 'get_status_display')],
+                )
+    """
+
+    bulk_actions = {}
+    bulk_id_param = 'ids'
+
+    def post(self, request, *args, **kwargs):
+        action = request.POST.get('bulk_action', '')
+        handler_name = self.bulk_actions.get(action)
+        if not handler_name:
+            return JsonResponse({'error': f'Unknown action: {action}'}, status=400)
+
+        handler = getattr(self, handler_name, None)
+        if not handler:
+            return JsonResponse({'error': f'Handler not found: {handler_name}'}, status=500)
+
+        ids_raw = request.POST.get(self.bulk_id_param, '')
+        ids = [i.strip() for i in ids_raw.split(',') if i.strip()]
+        if not ids:
+            return JsonResponse({'error': 'No items selected.'}, status=400)
+
+        queryset = self.get_queryset().filter(pk__in=ids)
+        return handler(queryset)
+
+    def bulk_success(self, message, redirect_url=None):
+        """Return a success response (JSON for htmx, redirect otherwise)."""
+        from django.contrib import messages
+        from django.shortcuts import redirect as redir
+
+        if self.request.headers.get('HX-Request'):
+            return JsonResponse({'message': message})
+        messages.success(self.request, message)
+        return redir(redirect_url or self.request.get_full_path())
+
+    def bulk_csv_response(self, queryset, filename, columns):
+        """Generate a CSV download from a queryset.
+
+        Args:
+            queryset: Filtered queryset of selected objects.
+            filename: Download filename.
+            columns: List of (header, field_or_callable) tuples,
+                same format as CSVExportMixin.csv_columns.
+        """
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([col[0] for col in columns])
+
+        for obj in queryset:
+            row = []
+            for _, field in columns:
+                if callable(field):
+                    row.append(field(obj))
+                else:
+                    value = obj
+                    for attr in field.split('.'):
+                        value = getattr(value, attr, '') if value else ''
+                    if callable(value):
+                        value = value()
+                    row.append(value)
+            writer.writerow(row)
+
+        return response
