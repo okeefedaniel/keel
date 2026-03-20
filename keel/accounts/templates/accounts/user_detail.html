@@ -1,0 +1,132 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}{{ target_user }} — Keel Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'keel_accounts:dashboard' %}">Admin</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'keel_accounts:user_list' %}">Users</a></li>
+      <li class="breadcrumb-item active">{{ target_user }}</li>
+    </ol>
+  </nav>
+
+  <div class="row">
+    <!-- Profile card -->
+    <div class="col-md-4">
+      <div class="card mb-4">
+        <div class="card-header"><strong>Profile</strong></div>
+        <div class="card-body">
+          <dl class="mb-0">
+            <dt>Name</dt>
+            <dd>{{ target_user.first_name }} {{ target_user.last_name }}</dd>
+            <dt>Username</dt>
+            <dd><code>{{ target_user.username }}</code></dd>
+            <dt>Email</dt>
+            <dd>{{ target_user.email|default:"-" }}</dd>
+            <dt>Phone</dt>
+            <dd>{{ target_user.phone|default:"-" }}</dd>
+            <dt>Title</dt>
+            <dd>{{ target_user.title|default:"-" }}</dd>
+            <dt>Agency</dt>
+            <dd>{{ target_user.agency|default:"-" }}</dd>
+            <dt>State User</dt>
+            <dd>{% if target_user.is_state_user %}<span class="badge bg-success">Yes</span>{% else %}No{% endif %}</dd>
+            <dt>Terms Accepted</dt>
+            <dd>
+              {% if target_user.accepted_terms %}
+              <span class="badge bg-success">Yes</span>
+              {% if target_user.accepted_terms_at %}
+              <small class="text-muted ms-1">{{ target_user.accepted_terms_at|date:"M d, Y" }}</small>
+              {% endif %}
+              {% else %}
+              <span class="text-muted">No</span>
+              {% endif %}
+            </dd>
+            <dt>Created</dt>
+            <dd>{{ target_user.created_at|date:"M d, Y H:i" }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product access -->
+    <div class="col-md-8">
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>Product Access</strong>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Product</th>
+                <th>Role</th>
+                <th>Granted</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for access in access_list %}
+              <tr>
+                <td><strong>{{ access.product }}</strong></td>
+                <td><code>{{ access.role }}</code></td>
+                <td>{{ access.granted_at|date:"M d, Y" }}</td>
+                <td>
+                  {% if access.is_active %}
+                  <span class="badge bg-success">Active</span>
+                  {% else %}
+                  <span class="badge bg-secondary">Revoked</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  {% if access.is_active %}
+                  <form method="post" action="{% url 'keel_accounts:revoke_access' access_id=access.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                            onclick="return confirm('Revoke {{ target_user }}\'s access to {{ access.product }}?')">
+                      Revoke
+                    </button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">No product access granted.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Grant access form -->
+      <div class="card">
+        <div class="card-header"><strong>Grant Product Access</strong></div>
+        <div class="card-body">
+          <form method="post" action="{% url 'keel_accounts:grant_access' user_id=target_user.pk %}" class="row g-2">
+            {% csrf_token %}
+            <div class="col-md-4">
+              <select name="product" class="form-select" required>
+                <option value="">Select product...</option>
+                {% for value, label in products %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <input type="text" name="role" class="form-control" placeholder="Role (e.g. admin, analyst)" required>
+            </div>
+            <div class="col-md-4">
+              <button type="submit" class="btn btn-primary w-100">Grant Access</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

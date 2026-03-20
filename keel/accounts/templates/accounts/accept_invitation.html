@@ -1,0 +1,63 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Accept Invitation{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header text-center">
+          <strong>You've been invited to {{ invitation.product|title }}</strong>
+        </div>
+        <div class="card-body">
+          <p class="text-center text-muted mb-4">
+            You'll be joining as <code>{{ invitation.role }}</code>
+          </p>
+
+          {% if user_exists %}
+          <!-- Already logged in — just accept -->
+          <form method="post">
+            {% csrf_token %}
+            <p class="text-center">
+              Signed in as <strong>{{ request.user.email }}</strong>
+            </p>
+            <button type="submit" class="btn btn-primary w-100">Accept Invitation</button>
+          </form>
+
+          {% else %}
+          <!-- New user — create account -->
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" value="{{ invitation.email }}" disabled>
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <label class="form-label">First Name</label>
+                <input type="text" name="first_name" class="form-control" required>
+              </div>
+              <div class="col">
+                <label class="form-label">Last Name</label>
+                <input type="text" name="last_name" class="form-control" required>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" name="password" class="form-control" minlength="8" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Create Account & Join</button>
+          </form>
+
+          <hr>
+          <p class="text-center text-muted mb-0">
+            Already have an account? <a href="/accounts/login/?next=/invite/{{ invitation.token }}/">Sign in</a>
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

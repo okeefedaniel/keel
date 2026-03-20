@@ -25,6 +25,7 @@ import logging
 
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from django.conf import settings
 from django.contrib.auth import get_user_model
 
 logger = logging.getLogger(__name__)
@@ -93,30 +94,27 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                 counter += 1
             user.username = username
 
-        # Map domain to role
+        # Determine role from email domain
         domain = email.split('@')[-1].lower() if '@' in email else ''
-        role = self.role_domain_map.get(domain)
-        if role:
-            user.role = role
-            user.is_state_user = True
-        else:
-            user.role = self.default_role
-            user.is_state_user = domain in self.state_user_domains
+        role = self.role_domain_map.get(domain, self.default_role)
+        user.is_state_user = bool(self.role_domain_map.get(domain)) or domain in self.state_user_domains
+
+        # Store role temporarily for save_user to create ProductAccess
+        user._sso_role = role
 
         user.accepted_terms = True
 
         # Link to agency by domain prefix
         if user.is_state_user:
-            from django.apps import apps
             try:
-                Agency = apps.get_model('core', 'Agency')
+                from keel.accounts.models import Agency
                 domain_prefix = domain.split('.')[0].upper()
                 agency = Agency.objects.filter(
                     abbreviation__iexact=domain_prefix, is_active=True,
                 ).first()
                 if agency:
                     user.agency = agency
-            except LookupError:
+            except Exception:
                 pass
 
         return user
@@ -127,4 +125,20 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
             from django.utils import timezone
             user.accepted_terms_at = timezone.now()
             user.save(update_fields=['accepted_terms_at'])
+
+        # Create ProductAccess for the current product
+        product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+        role = getattr(user, '_sso_role', self.default_role)
+        if product:
+            try:
+                from keel.accounts.models import ProductAccess
+                ProductAccess.objects.get_or_create(
+                    user=user,
+                    product=product,
+                    defaults={'role': role, 'is_active': True},
+                )
+                logger.info('SSO: Granted %s access to %s as %s', user, product, role)
+            except Exception:
+                logger.exception('SSO: Failed to create ProductAccess for %s', user)
+
         return user

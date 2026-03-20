@@ -1,0 +1,25 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Invitation Expired{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 text-center">
+      <h2 class="text-muted mb-3">Invitation Unavailable</h2>
+      <p class="mb-4">
+        This invitation to <strong>{{ invitation.product|title }}</strong>
+        {% if invitation.status == "revoked" %}
+        has been revoked.
+        {% elif invitation.status == "accepted" %}
+        has already been accepted.
+        {% else %}
+        has expired.
+        {% endif %}
+      </p>
+      <p class="text-muted">Contact your administrator for a new invitation.</p>
+      <a href="/" class="btn btn-outline-primary">Go Home</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

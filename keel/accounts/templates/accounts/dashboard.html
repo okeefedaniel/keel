@@ -1,0 +1,103 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Keel Admin Console{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Admin Console</h2>
+
+  <!-- Stats cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card text-center">
+        <div class="card-body">
+          <h3 class="card-title mb-0">{{ total_users }}</h3>
+          <p class="text-muted mb-0">Active Users</p>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'keel_accounts:user_list' %}" class="text-decoration-none">View all users</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center">
+        <div class="card-body">
+          <h3 class="card-title mb-0">{{ products|length }}</h3>
+          <p class="text-muted mb-0">Products</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center">
+        <div class="card-body">
+          <h3 class="card-title mb-0">{{ total_invitations }}</h3>
+          <p class="text-muted mb-0">Pending Invitations</p>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'keel_accounts:invitation_list' %}" class="text-decoration-none">Manage invitations</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product breakdown -->
+  <div class="card mb-4">
+    <div class="card-header"><strong>Products</strong></div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Product</th>
+            <th>Code</th>
+            <th class="text-end">Active Users</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr>
+            <td><strong>{{ p.name }}</strong></td>
+            <td><code>{{ p.code }}</code></td>
+            <td class="text-end">{{ p.user_count }}</td>
+            <td class="text-end">
+              <a href="{% url 'keel_accounts:user_list' %}?product={{ p.code }}" class="btn btn-sm btn-outline-primary">View users</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent users -->
+  <div class="card">
+    <div class="card-header"><strong>Recently Created Users</strong></div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Agency</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in recent_users %}
+          <tr>
+            <td>{{ u.first_name }} {{ u.last_name }}</td>
+            <td>{{ u.email }}</td>
+            <td>{{ u.agency.abbreviation|default:"-" }}</td>
+            <td>{{ u.created_at|timesince }} ago</td>
+            <td class="text-end">
+              <a href="{% url 'keel_accounts:user_detail' user_id=u.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

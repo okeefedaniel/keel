@@ -1,0 +1,79 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Users — Keel Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Users</h2>
+    <a href="{% url 'keel_accounts:invitation_list' %}" class="btn btn-primary">
+      <i class="bi bi-envelope-plus me-1"></i>Invite User
+    </a>
+  </div>
+
+  <!-- Search & filter -->
+  <form method="get" class="row g-2 mb-4">
+    <div class="col-md-6">
+      <input type="text" name="q" class="form-control" placeholder="Search by name or email..." value="{{ search_query }}">
+    </div>
+    <div class="col-md-4">
+      <select name="product" class="form-select">
+        <option value="">All products</option>
+        {% for value, label in products %}
+        <option value="{{ value }}" {% if value == selected_product %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-outline-primary w-100">Filter</button>
+    </div>
+  </form>
+
+  <!-- User table -->
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Agency</th>
+            <th class="text-center">Products</th>
+            <th>State User</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>
+              <strong>{{ u.first_name }} {{ u.last_name }}</strong>
+              {% if u.is_superuser %}<span class="badge bg-danger ms-1">Super</span>{% endif %}
+            </td>
+            <td>{{ u.email }}</td>
+            <td>{{ u.agency.abbreviation|default:"-" }}</td>
+            <td class="text-center">
+              <span class="badge bg-secondary">{{ u.product_count }}</span>
+            </td>
+            <td>
+              {% if u.is_state_user %}
+              <span class="badge bg-success">Yes</span>
+              {% else %}
+              <span class="text-muted">No</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'keel_accounts:user_detail' user_id=u.pk %}" class="btn btn-sm btn-outline-secondary">Manage</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">No users found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

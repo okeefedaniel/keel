@@ -66,7 +66,12 @@ def get_role_display(role):
 @require_POST
 @rate_limit(max_requests=10, window=60)
 def demo_login_view(request):
-    """One-click demo login. POST with role= to log in as that demo user."""
+    """One-click demo login. POST with role= to log in as that demo user.
+
+    Works with both legacy per-product User models and centralized
+    KeelUser + ProductAccess. The demo user's username matches the role
+    name, and ProductAccessMiddleware resolves the role from ProductAccess.
+    """
     if not getattr(settings, 'DEMO_MODE', False):
         return JsonResponse({'error': 'Demo mode is not enabled'}, status=403)
 
@@ -85,6 +90,6 @@ def demo_login_view(request):
         return redirect(redirect_url)
 
     return JsonResponse(
-        {'error': f'Demo user "{role}" not found. Run seed_demo_users.'},
+        {'error': f'Demo user "{role}" not found. Run seed_keel_users.'},
         status=500,
     )
