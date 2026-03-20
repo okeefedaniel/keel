@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}Tools{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 style="color: var(--ct-dark-blue);">
+      <i class="bi bi-wrench-adjustable me-2"></i>Tools
+    </h3>
+  </div>
+
+  <!-- Run Controls -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-palette me-1"></i>UI Consistency Audit</h6>
+          <p class="card-text text-muted" style="font-size: 0.85rem;">
+            Scan all products for visual inconsistencies — CSS tokens, CDN versions, accessibility, typography, icons.
+          </p>
+          <button class="btn btn-primary btn-sm run-btn" data-tool="ui-audit">
+            <i class="bi bi-play-fill me-1"></i>Run UI Audit
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-lightning me-1"></i>Smoke Tests (Live)</h6>
+          <p class="card-text text-muted" style="font-size: 0.85rem;">
+            Hit every product's live URL — login flows, role-based access, broken links, health checks.
+          </p>
+          <button class="btn btn-primary btn-sm run-btn" data-tool="smoke-live">
+            <i class="bi bi-play-fill me-1"></i>Run Smoke Tests
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-stack me-1"></i>Full Test Suite</h6>
+          <p class="card-text text-muted" style="font-size: 0.85rem;">
+            Unit tests + smoke tests + UI audit across all products. Takes a few minutes.
+          </p>
+          <button class="btn btn-primary btn-sm run-btn" data-tool="full">
+            <i class="bi bi-play-fill me-1"></i>Run Full Suite
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product filter -->
+  <div class="mb-4">
+    <label class="form-label fw-semibold" style="font-size: 0.85rem;">Filter by product (optional):</label>
+    <div class="d-flex flex-wrap gap-2">
+      <div class="form-check">
+        <input class="form-check-input product-filter" type="checkbox" value="lookout" id="pf-lookout">
+        <label class="form-check-label" for="pf-lookout">Lookout</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input product-filter" type="checkbox" value="beacon" id="pf-beacon">
+        <label class="form-check-label" for="pf-beacon">Beacon</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input product-filter" type="checkbox" value="harbor" id="pf-harbor">
+        <label class="form-check-label" for="pf-harbor">Harbor</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input product-filter" type="checkbox" value="admiralty" id="pf-admiralty">
+        <label class="form-check-label" for="pf-admiralty">Admiralty</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input product-filter" type="checkbox" value="manifest" id="pf-manifest">
+        <label class="form-check-label" for="pf-manifest">Manifest</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Run -->
+  <div id="active-run" class="d-none mb-4">
+    <div class="card border-primary shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="spinner-border spinner-border-sm text-primary me-2" id="run-spinner"></div>
+          <strong id="run-status-text">Running...</strong>
+        </div>
+        <div class="mt-2" style="font-size: 0.85rem; color: var(--ct-dark-blue);">
+          <span id="run-tool-label"></span> &middot; <span id="run-products-label"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="run-result" class="d-none mb-4">
+    <div class="card shadow-sm" id="result-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong id="result-title"></strong>
+        <span id="result-badge" class="badge"></span>
+      </div>
+      <div class="card-body">
+        <!-- Summary stats -->
+        <div class="row g-3 mb-3" id="result-stats"></div>
+
+        <!-- Failures detail -->
+        <div id="result-failures" class="d-none">
+          <h6 class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Failures</h6>
+          <div id="failures-list"></div>
+        </div>
+
+        <!-- Raw output toggle -->
+        <div class="mt-3">
+          <a class="text-muted" style="font-size: 0.85rem; cursor: pointer;" data-bs-toggle="collapse" href="#raw-output">
+            <i class="bi bi-code me-1"></i>Show raw output
+          </a>
+          <div class="collapse mt-2" id="raw-output">
+            <pre class="bg-dark text-light p-3 rounded" style="font-size: 0.75rem; max-height: 400px; overflow-y: auto;" id="raw-output-text"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run History -->
+  <h5 class="mb-3" style="color: var(--ct-dark-blue);">Run History</h5>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover" id="history-table">
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Tool</th>
+          <th>Products</th>
+          <th>Status</th>
+          <th>Started</th>
+          <th>By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in recent_runs %}
+        <tr class="history-row" data-run-id="{{ run.id }}" style="cursor: pointer;">
+          <td><code>{{ run.id }}</code></td>
+          <td>{{ run.tool }}</td>
+          <td>{{ run.products|join:", " }}</td>
+          <td>
+            {% if run.status == 'passed' %}
+              <span class="badge bg-success">Passed</span>
+            {% elif run.status == 'failed' %}
+              <span class="badge bg-danger">Failed</span>
+            {% elif run.status == 'running' %}
+              <span class="badge bg-primary">Running</span>
+            {% elif run.status == 'timeout' %}
+              <span class="badge bg-warning">Timeout</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ run.status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ run.started_at }}</td>
+          <td>{{ run.started_by }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted text-center">No runs yet. Launch one above.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TOOL_LABELS = {
+  'ui-audit': 'UI Consistency Audit',
+  'smoke-live': 'Smoke Tests (Live)',
+  'smoke': 'Smoke Tests (Local)',
+  'unit': 'Unit Tests',
+  'full': 'Full Test Suite'
+};
+
+document.querySelectorAll('.run-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const tool = btn.dataset.tool;
+    const products = [...document.querySelectorAll('.product-filter:checked')].map(c => c.value);
+
+    // Disable all buttons
+    document.querySelectorAll('.run-btn').forEach(b => { b.disabled = true; });
+
+    // Show active run
+    const activeEl = document.getElementById('active-run');
+    activeEl.classList.remove('d-none');
+    document.getElementById('run-spinner').classList.remove('d-none');
+    document.getElementById('run-status-text').textContent = 'Running...';
+    document.getElementById('run-tool-label').textContent = TOOL_LABELS[tool] || tool;
+    document.getElementById('run-products-label').textContent = products.length ? products.join(', ') : 'All products';
+
+    // Hide previous result
+    document.getElementById('run-result').classList.add('d-none');
+
+    // Build form data
+    const fd = new FormData();
+    fd.append('tool', tool);
+    products.forEach(p => fd.append('products', p));
+
+    try {
+      const resp = await fetch('{% url "tools_run" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        body: fd,
+      });
+      const data = await resp.json();
+      showResult(data);
+    } catch (err) {
+      showResult({ status: 'error', output: err.toString(), tool, products: products.length ? products : ['all'] });
+    }
+
+    // Re-enable buttons
+    document.querySelectorAll('.run-btn').forEach(b => { b.disabled = false; });
+    activeEl.classList.add('d-none');
+  });
+});
+
+function showResult(data) {
+  const el = document.getElementById('run-result');
+  el.classList.remove('d-none');
+
+  // Title + badge
+  document.getElementById('result-title').textContent = TOOL_LABELS[data.tool] || data.tool || 'Run Result';
+  const badge = document.getElementById('result-badge');
+  if (data.status === 'passed') {
+    badge.className = 'badge bg-success';
+    badge.textContent = 'PASSED';
+  } else if (data.status === 'failed') {
+    badge.className = 'badge bg-danger';
+    badge.textContent = 'FAILED';
+  } else {
+    badge.className = 'badge bg-warning';
+    badge.textContent = data.status.toUpperCase();
+  }
+
+  // Stats from JSON report
+  const statsEl = document.getElementById('result-stats');
+  const failuresEl = document.getElementById('result-failures');
+  const failuresListEl = document.getElementById('failures-list');
+  statsEl.innerHTML = '';
+  failuresListEl.innerHTML = '';
+  failuresEl.classList.add('d-none');
+
+  if (data.report) {
+    const r = data.report;
+    const stats = [
+      { label: 'Total', value: r.total || 0, color: 'primary' },
+      { label: 'Passed', value: r.passed || 0, color: 'success' },
+      { label: 'Failed', value: r.failed || 0, color: 'danger' },
+    ];
+    stats.forEach(s => {
+      statsEl.innerHTML += `
+        <div class="col-auto">
+          <div class="border rounded px-3 py-2 text-center">
+            <div class="fw-bold text-${s.color}" style="font-size: 1.5rem;">${s.value}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">${s.label}</div>
+          </div>
+        </div>`;
+    });
+
+    // Show failures
+    if (r.failures && r.failures.length > 0) {
+      failuresEl.classList.remove('d-none');
+      r.failures.forEach(f => {
+        failuresListEl.innerHTML += `
+          <div class="alert alert-danger py-2 mb-2" style="font-size: 0.85rem;">
+            <strong>${f.product || ''}</strong> &middot; ${f.section || ''}
+            <br><span class="text-muted">${f.test || ''}</span>
+            ${f.detail ? '<br><small>' + f.detail + '</small>' : ''}
+          </div>`;
+      });
+    }
+  }
+
+  // Raw output
+  document.getElementById('raw-output-text').textContent = data.output || 'No output.';
+
+  // Add to history table
+  const tbody = document.querySelector('#history-table tbody');
+  const emptyRow = tbody.querySelector('td[colspan]');
+  if (emptyRow) emptyRow.closest('tr').remove();
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><code>${data.id || '-'}</code></td>
+    <td>${data.tool || '-'}</td>
+    <td>${(data.products || []).join(', ')}</td>
+    <td><span class="badge bg-${data.status === 'passed' ? 'success' : data.status === 'failed' ? 'danger' : 'warning'}">${(data.status || '').charAt(0).toUpperCase() + (data.status || '').slice(1)}</span></td>
+    <td>${data.started_at || '-'}</td>
+    <td>${data.started_by || '-'}</td>`;
+  tbody.insertBefore(tr, tbody.firstChild);
+}
+
+// Click history rows to reload details
+document.querySelectorAll('.history-row').forEach(row => {
+  row.addEventListener('click', async () => {
+    const runId = row.dataset.runId;
+    const resp = await fetch(`/tools/run/${runId}/`);
+    if (resp.ok) {
+      const data = await resp.json();
+      showResult(data);
+    }
+  });
+});
+</script>
+{% endblock %}

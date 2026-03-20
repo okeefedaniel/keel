@@ -4,6 +4,8 @@ from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
 from django.urls import include, path
 
+from . import tools
+
 
 def home(request):
     if request.user.is_authenticated:
@@ -34,6 +36,11 @@ urlpatterns = [
 
     # Invitation acceptance (clean URL)
     path('invite/<str:token>/', include([])),  # handled by keel.accounts.urls
+
+    # Tools (test suite, UI audit)
+    path('tools/', tools.tools_dashboard, name='tools_dashboard'),
+    path('tools/run/', tools.run_tool, name='tools_run'),
+    path('tools/run/<str:run_id>/', tools.run_detail, name='tools_run_detail'),
 
     # Django admin (fallback)
     path('admin/', admin.site.urls),
