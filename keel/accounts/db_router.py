@@ -14,7 +14,7 @@ Usage in product settings.py:
     DATABASE_ROUTERS = ['keel.accounts.db_router.KeelAccountsRouter']
 """
 
-KEEL_APP_LABELS = {'keel_accounts', 'auth', 'contenttypes', 'sessions'}
+KEEL_APP_LABELS = {'keel_accounts', 'keel_requests', 'auth', 'contenttypes', 'sessions'}
 
 
 class KeelAccountsRouter:

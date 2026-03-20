@@ -1,0 +1,79 @@
+{% if is_authenticated %}
+<!-- Feedback button -->
+<button type="button" class="btn btn-primary rounded-circle shadow-lg position-fixed"
+        style="bottom: 1.5rem; right: 1.5rem; width: 3rem; height: 3rem; z-index: 1050;"
+        data-bs-toggle="modal" data-bs-target="#feedbackModal"
+        title="Submit feedback or request a change">
+  <i class="bi bi-chat-dots"></i>
+</button>
+
+<!-- Feedback modal -->
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'keel_requests:submit_request' %}">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product }}">
+        <input type="hidden" name="page_url" id="feedbackPageUrl" value="">
+
+        <div class="modal-header">
+          <h5 class="modal-title" id="feedbackModalLabel">
+            <i class="bi bi-chat-dots me-2"></i>Submit Feedback
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" name="title" class="form-control" required
+                   placeholder="Brief summary of your request">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea name="description" class="form-control" rows="4" required
+                      placeholder="Describe what you'd like changed, added, or fixed. Be as specific as possible."></textarea>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Category</label>
+              <select name="category" class="form-select">
+                <option value="feature">Feature Request</option>
+                <option value="bug">Bug Report</option>
+                <option value="ui">UI/UX Improvement</option>
+                <option value="data">Data/Report Request</option>
+                <option value="workflow">Workflow Change</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Priority</label>
+              <select name="priority" class="form-select">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send me-1"></i>Submit
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('feedbackModal').addEventListener('show.bs.modal', function() {
+  document.getElementById('feedbackPageUrl').value = window.location.pathname;
+});
+</script>
+{% endif %}

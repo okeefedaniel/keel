@@ -1,0 +1,205 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}{{ cr.title }} — Keel Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  .prompt-box {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .prompt-box h1, .prompt-box h2 { color: #7eb8ff; font-size: 1rem; }
+  .prompt-box strong { color: #fff; }
+  .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'keel_requests:dashboard' %}">Change Requests</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'keel_requests:request_list' %}">All</a></li>
+      <li class="breadcrumb-item active">{{ cr.title|truncatechars:40 }}</li>
+    </ol>
+  </nav>
+
+  <div class="row">
+    <!-- Request details -->
+    <div class="col-md-{% if prompt %}6{% else %}8{% endif %}">
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>{{ cr.title }}</strong>
+          {% if cr.status == "pending" %}<span class="badge bg-warning text-dark">Pending</span>
+          {% elif cr.status == "approved" %}<span class="badge bg-success">Approved</span>
+          {% elif cr.status == "declined" %}<span class="badge bg-secondary">Declined</span>
+          {% elif cr.status == "implementing" %}<span class="badge bg-info">Implementing</span>
+          {% elif cr.status == "implemented" %}<span class="badge bg-primary">Implemented</span>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <dl>
+            <dt>Product</dt>
+            <dd><code>{{ cr.product }}</code></dd>
+            <dt>Category</dt>
+            <dd>{{ cr.get_category_display }}</dd>
+            <dt>Priority</dt>
+            <dd>
+              {% if cr.priority == "critical" %}<span class="text-danger fw-bold">{{ cr.get_priority_display }}</span>
+              {% elif cr.priority == "high" %}<span class="text-warning fw-bold">{{ cr.get_priority_display }}</span>
+              {% else %}{{ cr.get_priority_display }}
+              {% endif %}
+            </dd>
+            <dt>Submitted By</dt>
+            <dd>{{ cr.submitted_by_name|default:"Unknown" }} ({{ cr.submitted_by_email|default:"-" }})</dd>
+            <dt>Submitted</dt>
+            <dd>{{ cr.created_at|date:"M d, Y H:i" }}</dd>
+            {% if cr.page_url %}
+            <dt>Related Page</dt>
+            <dd><code>{{ cr.page_url }}</code></dd>
+            {% endif %}
+          </dl>
+
+          <hr>
+          <h6>Description</h6>
+          <div class="bg-light rounded p-3">{{ cr.description|linebreaks }}</div>
+
+          {% if cr.admin_notes %}
+          <hr>
+          <h6>Admin Notes</h6>
+          <div class="bg-light rounded p-3">{{ cr.admin_notes|linebreaks }}</div>
+          {% endif %}
+
+          {% if cr.decline_reason %}
+          <hr>
+          <h6>Decline Reason</h6>
+          <div class="bg-light rounded p-3 text-muted">{{ cr.decline_reason|linebreaks }}</div>
+          {% endif %}
+
+          {% if cr.implementation_notes %}
+          <hr>
+          <h6>Implementation Notes</h6>
+          <div class="bg-light rounded p-3">{{ cr.implementation_notes|linebreaks }}</div>
+          {% endif %}
+
+          {% if cr.reviewed_by %}
+          <hr>
+          <small class="text-muted">
+            Reviewed by {{ cr.reviewed_by }} on {{ cr.reviewed_at|date:"M d, Y H:i" }}
+          </small>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Action forms -->
+      {% if cr.status == "pending" %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card border-success">
+            <div class="card-header bg-success text-white"><strong>Approve</strong></div>
+            <div class="card-body">
+              <form method="post" action="{% url 'keel_requests:approve_request' request_id=cr.pk %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label">Implementation guidance (optional)</label>
+                  <textarea name="admin_notes" class="form-control" rows="3"
+                            placeholder="Scope constraints, approach, or specific instructions for Claude Code..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-success w-100">
+                  <i class="bi bi-check-lg me-1"></i>Approve
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-secondary">
+            <div class="card-header"><strong>Decline</strong></div>
+            <div class="card-body">
+              <form method="post" action="{% url 'keel_requests:decline_request' request_id=cr.pk %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label">Reason (optional)</label>
+                  <textarea name="decline_reason" class="form-control" rows="3"
+                            placeholder="Why this request won't be implemented..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-outline-secondary w-100">
+                  <i class="bi bi-x-lg me-1"></i>Decline
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if cr.status == "approved" or cr.status == "implementing" %}
+      <div class="card border-primary">
+        <div class="card-header"><strong>Mark as Implemented</strong></div>
+        <div class="card-body">
+          <form method="post" action="{% url 'keel_requests:mark_implemented' request_id=cr.pk %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">Implementation notes (optional)</label>
+              <textarea name="implementation_notes" class="form-control" rows="2"
+                        placeholder="What was changed, commit hash, etc."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-check-circle me-1"></i>Mark Implemented
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Claude Code prompt -->
+    {% if prompt %}
+    <div class="col-md-6">
+      <div class="card border-primary sticky-top" style="top: 1rem;">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-terminal me-1"></i>Claude Code Prompt</strong>
+          <button class="btn btn-sm btn-light copy-prompt-btn" onclick="copyPrompt()">
+            <i class="bi bi-clipboard me-1"></i>Copy
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <div class="prompt-box" id="promptText">{{ prompt }}</div>
+        </div>
+        <div class="card-footer text-center">
+          <small class="text-muted">
+            Paste this into Claude Code in the <code>{{ cr.product }}</code> project directory
+          </small>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyPrompt() {
+  const text = document.getElementById('promptText').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-prompt-btn');
+    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Copied!';
+    btn.classList.replace('btn-light', 'btn-success');
+    setTimeout(() => {
+      btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
+      btn.classList.replace('btn-success', 'btn-light');
+    }, 2000);
+  });
+}
+</script>
+{% endblock %}
