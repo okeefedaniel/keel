@@ -1,4 +1,5 @@
 {% extends base_template|default:"base.html" %}
+{% load json_script from django.utils.html %}
 
 {% block title %}Invitations — Keel Admin{% endblock %}
 
@@ -10,21 +11,27 @@
   <div class="card mb-4">
     <div class="card-header"><strong>Send Invitation</strong></div>
     <div class="card-body">
-      <form method="post" action="{% url 'keel_accounts:send_invitation' %}" class="row g-2">
+      <form method="post" action="{% url 'keel_accounts:send_invitation' %}" class="row g-2 align-items-end">
         {% csrf_token %}
         <div class="col-md-3">
-          <input type="email" name="email" class="form-control" placeholder="Email address" required>
+          <label class="form-label small text-muted">Email</label>
+          <input type="email" name="email" class="form-control" placeholder="user@example.com" required>
         </div>
         <div class="col-md-3">
-          <select name="product" class="form-select" required>
+          <label class="form-label small text-muted">Product</label>
+          <select name="product" id="inv-product" class="form-select" required>
             <option value="">Select product...</option>
+            <option value="all">All Products (Full Suite)</option>
             {% for value, label in products %}
             <option value="{{ value }}">{{ label }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="col-md-3">
-          <input type="text" name="role" class="form-control" placeholder="Role (e.g. admin)" required>
+          <label class="form-label small text-muted">Role</label>
+          <select name="role" id="inv-role" class="form-select" required>
+            <option value="">Select product first...</option>
+          </select>
         </div>
         <div class="col-md-3">
           <button type="submit" class="btn btn-primary w-100">
@@ -68,7 +75,7 @@
           {% for inv in invitations %}
           <tr>
             <td>{{ inv.email }}</td>
-            <td><strong>{{ inv.product }}</strong></td>
+            <td><strong class="text-capitalize">{{ inv.product }}</strong></td>
             <td><code>{{ inv.role }}</code></td>
             <td>
               {% if inv.status == "pending" %}
@@ -103,4 +110,36 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const PRODUCT_ROLES = {{ product_roles_json|safe }};
+
+  const productSelect = document.getElementById('inv-product');
+  const roleSelect = document.getElementById('inv-role');
+
+  function updateRoles() {
+    const product = productSelect.value;
+    roleSelect.innerHTML = '';
+
+    if (!product) {
+      roleSelect.innerHTML = '<option value="">Select product first...</option>';
+      return;
+    }
+
+    const roles = PRODUCT_ROLES[product] || [['admin', 'Admin']];
+    roleSelect.innerHTML = '<option value="">Select role...</option>';
+    roles.forEach(function(r) {
+      const opt = document.createElement('option');
+      opt.value = r[0];
+      opt.textContent = r[1];
+      roleSelect.appendChild(opt);
+    });
+  }
+
+  productSelect.addEventListener('change', updateRoles);
+})();
+</script>
 {% endblock %}

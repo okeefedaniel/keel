@@ -107,10 +107,11 @@
       <div class="card">
         <div class="card-header"><strong>Grant Product Access</strong></div>
         <div class="card-body">
-          <form method="post" action="{% url 'keel_accounts:grant_access' user_id=target_user.pk %}" class="row g-2">
+          <form method="post" action="{% url 'keel_accounts:grant_access' user_id=target_user.pk %}" class="row g-2 align-items-end">
             {% csrf_token %}
             <div class="col-md-4">
-              <select name="product" class="form-select" required>
+              <label class="form-label small text-muted">Product</label>
+              <select name="product" id="grant-product" class="form-select" required>
                 <option value="">Select product...</option>
                 {% for value, label in products %}
                 <option value="{{ value }}">{{ label }}</option>
@@ -118,7 +119,10 @@
               </select>
             </div>
             <div class="col-md-4">
-              <input type="text" name="role" class="form-control" placeholder="Role (e.g. admin, analyst)" required>
+              <label class="form-label small text-muted">Role</label>
+              <select name="role" id="grant-role" class="form-select" required>
+                <option value="">Select product first...</option>
+              </select>
             </div>
             <div class="col-md-4">
               <button type="submit" class="btn btn-primary w-100">Grant Access</button>
@@ -129,4 +133,36 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const PRODUCT_ROLES = {{ product_roles_json|safe }};
+
+  const productSelect = document.getElementById('grant-product');
+  const roleSelect = document.getElementById('grant-role');
+
+  function updateRoles() {
+    const product = productSelect.value;
+    roleSelect.innerHTML = '';
+
+    if (!product) {
+      roleSelect.innerHTML = '<option value="">Select product first...</option>';
+      return;
+    }
+
+    const roles = PRODUCT_ROLES[product] || [['admin', 'Admin']];
+    roleSelect.innerHTML = '<option value="">Select role...</option>';
+    roles.forEach(function(r) {
+      const opt = document.createElement('option');
+      opt.value = r[0];
+      opt.textContent = r[1];
+      roleSelect.appendChild(opt);
+    });
+  }
+
+  productSelect.addEventListener('change', updateRoles);
+})();
+</script>
 {% endblock %}

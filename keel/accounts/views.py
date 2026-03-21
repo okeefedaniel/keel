@@ -8,6 +8,7 @@ product's urls.py:
         path('accounts/', include(accounts_urls)),
     ]
 """
+import json
 import logging
 from datetime import timedelta
 
@@ -22,7 +23,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Agency, Invitation, KeelUser, ProductAccess, get_product_choices
+from .models import (
+    Agency, Invitation, KeelUser, ProductAccess,
+    get_product_choices, get_product_roles,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +99,7 @@ def user_list(request):
         ).values_list('user_id', flat=True)
         users = users.filter(id__in=user_ids)
 
-    users = users.annotate(
+    users = users.prefetch_related('product_access').annotate(
         product_count=Count('product_access', filter=Q(product_access__is_active=True))
     ).order_by('last_name', 'first_name')
 
@@ -114,10 +118,13 @@ def user_detail(request, user_id):
     target_user = get_object_or_404(KeelUser, pk=user_id)
     access_list = target_user.product_access.all().order_by('product')
 
+    all_roles = get_product_roles()
     context = {
         'target_user': target_user,
         'access_list': access_list,
         'products': get_product_choices(),
+        'product_roles': all_roles,
+        'product_roles_json': json.dumps(all_roles),
     }
     return render(request, 'accounts/user_detail.html', context)
 
@@ -185,10 +192,14 @@ def invitation_list(request):
     if status:
         invitations = invitations.filter(status=status)
 
+    all_roles = get_product_roles()
+    all_roles['all'] = get_product_roles('all')
     context = {
         'invitations': invitations.order_by('-created_at')[:100],
         'selected_status': status,
         'products': get_product_choices(),
+        'product_roles': all_roles,
+        'product_roles_json': json.dumps(all_roles),
     }
     return render(request, 'accounts/invitation_list.html', context)
 
@@ -205,34 +216,55 @@ def send_invitation(request):
         messages.error(request, 'Email, product, and role are required.')
         return redirect('keel_accounts:invitation_list')
 
-    # Check for existing pending invitation
-    existing = Invitation.objects.filter(
-        email=email, product=product, status='pending',
-    ).first()
-    if existing:
-        messages.warning(
-            request, f'A pending invitation already exists for {email} → {product}.',
-        )
-        return redirect('keel_accounts:invitation_list')
-
     days = getattr(settings, 'KEEL_INVITATION_EXPIRY_DAYS', 7)
-    invitation = Invitation.objects.create(
-        email=email,
-        product=product,
-        role=role,
-        invited_by=request.user,
-        expires_at=timezone.now() + timedelta(days=days),
-    )
+    expires_at = timezone.now() + timedelta(days=days)
 
-    # TODO: Send email with invitation link
-    # For now, show the link in the success message
-    invite_url = request.build_absolute_uri(f'/invite/{invitation.token}/')
-    messages.success(
-        request,
-        f'Invitation created for {email} → {product} ({role}). '
-        f'Share this link: {invite_url}',
-    )
-    logger.info('Admin %s created invitation: %s', request.user, invitation)
+    # "all" = invite to every product in the suite
+    if product == 'all':
+        products_to_invite = [
+            code for code, _ in get_product_choices() if code != 'keel'
+        ]
+    else:
+        products_to_invite = [product]
+
+    created_invitations = []
+    skipped = []
+    for prod in products_to_invite:
+        existing = Invitation.objects.filter(
+            email=email, product=prod, status='pending',
+        ).first()
+        if existing:
+            skipped.append(prod)
+            continue
+
+        inv = Invitation.objects.create(
+            email=email,
+            product=prod,
+            role=role,
+            invited_by=request.user,
+            expires_at=expires_at,
+        )
+        created_invitations.append(inv)
+
+    if skipped:
+        messages.warning(
+            request,
+            f'Pending invitation already exists for {email} → {", ".join(skipped)}.',
+        )
+
+    if created_invitations:
+        # Use the first invitation's token for the link
+        invite_url = request.build_absolute_uri(
+            f'/invite/{created_invitations[0].token}/'
+        )
+        product_names = ', '.join(inv.product for inv in created_invitations)
+        messages.success(
+            request,
+            f'Invitation created for {email} → {product_names} ({role}). '
+            f'Share this link: {invite_url}',
+        )
+        logger.info('Admin %s created invitation(s): %s', request.user, created_invitations)
+
     return redirect('keel_accounts:invitation_list')
 
 

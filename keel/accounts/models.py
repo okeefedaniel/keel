@@ -25,9 +25,48 @@ class Product(models.TextChoices):
     Extend via KEEL_EXTRA_PRODUCTS in settings:
         KEEL_EXTRA_PRODUCTS = [('my_app', 'My App')]
     """
-    BEACON = 'beacon', _('Beacon')
-    HARBOR = 'harbor', _('Harbor')
-    LOOKOUT = 'lookout', _('Lookout')
+    BEACON = 'beacon', _('Beacon CRM')
+    HARBOR = 'harbor', _('Harbor Grants')
+    LOOKOUT = 'lookout', _('Lookout Legislative')
+    KEEL = 'keel', _('Keel Admin')
+
+
+# ---------------------------------------------------------------------------
+# Product → Role registry
+# ---------------------------------------------------------------------------
+PRODUCT_ROLES = {
+    'beacon': [
+        ('system_admin', 'System Administrator'),
+        ('agency_admin', 'Agency Administrator'),
+        ('relationship_manager', 'Relationship Manager'),
+        ('foia_officer', 'FOIA Officer'),
+        ('foia_attorney', 'FOIA Attorney'),
+        ('analyst', 'Analyst'),
+        ('executive', 'Executive (Read-Only)'),
+        ('quasi_admin', 'Quasi Administrator'),
+        ('quasi_relationship_manager', 'Quasi Relationship Manager'),
+        ('quasi_analyst', 'Quasi Analyst'),
+    ],
+    'harbor': [
+        ('system_admin', 'System Administrator'),
+        ('agency_admin', 'Agency Administrator'),
+        ('program_officer', 'Program Officer'),
+        ('fiscal_officer', 'Fiscal Officer'),
+        ('federal_fund_coordinator', 'Federal Fund Coordinator'),
+        ('reviewer', 'Reviewer'),
+        ('applicant', 'Applicant'),
+        ('auditor', 'Auditor'),
+    ],
+    'lookout': [
+        ('admin', 'Admin'),
+        ('legislative_aid', 'Legislative Aid'),
+        ('stakeholder', 'Stakeholder'),
+    ],
+    'keel': [
+        ('admin', 'Admin'),
+        ('system_admin', 'System Administrator'),
+    ],
+}
 
 
 def get_product_choices():
@@ -36,6 +75,26 @@ def get_product_choices():
     extras = getattr(settings, 'KEEL_EXTRA_PRODUCTS', [])
     choices.extend(extras)
     return choices
+
+
+def get_product_roles(product=None):
+    """Return role choices for a product, or all roles keyed by product.
+
+    If product is None, returns the full PRODUCT_ROLES dict.
+    If product is 'all', returns a merged list of common roles.
+    """
+    extras = getattr(settings, 'KEEL_EXTRA_PRODUCT_ROLES', {})
+    all_roles = {**PRODUCT_ROLES, **extras}
+
+    if product is None:
+        return all_roles
+    if product == 'all':
+        # For suite-wide invitations, offer roles common across products
+        return [
+            ('admin', 'Admin'),
+            ('system_admin', 'System Administrator'),
+        ]
+    return all_roles.get(product, [('admin', 'Admin')])
 
 
 # ---------------------------------------------------------------------------

@@ -52,8 +52,16 @@
             </td>
             <td>{{ u.email }}</td>
             <td>{{ u.agency.abbreviation|default:"-" }}</td>
-            <td class="text-center">
-              <span class="badge bg-secondary">{{ u.product_count }}</span>
+            <td>
+              {% for access in u.product_access.all %}
+                {% if access.is_active %}
+                <span class="badge {% if access.product == 'beacon' %}bg-primary{% elif access.product == 'harbor' %}bg-success{% elif access.product == 'lookout' %}bg-info{% elif access.product == 'keel' %}bg-dark{% else %}bg-secondary{% endif %} me-1">
+                  {{ access.product }}
+                </span>
+                {% endif %}
+              {% empty %}
+              <span class="text-muted">—</span>
+              {% endfor %}
             </td>
             <td>
               {% if u.is_state_user %}
