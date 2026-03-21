@@ -4,19 +4,20 @@ from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from . import tools
+from . import dashboard, tools
 
 
 def home(request):
     if request.user.is_authenticated:
-        return redirect('keel_requests:dashboard')
+        return redirect('platform_dashboard')
     return redirect('login')
 
 
 urlpatterns = [
-    # Home redirects to requests dashboard
+    # Home → platform dashboard
     path('', home, name='home'),
-    path('dashboard/', home, name='dashboard'),
+    path('dashboard/', dashboard.platform_dashboard, name='platform_dashboard'),
+    path('api/activity/', dashboard.activity_feed_api, name='activity_feed_api'),
 
     # Auth
     path('accounts/login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),

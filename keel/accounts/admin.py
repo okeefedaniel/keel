@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Agency, Invitation, KeelUser, ProductAccess
+from .models import Agency, AuditLog, Invitation, KeelUser, ProductAccess
 
 
 class ProductAccessInline(admin.TabularInline):
@@ -49,3 +49,25 @@ class InvitationAdmin(admin.ModelAdmin):
     search_fields = ('email',)
     raw_id_fields = ('invited_by', 'accepted_by')
     readonly_fields = ('token',)
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('timestamp', 'user', 'action', 'entity_type', 'product', 'ip_address')
+    list_filter = ('action', 'product', 'entity_type')
+    search_fields = ('description', 'user__email', 'user__username', 'entity_id')
+    raw_id_fields = ('user',)
+    readonly_fields = (
+        'id', 'user', 'action', 'entity_type', 'entity_id',
+        'description', 'changes', 'ip_address', 'product', 'timestamp',
+    )
+    date_hierarchy = 'timestamp'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Platform Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h4 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">
+        <i class="bi bi-speedometer2 me-2"></i>Platform Dashboard
+      </h4>
+      <p class="text-muted small mb-0">Across all DockLabs products</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'keel_requests:dashboard' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-chat-dots me-1"></i>Requests
+      </a>
+      <a href="{% url 'tools_dashboard' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-wrench-adjustable me-1"></i>Tools
+      </a>
+    </div>
+  </div>
+
+  <!-- Top stat cards -->
+  <div class="row g-3 mb-4">
+    <!-- Users -->
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <p class="text-muted small mb-1">Total Users</p>
+              <h3 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">{{ total_users }}</h3>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width: 42px; height: 42px; background: var(--ct-pale-blue);">
+              <i class="bi bi-people" style="color: var(--ct-dark-blue); font-size: 1.2rem;"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <span class="badge bg-success-subtle text-success me-1">{{ active_today }} today</span>
+            <span class="badge bg-primary-subtle text-primary">+{{ new_this_week }} this week</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending requests -->
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <p class="text-muted small mb-1">Pending Requests</p>
+              <h3 class="fw-bold mb-0" style="color: {% if pending_requests %}var(--ct-orange){% else %}var(--ct-dark-blue){% endif %};">
+                {{ pending_requests }}
+              </h3>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width: 42px; height: 42px; background: #fff3e0;">
+              <i class="bi bi-chat-left-dots" style="color: var(--ct-orange, #e65100); font-size: 1.2rem;"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <span class="badge bg-info-subtle text-info me-1">{{ approved_requests }} approved</span>
+            <span class="badge bg-success-subtle text-success">{{ implemented_this_month }} done/mo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security -->
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <p class="text-muted small mb-1">Security Events</p>
+              <h3 class="fw-bold mb-0" style="color: {% if security_events %}var(--ct-red, #c62828){% else %}var(--ct-green, #2e7d32){% endif %};">
+                {{ security_events }}
+              </h3>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width: 42px; height: 42px; background: {% if security_events %}#ffebee{% else %}#e8f5e9{% endif %};">
+              <i class="bi bi-shield-{% if security_events %}exclamation{% else %}check{% endif %}"
+                 style="color: {% if security_events %}var(--ct-red, #c62828){% else %}var(--ct-green, #2e7d32){% endif %}; font-size: 1.2rem;"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <span class="badge bg-{% if failed_logins_today %}warning{% else %}success-subtle text-success{% endif %}">
+              {{ failed_logins_today }} failed logins today
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invitations -->
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <p class="text-muted small mb-1">Open Invitations</p>
+              <h3 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">{{ pending_invitations }}</h3>
+            </div>
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width: 42px; height: 42px; background: var(--ct-pale-blue);">
+              <i class="bi bi-envelope-paper" style="color: var(--ct-dark-blue); font-size: 1.2rem;"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <a href="{% url 'keel_accounts:invitation_list' %}" class="text-decoration-none small">
+              Manage invitations <i class="bi bi-arrow-right"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Left column: Activity Feed -->
+    <div class="col-lg-8">
+
+      <!-- Login chart -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3">
+            <i class="bi bi-graph-up me-1"></i>Active Users (Last 7 Days)
+          </h6>
+          <div class="d-flex align-items-end gap-2" style="height: 120px;">
+            {% for day in login_by_day %}
+            <div class="flex-fill text-center">
+              <div class="d-flex flex-column align-items-center justify-content-end" style="height: 100px;">
+                <small class="text-muted mb-1">{{ day.count }}</small>
+                <div class="rounded-top w-100"
+                     style="background: var(--ct-dark-blue); min-height: 4px;
+                            height: {% widthratio day.count 1 10 %}px; max-height: 90px;
+                            opacity: {% if forloop.last %}1{% else %}0.7{% endif %};">
+                </div>
+              </div>
+              <small class="text-muted" style="font-size: 0.7rem;">{{ day.date }}</small>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity feed -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+          <h6 class="fw-bold mb-0">
+            <i class="bi bi-activity me-1"></i>Activity Feed
+          </h6>
+          <div class="d-flex gap-2">
+            <select id="feed-filter-product" class="form-select form-select-sm" style="width: auto; font-size: 0.8rem;">
+              <option value="">All Products</option>
+              <option value="beacon">Beacon</option>
+              <option value="harbor">Harbor</option>
+              <option value="lookout">Lookout</option>
+              <option value="keel">Keel</option>
+            </select>
+            <select id="feed-filter-action" class="form-select form-select-sm" style="width: auto; font-size: 0.8rem;">
+              <option value="">All Actions</option>
+              <option value="login">Logins</option>
+              <option value="create">Creates</option>
+              <option value="update">Updates</option>
+              <option value="submit">Submissions</option>
+              <option value="approve">Approvals</option>
+              <option value="export">Exports</option>
+              <option value="security_event">Security</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+          <div class="list-group list-group-flush" id="activity-feed">
+            {% for log in recent_activity %}
+            <div class="list-group-item px-3 py-2 border-0 border-bottom">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="d-flex align-items-start">
+                  <span class="me-2 mt-1">
+                    {% if log.action == 'login' %}
+                      <i class="bi bi-box-arrow-in-right text-success"></i>
+                    {% elif log.action == 'create' %}
+                      <i class="bi bi-plus-circle text-primary"></i>
+                    {% elif log.action == 'update' %}
+                      <i class="bi bi-pencil text-info"></i>
+                    {% elif log.action == 'delete' %}
+                      <i class="bi bi-trash text-danger"></i>
+                    {% elif log.action == 'submit' %}
+                      <i class="bi bi-send text-primary"></i>
+                    {% elif log.action == 'approve' %}
+                      <i class="bi bi-check-circle text-success"></i>
+                    {% elif log.action == 'reject' %}
+                      <i class="bi bi-x-circle text-danger"></i>
+                    {% elif log.action == 'export' %}
+                      <i class="bi bi-download text-secondary"></i>
+                    {% elif log.action == 'login_failed' %}
+                      <i class="bi bi-exclamation-triangle text-warning"></i>
+                    {% elif log.action == 'security_event' %}
+                      <i class="bi bi-shield-exclamation text-danger"></i>
+                    {% else %}
+                      <i class="bi bi-circle text-muted"></i>
+                    {% endif %}
+                  </span>
+                  <div>
+                    <span class="small">
+                      <strong>{{ log.user|default:"System" }}</strong>
+                      <span class="text-muted">{{ log.get_action_display|lower }}d</span>
+                      <span>{{ log.entity_type }}</span>
+                    </span>
+                    {% if log.description %}
+                    <div class="text-muted" style="font-size: 0.75rem;">{{ log.description|truncatewords:20 }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="text-end" style="min-width: 80px;">
+                  {% if log.product %}
+                  <span class="badge bg-light text-dark" style="font-size: 0.65rem;">{{ log.product }}</span>
+                  {% endif %}
+                  <div class="text-muted" style="font-size: 0.7rem;">{{ log.timestamp|timesince }} ago</div>
+                </div>
+              </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted py-5">
+              <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+              <p class="mt-2">No activity recorded yet.</p>
+              <p class="small">Activity will appear here as users interact with DockLabs products.</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Product breakdown + quick actions -->
+    <div class="col-lg-4">
+
+      <!-- Products -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3">
+            <i class="bi bi-grid me-1"></i>Products
+          </h6>
+          {% for stat in product_stats %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex align-items-center">
+              <span class="me-2">
+                {% if stat.product == 'beacon' %}
+                  <i class="bi bi-broadcast text-primary"></i>
+                {% elif stat.product == 'harbor' %}
+                  <i class="bi bi-bank2 text-success"></i>
+                {% elif stat.product == 'lookout' %}
+                  <i class="bi bi-binoculars text-info"></i>
+                {% else %}
+                  <i class="bi bi-box text-secondary"></i>
+                {% endif %}
+              </span>
+              <span class="text-capitalize">{{ stat.product }}</span>
+            </div>
+            <span class="badge bg-primary-subtle text-primary">{{ stat.user_count }} users</span>
+          </div>
+          {% empty %}
+          <p class="text-muted small mb-0">No product access records yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Actions by type -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3">
+            <i class="bi bi-pie-chart me-1"></i>Actions This Week
+          </h6>
+          {% for ac in action_counts %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small text-capitalize">{{ ac.action|cut:"_" }}</span>
+            <div class="d-flex align-items-center">
+              <div class="bg-primary rounded-pill me-2" style="height: 6px; width: {% widthratio ac.count action_counts.0.count 80 %}px; opacity: 0.7;"></div>
+              <span class="text-muted small" style="min-width: 30px; text-align: right;">{{ ac.count }}</span>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-muted small mb-0">No activity this week.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3">
+            <i class="bi bi-lightning me-1"></i>Quick Actions
+          </h6>
+          <div class="d-grid gap-2">
+            <a href="{% url 'keel_requests:request_list' %}?status=pending" class="btn btn-outline-primary btn-sm text-start">
+              <i class="bi bi-chat-left-dots me-2"></i>Review Pending Requests
+              {% if pending_requests %}
+              <span class="badge bg-warning text-dark float-end">{{ pending_requests }}</span>
+              {% endif %}
+            </a>
+            <a href="{% url 'keel_accounts:user_list' %}" class="btn btn-outline-primary btn-sm text-start">
+              <i class="bi bi-people me-2"></i>Manage Users
+            </a>
+            <a href="{% url 'keel_accounts:invitation_list' %}" class="btn btn-outline-primary btn-sm text-start">
+              <i class="bi bi-envelope-paper me-2"></i>Send Invitation
+            </a>
+            <a href="{% url 'tools_dashboard' %}" class="btn btn-outline-primary btn-sm text-start">
+              <i class="bi bi-wrench-adjustable me-2"></i>Run Tests / Audit
+            </a>
+            <a href="{% url 'admin:index' %}" class="btn btn-outline-secondary btn-sm text-start">
+              <i class="bi bi-gear me-2"></i>Django Admin
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh activity feed every 30 seconds
+(function() {
+  const feed = document.getElementById('activity-feed');
+  const filterProduct = document.getElementById('feed-filter-product');
+  const filterAction = document.getElementById('feed-filter-action');
+
+  async function refreshFeed() {
+    const params = new URLSearchParams();
+    if (filterProduct.value) params.set('product', filterProduct.value);
+    if (filterAction.value) params.set('action', filterAction.value);
+
+    try {
+      const resp = await fetch('{% url "activity_feed_api" %}?' + params.toString());
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      if (!data.entries.length) {
+        feed.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size: 2rem;"></i><p class="mt-2">No matching activity.</p></div>';
+        return;
+      }
+
+      const icons = {
+        login: '<i class="bi bi-box-arrow-in-right text-success"></i>',
+        create: '<i class="bi bi-plus-circle text-primary"></i>',
+        update: '<i class="bi bi-pencil text-info"></i>',
+        'delete': '<i class="bi bi-trash text-danger"></i>',
+        submit: '<i class="bi bi-send text-primary"></i>',
+        approve: '<i class="bi bi-check-circle text-success"></i>',
+        reject: '<i class="bi bi-x-circle text-danger"></i>',
+        export: '<i class="bi bi-download text-secondary"></i>',
+        login_failed: '<i class="bi bi-exclamation-triangle text-warning"></i>',
+        security_event: '<i class="bi bi-shield-exclamation text-danger"></i>',
+      };
+
+      feed.innerHTML = data.entries.map(e => {
+        const icon = icons[e.action] || '<i class="bi bi-circle text-muted"></i>';
+        const ago = timeSince(new Date(e.timestamp));
+        const desc = e.description ? `<div class="text-muted" style="font-size: 0.75rem;">${truncate(e.description, 60)}</div>` : '';
+        const product = e.product ? `<span class="badge bg-light text-dark" style="font-size: 0.65rem;">${e.product}</span>` : '';
+        return `<div class="list-group-item px-3 py-2 border-0 border-bottom">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex align-items-start">
+              <span class="me-2 mt-1">${icon}</span>
+              <div>
+                <span class="small"><strong>${e.user}</strong> <span class="text-muted">${e.action_display.toLowerCase()}d</span> ${e.entity_type}</span>
+                ${desc}
+              </div>
+            </div>
+            <div class="text-end" style="min-width: 80px;">
+              ${product}
+              <div class="text-muted" style="font-size: 0.7rem;">${ago} ago</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch (err) {
+      console.warn('Feed refresh failed:', err);
+    }
+  }
+
+  function timeSince(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return seconds + 's';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
+    return Math.floor(seconds / 86400) + 'd';
+  }
+
+  function truncate(str, len) {
+    return str.length > len ? str.substring(0, len) + '...' : str;
+  }
+
+  filterProduct.addEventListener('change', refreshFeed);
+  filterAction.addEventListener('change', refreshFeed);
+
+  // Auto-refresh every 30 seconds
+  setInterval(refreshFeed, 30000);
+})();
+</script>
+{% endblock %}

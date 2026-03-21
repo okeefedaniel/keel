@@ -294,3 +294,60 @@ class Invitation(models.Model):
         if self.status == self.Status.PENDING:
             self.status = self.Status.REVOKED
             self.save(update_fields=['status'])
+
+
+# ---------------------------------------------------------------------------
+# AuditLog — concrete audit log for the Keel admin console
+# ---------------------------------------------------------------------------
+class AuditLog(models.Model):
+    """Concrete audit log for the Keel site.
+
+    Products that subclass AbstractAuditLog have their own tables.
+    This one aggregates platform-level events (logins, admin actions,
+    change requests, etc.) and can also ingest events from products
+    via the API or management commands.
+    """
+
+    class Action(models.TextChoices):
+        CREATE = 'create', _('Create')
+        UPDATE = 'update', _('Update')
+        DELETE = 'delete', _('Delete')
+        STATUS_CHANGE = 'status_change', _('Status Change')
+        SUBMIT = 'submit', _('Submit')
+        APPROVE = 'approve', _('Approve')
+        REJECT = 'reject', _('Reject')
+        LOGIN = 'login', _('Login')
+        EXPORT = 'export', _('Export')
+        VIEW = 'view', _('View')
+        LOGIN_FAILED = 'login_failed', _('Login Failed')
+        SECURITY_EVENT = 'security_event', _('Security Event')
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        KeelUser, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='audit_logs',
+    )
+    action = models.CharField(max_length=25, choices=Action.choices)
+    entity_type = models.CharField(max_length=100)
+    entity_id = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    changes = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    product = models.CharField(max_length=50, blank=True, db_index=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'keel_audit_log'
+        ordering = ['-timestamp']
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValueError('Audit log records are immutable.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError('Audit log records cannot be deleted.')
+
+    def __str__(self):
+        user_display = self.user if self.user else 'System'
+        return f"{user_display} - {self.get_action_display()} - {self.entity_type} ({self.timestamp:%Y-%m-%d %H:%M})"

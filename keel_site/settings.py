@@ -158,7 +158,7 @@ KEEL_PRODUCT_NAME = 'keel'
 KEEL_GATE_ACCESS = False  # Keel admin console doesn't gate itself
 DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
 DEMO_ROLES = ['admin']
-KEEL_AUDIT_LOG_MODEL = 'keel_accounts.KeelUser'  # placeholder; override if using audit
+KEEL_AUDIT_LOG_MODEL = 'keel_accounts.AuditLog'
 
 # ---------------------------------------------------------------------------
 # Security (production)
