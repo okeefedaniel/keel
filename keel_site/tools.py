@@ -5,6 +5,7 @@ On Railway (production), the test/audit code runs inside the container.
 Locally, it runs against the local repos.
 """
 import json
+import os
 import subprocess
 import sys
 import uuid
@@ -58,7 +59,34 @@ def tools_dashboard(request):
 @require_POST
 def run_tool(request):
     """Launch a test/audit run. Returns a run ID to poll for results."""
+    # These tools require access to the product repos on the filesystem.
+    # On Railway, only the keel repo is available.
+    is_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
     tool = request.POST.get('tool', 'full')
+
+    # Security audit + compliance check can run on Railway (no repo scanning needed)
+    repo_tools = {'ui-audit', 'smoke', 'unit', 'full'}
+    if is_railway and tool in repo_tools:
+        return JsonResponse({
+            'id': str(uuid.uuid4())[:8],
+            'tool': tool,
+            'products': ['all'],
+            'status': 'error',
+            'started_at': datetime.now().isoformat(),
+            'finished_at': datetime.now().isoformat(),
+            'output': (
+                'This tool requires access to the product source code '
+                '(beacon, harbor, lookout repos) which are not available on Railway.\n\n'
+                'Run it locally instead:\n'
+                '  cd ~/SynologyDrive/Work/CT/Web/keel\n'
+                '  source .venv/bin/activate\n'
+                f'  python -m keel.testing --{"ui-only" if tool == "ui-audit" else tool}'
+            ),
+            'report': None,
+            'exit_code': 1,
+            'started_by': str(request.user),
+        })
+
     products = request.POST.getlist('products')
 
     cmd = [PYTHON, '-m', 'keel.testing', '--json']
