@@ -160,6 +160,12 @@ DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
 DEMO_ROLES = ['admin']
 KEEL_AUDIT_LOG_MODEL = 'keel_accounts.AuditLog'
 
+# SMS via Twilio (set env vars on Railway to enable)
+KEEL_SMS_BACKEND = os.environ.get('KEEL_SMS_BACKEND', None)  # Set to 'twilio' to enable
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_FROM_NUMBER = os.environ.get('TWILIO_FROM_NUMBER', '')
+
 # ---------------------------------------------------------------------------
 # Security (production)
 # ---------------------------------------------------------------------------

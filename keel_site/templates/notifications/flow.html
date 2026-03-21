@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Notification Flow — Keel Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h4 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">
+        <i class="bi bi-diagram-3 me-2"></i>Notification Flow
+      </h4>
+      <p class="text-muted small mb-0">Who gets notified of what across all DockLabs products</p>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <h3 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">{{ total_types }}</h3>
+          <p class="text-muted small mb-0">Notification Types</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <div class="d-flex justify-content-center gap-3">
+            <div>
+              <span class="badge bg-primary">{{ channel_stats.in_app }}</span>
+              <div class="text-muted" style="font-size: 0.7rem;">In-App</div>
+            </div>
+            <div>
+              <span class="badge bg-info">{{ channel_stats.email }}</span>
+              <div class="text-muted" style="font-size: 0.7rem;">Email</div>
+            </div>
+            <div>
+              <span class="badge bg-success">{{ channel_stats.sms }}</span>
+              <div class="text-muted" style="font-size: 0.7rem;">SMS</div>
+            </div>
+          </div>
+          <p class="text-muted small mb-0 mt-1">Channel Coverage</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <h3 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">{{ role_coverage|length }}</h3>
+          <p class="text-muted small mb-0">Roles Receiving Notifications</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <h3 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">{{ categories|length }}</h3>
+          <p class="text-muted small mb-0">Categories</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Left: Flow diagram by category -->
+    <div class="col-lg-8">
+      {% for category, types in categories.items %}
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white border-0">
+          <h6 class="fw-bold mb-0">
+            <i class="bi bi-folder me-1"></i>{{ category }}
+            <span class="badge bg-secondary ms-1">{{ types|length }}</span>
+          </h6>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 0.85rem;">
+              <thead class="table-light">
+                <tr>
+                  <th style="min-width: 200px;">Event</th>
+                  <th>Channels</th>
+                  <th>Recipients (Roles)</th>
+                  <th>Priority</th>
+                  <th class="text-center">Mutable</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for t in types %}
+                <tr data-key="{{ t.key }}">
+                  <td>
+                    <strong>{{ t.label }}</strong>
+                    {% if t.description %}
+                    <div class="text-muted" style="font-size: 0.75rem;">{{ t.description|truncatewords:15 }}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% for ch in t.channels %}
+                    <span class="badge {% if ch == 'in_app' %}bg-primary{% elif ch == 'email' %}bg-info{% elif ch == 'sms' %}bg-success{% endif %} me-1">
+                      {% if ch == 'in_app' %}<i class="bi bi-bell"></i>{% elif ch == 'email' %}<i class="bi bi-envelope"></i>{% elif ch == 'sms' %}<i class="bi bi-phone"></i>{% endif %}
+                      {{ ch }}
+                    </span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    {% for role in t.roles %}
+                    <span class="badge bg-light text-dark me-1" style="font-size: 0.7rem;">{{ role }}</span>
+                    {% endfor %}
+                    {% if t.has_custom_resolver %}
+                    <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">custom resolver</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge {% if t.priority == 'urgent' %}bg-danger{% elif t.priority == 'high' %}bg-warning text-dark{% elif t.priority == 'medium' %}bg-info{% else %}bg-secondary{% endif %}">
+                      {{ t.priority }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    {% if t.allow_mute %}
+                    <i class="bi bi-check-circle text-success"></i>
+                    {% else %}
+                    <i class="bi bi-lock text-danger" title="Cannot be muted"></i>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-secondary edit-btn" data-key="{{ t.key }}">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center text-muted py-5">
+          <i class="bi bi-bell-slash" style="font-size: 2rem;"></i>
+          <p class="mt-2">No notification types registered.</p>
+          <p class="small">Notification types are registered by products during startup.<br>
+          Deploy with products installed to see their notification configurations.</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Right: Role coverage + legend -->
+    <div class="col-lg-4">
+
+      <!-- Architecture diagram -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3"><i class="bi bi-signpost-split me-1"></i>How It Works</h6>
+          <div class="text-center" style="font-size: 0.8rem;">
+            <div class="p-2 rounded mb-2" style="background: var(--ct-pale-blue);">
+              <strong>Event Triggered</strong><br>
+              <span class="text-muted">e.g., Application Submitted</span>
+            </div>
+            <i class="bi bi-arrow-down text-muted"></i>
+            <div class="p-2 rounded mb-2" style="background: #fff3e0;">
+              <strong>Registry Lookup</strong><br>
+              <span class="text-muted">Channels, roles, priority</span>
+            </div>
+            <i class="bi bi-arrow-down text-muted"></i>
+            <div class="p-2 rounded mb-2" style="background: #e8f5e9;">
+              <strong>Recipient Resolution</strong><br>
+              <span class="text-muted">Role-based or custom resolver</span>
+            </div>
+            <i class="bi bi-arrow-down text-muted"></i>
+            <div class="p-2 rounded mb-2" style="background: #e3f2fd;">
+              <strong>User Preferences</strong><br>
+              <span class="text-muted">Channel toggles, mute</span>
+            </div>
+            <i class="bi bi-arrow-down text-muted"></i>
+            <div class="d-flex gap-2 justify-content-center">
+              <div class="p-2 rounded flex-fill" style="background: #e8eaf6;">
+                <i class="bi bi-bell"></i><br>
+                <small>In-App</small>
+              </div>
+              <div class="p-2 rounded flex-fill" style="background: #e0f7fa;">
+                <i class="bi bi-envelope"></i><br>
+                <small>Email</small>
+              </div>
+              <div class="p-2 rounded flex-fill" style="background: #e8f5e9;">
+                <i class="bi bi-phone"></i><br>
+                <small>SMS</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Role coverage -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3"><i class="bi bi-people me-1"></i>Role Coverage</h6>
+          {% for role, type_keys in role_coverage.items %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small">
+              <code>{{ role }}</code>
+            </span>
+            <span class="badge bg-primary-subtle text-primary">{{ type_keys|length }} notifications</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Channel config -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3"><i class="bi bi-gear me-1"></i>Channel Config</h6>
+          <dl class="mb-0" style="font-size: 0.85rem;">
+            <dt><i class="bi bi-bell me-1 text-primary"></i> In-App</dt>
+            <dd class="text-muted">Always available. Creates DB record.</dd>
+
+            <dt><i class="bi bi-envelope me-1 text-info"></i> Email</dt>
+            <dd class="text-muted">
+              Via SMTP ({{ email_backend }}).
+            </dd>
+
+            <dt><i class="bi bi-phone me-1 text-success"></i> SMS (Twilio)</dt>
+            <dd class="text-muted">
+              {% if sms_configured %}
+              <span class="badge bg-success">Configured</span>
+              {% else %}
+              <span class="badge bg-warning text-dark">Not configured</span>
+              <br><small>Set <code>KEEL_SMS_BACKEND=twilio</code> + Twilio env vars on Railway</small>
+              {% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Notification Routing</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-form">
+          <input type="hidden" name="key" id="edit-key">
+
+          <div class="mb-3">
+            <label class="form-label fw-bold" id="edit-label"></label>
+            <p class="text-muted small" id="edit-description"></p>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Channels</label>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="channels" value="in_app" id="ch-in_app">
+              <label class="form-check-label" for="ch-in_app"><i class="bi bi-bell me-1"></i>In-App</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="channels" value="email" id="ch-email">
+              <label class="form-check-label" for="ch-email"><i class="bi bi-envelope me-1"></i>Email</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="channels" value="sms" id="ch-sms">
+              <label class="form-check-label" for="ch-sms"><i class="bi bi-phone me-1"></i>SMS (Twilio)</label>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Priority</label>
+            <select name="priority" id="edit-priority" class="form-select">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="allow_mute" id="edit-mutable" value="true">
+              <label class="form-check-label" for="edit-mutable">Users can mute this notification</label>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const FLOW_DATA = {{ flow_data_json|safe }};
+  const modal = new bootstrap.Modal(document.getElementById('editModal'));
+
+  // Index flow data by key
+  const dataMap = {};
+  FLOW_DATA.forEach(d => dataMap[d.key] = d);
+
+  // Edit button click
+  document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.key;
+      const data = dataMap[key];
+      if (!data) return;
+
+      document.getElementById('edit-key').value = key;
+      document.getElementById('edit-label').textContent = data.label;
+      document.getElementById('edit-description').textContent = data.description;
+      document.getElementById('edit-priority').value = data.priority;
+      document.getElementById('edit-mutable').checked = data.allow_mute;
+
+      // Set channel checkboxes
+      ['in_app', 'email', 'sms'].forEach(ch => {
+        document.getElementById('ch-' + ch).checked = data.channels.includes(ch);
+      });
+
+      modal.show();
+    });
+  });
+
+  // Save
+  document.getElementById('save-btn').addEventListener('click', async () => {
+    const form = document.getElementById('edit-form');
+    const formData = new FormData(form);
+
+    // Add CSRF token
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    try {
+      const resp = await fetch('{% url "notification_update" %}', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await resp.json();
+      if (data.status === 'ok') {
+        modal.hide();
+        // Update the local data
+        if (dataMap[data.key]) {
+          dataMap[data.key].channels = data.channels;
+          dataMap[data.key].roles = data.roles;
+          dataMap[data.key].priority = data.priority;
+        }
+        location.reload();
+      } else {
+        alert('Error: ' + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Save failed: ' + err.message);
+    }
+  });
+})();
+</script>
+{% endblock %}

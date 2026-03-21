@@ -4,7 +4,7 @@ from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from . import dashboard, tools
+from . import dashboard, notifications_admin, tools
 
 
 def home(request):
@@ -55,6 +55,10 @@ urlpatterns = [
 
     # Invitation acceptance (clean URL)
     path('invite/<str:token>/', include([])),  # handled by keel.accounts.urls
+
+    # Notification flow & routing
+    path('notifications/flow/', notifications_admin.notification_flow, name='notification_flow'),
+    path('notifications/flow/update/', notifications_admin.update_notification_type, name='notification_update'),
 
     # Tools (test suite, UI audit)
     path('tools/', tools.tools_dashboard, name='tools_dashboard'),

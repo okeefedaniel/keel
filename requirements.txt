@@ -5,8 +5,10 @@ whitenoise>=6.7
 dj-database-url>=2.2
 psycopg2-binary>=2.9
 
+# SMS & webhooks
+twilio>=9.0
+requests>=2.30
+
 # Optional (uncomment as needed)
 # django-allauth>=65.0   # SSO via Microsoft Entra ID
 # anthropic>=0.40         # AI features
-# requests>=2.30          # Webhook alerts
-# twilio>=9.0             # SMS notifications
