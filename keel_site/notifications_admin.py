@@ -88,6 +88,24 @@ def notification_flow(request):
     sms_configured = bool(getattr(django_settings, 'KEEL_SMS_BACKEND', None))
     email_backend = getattr(django_settings, 'EMAIL_BACKEND', '').split('.')[-1]
 
+    # Build the routing matrix: rows = notification types, cols = roles
+    all_roles = sorted(role_coverage.keys())
+    matrix_rows = []
+    for item in flow_data:
+        cells = []
+        for role in all_roles:
+            if role in item['roles'] or 'all' in item['roles']:
+                cells.append(item['channels'])
+            else:
+                cells.append([])
+        matrix_rows.append({
+            'key': item['key'],
+            'label': item['label'],
+            'category': item['category'],
+            'priority': item['priority'],
+            'cells': cells,  # parallel with matrix_roles
+        })
+
     context = {
         'categories': categories,
         'channel_stats': channel_stats,
@@ -97,6 +115,8 @@ def notification_flow(request):
         'flow_data_json': json.dumps(flow_data),
         'sms_configured': sms_configured,
         'email_backend': email_backend,
+        'matrix_rows': matrix_rows,
+        'matrix_roles': all_roles,
     }
     return render(request, 'notifications/flow.html', context)
 
