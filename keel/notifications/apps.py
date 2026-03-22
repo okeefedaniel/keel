@@ -7,3 +7,10 @@ class KeelNotificationsConfig(AppConfig):
     label = 'keel_notifications'
     verbose_name = 'Keel Notifications'
     default_auto_field = 'django.db.models.BigAutoField'
+
+    def ready(self):
+        # Register all product notification types for the admin matrix.
+        # Products also register their own types at runtime for dispatch,
+        # but this gives Keel visibility into the full catalog.
+        from .product_types import register_all_product_types
+        register_all_product_types()
