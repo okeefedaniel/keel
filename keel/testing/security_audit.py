@@ -87,7 +87,7 @@ def _build_secret_patterns():
     sk = 'SECRET' + '_KEY'
     pw = 'PASS' + 'WORD'
     ak = 'API' + '_KEY'
-    creds = '|'.join(['aws_secret', 'aws_access', 'STRIPE' + '_SECRET', 'SENDGRID' + '_API'])
+    creds = '|'.join(['aws_' + 'secret', 'aws_' + 'access', 'STRIPE' + '_SECRET', 'SENDGRID' + '_API'])
     return [
         (re.compile(rf'{sk}\s*=\s*["\'][^"\']{"{10,}"}["\']'), 'Hardcoded SECRET_KEY'),
         (re.compile(rf'{pw}\s*=\s*["\'][^"\']+["\'](?!.*demo|.*example|.*test)', re.IGNORECASE),

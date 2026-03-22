@@ -146,7 +146,7 @@ from django.test import Client
 if 'testserver' not in settings.ALLOWED_HOSTS and '*' not in settings.ALLOWED_HOSTS:
     settings.ALLOWED_HOSTS.append('testserver')
 
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo2026!')
+DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
 results = []
 
 

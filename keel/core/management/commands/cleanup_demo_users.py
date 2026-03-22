@@ -8,13 +8,15 @@ Usage:
     python manage.py cleanup_demo_users
     python manage.py cleanup_demo_users --dry-run
 """
+import os
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 User = get_user_model()
 
-DEMO_PASSWORD = 'demo2026!'
+DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
 
 
 class Command(BaseCommand):

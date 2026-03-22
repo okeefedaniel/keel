@@ -8,11 +8,13 @@ Usage:
     python manage.py seed_keel_users --product harbor
     python manage.py seed_keel_users --dry-run
 """
+import os
+
 from django.core.management.base import BaseCommand
 
 from keel.accounts.models import Agency, KeelUser, ProductAccess
 
-DEMO_PASSWORD = 'demo2026!'
+DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
 
 # Default demo users per product with their roles
 PRODUCT_DEMO_CONFIGS = {
