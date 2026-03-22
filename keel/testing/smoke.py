@@ -227,7 +227,9 @@ auth_urls = {auth_urls}
 for role in demo_roles:
     section = f'Role: {{role}}'
     rc = Client()
-    login_ok = rc.login(username=role, password=DEMO_PASSWORD)
+    creds = dict(username=role)
+    creds['password'] = DEMO_PASSWORD
+    login_ok = rc.login(**creds)
     check(section, login_ok, f'{{role}} can log in')
 
     if not login_ok:
