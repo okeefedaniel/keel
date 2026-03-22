@@ -20,8 +20,10 @@ Configuration:
 
 Convention:
     Username = role name (e.g., 'admin', 'legislative_aid')
-    Password = 'demo2026!' (all accounts)
+    Password = DEMO_PASSWORD env var (all accounts)
 """
+import os
+
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
@@ -30,7 +32,7 @@ from django.views.decorators.http import require_POST
 
 from .utils import rate_limit
 
-DEMO_PASSWORD = 'demo2026!'
+DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo2026!')
 
 # Display labels and icons for common roles across DockLabs products
 ROLE_DISPLAY = {

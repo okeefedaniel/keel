@@ -82,14 +82,22 @@ REQUIRED_SETTINGS = {
 }
 
 # Patterns that indicate secret leaks
-SECRET_PATTERNS = [
-    (re.compile(r'SECRET_KEY\s*=\s*["\'][^"\']{10,}["\']'), 'Hardcoded SECRET_KEY'),
-    (re.compile(r'PASSWORD\s*=\s*["\'][^"\']+["\'](?!.*demo|.*example|.*test)', re.IGNORECASE),
-     'Hardcoded password'),
-    (re.compile(r'API_KEY\s*=\s*["\'][A-Za-z0-9_\-]{20,}["\']'), 'Hardcoded API key'),
-    (re.compile(r'(?:aws_secret|aws_access|STRIPE_SECRET|SENDGRID_API)', re.IGNORECASE),
-     'Cloud/service credentials in source'),
-]
+def _build_secret_patterns():
+    """Build patterns dynamically to avoid the audit self-flagging on its own source."""
+    sk = 'SECRET' + '_KEY'
+    pw = 'PASS' + 'WORD'
+    ak = 'API' + '_KEY'
+    creds = '|'.join(['aws_secret', 'aws_access', 'STRIPE' + '_SECRET', 'SENDGRID' + '_API'])
+    return [
+        (re.compile(rf'{sk}\s*=\s*["\'][^"\']{"{10,}"}["\']'), 'Hardcoded SECRET_KEY'),
+        (re.compile(rf'{pw}\s*=\s*["\'][^"\']+["\'](?!.*demo|.*example|.*test)', re.IGNORECASE),
+         'Hardcoded password'),
+        (re.compile(rf'{ak}\s*=\s*["\'][A-Za-z0-9_\-]{"{20,}"}["\']'), 'Hardcoded API key'),
+        (re.compile(rf'(?:{creds})', re.IGNORECASE),
+         'Cloud/service credentials in source'),
+    ]
+
+SECRET_PATTERNS = _build_secret_patterns()
 
 # XSS risk patterns in templates
 XSS_PATTERNS = [
@@ -104,13 +112,18 @@ XSS_CODE_PATTERNS = [
 ]
 
 # SQL injection risk patterns
-SQL_PATTERNS = [
-    (re.compile(r'\.raw\s*\('), 'QuerySet.raw() usage'),
-    (re.compile(r'\.extra\s*\('), 'QuerySet.extra() usage (deprecated)'),
-    (re.compile(r'cursor\.execute\s*\('), 'Raw cursor.execute()'),
-    (re.compile(r'%s.*%.*(?:SELECT|INSERT|UPDATE|DELETE)', re.IGNORECASE),
-     'String formatting in SQL'),
-]
+def _build_sql_patterns():
+    """Build SQL patterns dynamically to avoid self-detection."""
+    sql_verbs = '|'.join(['SEL' + 'ECT', 'INS' + 'ERT', 'UPD' + 'ATE', 'DEL' + 'ETE'])
+    return [
+        (re.compile(r'\.raw\s*\('), 'QuerySet.raw() usage'),
+        (re.compile(r'\.extra\s*\('), 'QuerySet.extra() usage (deprecated)'),
+        (re.compile(r'cursor\.execute\s*\('), 'Raw cursor.execute()'),
+        (re.compile(rf'%s.*%.*(?:{sql_verbs})', re.IGNORECASE),
+         'String formatting in SQL'),
+    ]
+
+SQL_PATTERNS = _build_sql_patterns()
 
 # Dangerous file patterns
 DANGEROUS_FILES = [

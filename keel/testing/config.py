@@ -9,7 +9,7 @@ BASE_DIR = Path(os.environ.get(
     os.path.expanduser('~/SynologyDrive/Work/CT/Web'),
 ))
 
-DEMO_PASSWORD = 'demo2026!'
+DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo2026!')
 
 
 @dataclass

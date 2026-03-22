@@ -27,6 +27,8 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from .validators import validate_document_file
+
 
 # ---------------------------------------------------------------------------
 # StatutoryExemption
@@ -271,9 +273,9 @@ class AbstractFOIAResponsePackage(models.Model):
     # Note: concrete model must add `foia_request` FK
 
     # Generated files
-    cover_letter = models.FileField(upload_to='foia_responses/%Y/%m/', blank=True)
-    response_file = models.FileField(upload_to='foia_responses/%Y/%m/', blank=True)
-    privilege_log = models.FileField(upload_to='foia_responses/%Y/%m/', blank=True)
+    cover_letter = models.FileField(upload_to='foia_responses/%Y/%m/', blank=True, validators=[validate_document_file])
+    response_file = models.FileField(upload_to='foia_responses/%Y/%m/', blank=True, validators=[validate_document_file])
+    privilege_log = models.FileField(upload_to='foia_responses/%Y/%m/', blank=True, validators=[validate_document_file])
 
     # Summary stats
     total_records_found = models.PositiveIntegerField(default=0)
@@ -339,6 +341,7 @@ class AbstractFOIAAppeal(models.Model):
     decision_summary = models.TextField(blank=True)
     decision_document = models.FileField(
         upload_to='foia_appeals/%Y/%m/', blank=True,
+        validators=[validate_document_file],
     )
 
     # Lessons learned
