@@ -39,7 +39,12 @@ def request_widget(context):
                     Q(is_beta_tester=True) | Q(role__in=('admin', 'system_admin'))
                 ).exists()
             except Exception:
-                show_widget = getattr(user, '_is_beta_tester', False)
+                # Fallback for products with their own User model (no ProductAccess).
+                # Check for is_beta_tester field or admin role on the user directly.
+                show_widget = (
+                    getattr(user, 'is_beta_tester', False)
+                    or getattr(user, 'role', '') in ('admin', 'system_admin')
+                )
 
     return {
         'user': user,

@@ -42,6 +42,7 @@ class Status(models.TextChoices):
 # Map product names to repo directories for prompt generation
 PRODUCT_PATHS = {
     'beacon': '~/SynologyDrive/Work/CT/Web/beacon',
+    'bounty': '~/SynologyDrive/Work/CT/Web/bounty',
     'harbor': '~/SynologyDrive/Work/CT/Web/harbor',
     'lookout': '~/SynologyDrive/Work/CT/Web/lookout',
     'keel': '~/SynologyDrive/Work/CT/Web/keel',
