@@ -408,9 +408,30 @@ th.sortable.sort-desc::after { content: '\F27E'; opacity: 1; }
     border-color: var(--ct-blue);
     box-shadow: 0 0 0 0.2rem rgba(31, 100, 229, 0.15);
 }
+.form-control:focus-visible,
+.form-select:focus-visible,
+.form-check-input:focus-visible {
+    outline: none;
+}
 .required-field::after {
     content: ' *';
     color: var(--ct-red);
+}
+
+/* =============================================
+   15b. WCAG 2.1 AA Focus Indicators
+   Visible ring for keyboard navigation on
+   non-form interactive elements (links, buttons,
+   nav items, etc.).  Form controls use the
+   Bootstrap/CT blue box-shadow above instead.
+   ============================================= */
+*:focus-visible {
+    outline: 3px solid var(--ct-orange);
+    outline-offset: 2px;
+}
+.btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 0.25rem rgba(242, 113, 36, 0.45);
 }
 
 /* =============================================
