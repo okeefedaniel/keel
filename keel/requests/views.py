@@ -3,7 +3,13 @@
 Two audiences:
 1. Beta users: submit requests via form or API from within any product.
 2. Admin (Daniel): review, approve/decline, copy Claude Code prompt.
+
+Products submit change requests to Keel via the /api/requests/ingest/
+endpoint, authenticated with a shared API key (KEEL_API_KEY env var).
+The widget in each product uses fetch() to POST JSON to this endpoint.
 """
+import hashlib
+import hmac
 import json
 import logging
 
@@ -110,6 +116,96 @@ def submit_request(request):
 
     messages.success(request, 'Your suggestion has been submitted. We\'ll review it shortly.')
     return redirect(request.META.get('HTTP_REFERER', '/'))
+
+
+# =========================================================================
+# Cross-origin API ingest (products → Keel)
+# =========================================================================
+@csrf_exempt
+@require_POST
+def api_ingest(request):
+    """Receive a change request from any DockLabs product.
+
+    Products POST JSON to https://keel.docklabs.ai/api/requests/ingest/
+    with header: Authorization: Bearer <KEEL_API_KEY>
+
+    This is the primary path for change requests to reach Keel's database.
+    The widget in each product uses fetch() to call this endpoint.
+    """
+    # Verify API key
+    api_key = getattr(settings, 'KEEL_API_KEY', '') or ''
+    if not api_key:
+        return JsonResponse({'error': 'API ingest not configured.'}, status=503)
+
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer ') or not hmac.compare_digest(
+        auth_header[7:].strip(), api_key
+    ):
+        return JsonResponse({'error': 'Invalid API key.'}, status=401)
+
+    # Parse JSON body
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    title = (data.get('title') or '').strip()
+    description = (data.get('description') or '').strip()
+    if not title or not description:
+        return JsonResponse({'error': 'Title and description are required.'}, status=400)
+
+    cr = ChangeRequest.objects.create(
+        submitted_by=None,  # No local user on Keel; identity captured below
+        submitted_by_name=(data.get('submitted_by_name') or 'Unknown').strip(),
+        submitted_by_email=(data.get('submitted_by_email') or '').strip(),
+        product=(data.get('product') or 'unknown').strip().lower(),
+        title=title,
+        description=description,
+        category=(data.get('category') or Category.FEATURE).strip(),
+        priority=(data.get('priority') or Priority.MEDIUM).strip(),
+        page_url=(data.get('page_url') or '').strip(),
+    )
+
+    # Notify Keel admins
+    _notify_admins_api(cr)
+
+    logger.info(
+        'API ingest: change request "%s" from %s (%s)',
+        cr.title, cr.submitted_by_name, cr.product,
+    )
+
+    return JsonResponse({
+        'id': str(cr.id),
+        'status': 'pending',
+        'message': 'Your request has been submitted for review.',
+    }, status=201)
+
+
+def _notify_admins_api(cr):
+    """Notify Keel admins about a new change request received via API."""
+    try:
+        from keel.notifications.dispatch import notify
+        from keel.accounts.models import KeelUser
+
+        admins = list(KeelUser.objects.filter(
+            is_superuser=True, is_active=True,
+        ))
+
+        if admins:
+            notify(
+                event='change_request_submitted',
+                recipients=admins,
+                title=f'New {cr.get_category_display()}: {cr.title}',
+                message=(
+                    f'{cr.submitted_by_name} submitted a '
+                    f'{cr.get_category_display().lower()} for '
+                    f'{cr.product.title()} from {cr.page_url or "unknown page"}.'
+                ),
+                priority='medium',
+                link=f'/keel/requests/{cr.id}/',
+            )
+    except Exception:
+        logger.debug('Could not send admin notification for API ingest', exc_info=True)
 
 
 def _notify_admins(cr, request):

@@ -23,6 +23,9 @@ urlpatterns = [
     path('<uuid:request_id>/implemented/', views.mark_implemented, name='mark_implemented'),
     path('<uuid:request_id>/prompt/', views.get_prompt, name='get_prompt'),
 
-    # Beta user submission
+    # Beta user submission (local — for products sharing Keel's DB)
     path('submit/', views.submit_request, name='submit_request'),
+
+    # Cross-origin API ingest (products → Keel over HTTPS)
+    path('api/ingest/', views.api_ingest, name='api_ingest'),
 ]

@@ -47,6 +47,7 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'keel.security.middleware.SecurityHeadersMiddleware',
     'keel.security.middleware.FailedLoginMonitor',
+    'keel_site.middleware.APICorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -157,6 +158,7 @@ STORAGES = {
 # ---------------------------------------------------------------------------
 KEEL_PRODUCT_NAME = 'keel'
 KEEL_GATE_ACCESS = False  # Keel admin console doesn't gate itself
+KEEL_API_KEY = os.environ.get('KEEL_API_KEY', '')  # Shared key for product → Keel API
 DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
 DEMO_ROLES = ['admin']
 KEEL_AUDIT_LOG_MODEL = 'keel_accounts.AuditLog'

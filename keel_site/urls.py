@@ -4,6 +4,7 @@ from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
 from django.urls import include, path
 
+from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
 
 
@@ -18,6 +19,9 @@ urlpatterns = [
     path('', home, name='home'),
     path('dashboard/', dashboard.platform_dashboard, name='platform_dashboard'),
     path('api/activity/', dashboard.activity_feed_api, name='activity_feed_api'),
+
+    # Public API (cross-origin, API-key authenticated)
+    path('api/requests/ingest/', api_ingest, name='api_ingest'),
 
     # Auth
     path('accounts/login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),

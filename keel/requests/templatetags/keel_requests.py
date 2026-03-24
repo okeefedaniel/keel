@@ -46,9 +46,15 @@ def request_widget(context):
                     or getattr(user, 'role', '') in ('admin', 'system_admin')
                 )
 
+    # Keel API URL and key for cross-origin submission
+    keel_api_url = getattr(settings, 'KEEL_API_URL', 'https://keel.docklabs.ai')
+    keel_api_key = getattr(settings, 'KEEL_API_KEY', '')
+
     return {
         'user': user,
         'show_widget': show_widget,
         'product': product,
         'csrf_token': context.get('csrf_token'),
+        'keel_api_url': f'{keel_api_url}/api/requests/ingest/',
+        'keel_api_key': keel_api_key,
     }
