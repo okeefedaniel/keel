@@ -121,12 +121,15 @@ def _generate_local_test_script(product):
     """Generate a self-contained Python script that runs smoke tests.
 
     The script bootstraps Django, uses test Client, and outputs JSON results.
+    Includes URL autodiscovery to test every parameterless endpoint.
     """
     import json
+    from .url_discovery import generate_discovery_code
 
     public_urls = json.dumps(product.public_urls)
     auth_urls = json.dumps(product.auth_urls)
     demo_roles = json.dumps(product.demo_roles)
+    discovery_code = generate_discovery_code()
 
     return f'''#!/usr/bin/env python
 """Auto-generated smoke test for {product.name}."""
@@ -252,6 +255,8 @@ fake = str(uuid.uuid4())
 resp = c.get(f'/nonexistent-{{fake}}/')
 check(section, resp.status_code == 404, '404 on unknown URL', f'status={{resp.status_code}}')
 check(section, resp.status_code < 500, 'Unknown URL is not a 500')
+
+{discovery_code}
 
 # ── Output ──
 print(json.dumps(results))

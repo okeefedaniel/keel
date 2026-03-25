@@ -19,6 +19,9 @@ Usage:
     # Security audit only
     python -m keel.testing --security-only
 
+    # Workflow integration tests only
+    python -m keel.testing --workflow-only
+
     # Security audit with auto-fix
     python -m keel.testing --security-only --auto-fix
 
@@ -41,6 +44,7 @@ from .security_audit import run_security_audit
 from .smoke import run_smoke_tests
 from .ui_audit import run_ui_audit
 from .unit_runner import run_django_tests
+from .workflows import run_workflow_tests
 
 
 def _notify_keel_dashboard(critical_findings):
@@ -130,6 +134,10 @@ def main():
         help='Run only the security audit',
     )
     parser.add_argument(
+        '--workflow-only', action='store_true',
+        help='Run only workflow integration tests (POST-based state transitions)',
+    )
+    parser.add_argument(
         '--auto-fix', action='store_true',
         help='Automatically fix safe security issues (e.g., missing settings)',
     )
@@ -168,6 +176,8 @@ def main():
         critical_findings = run_security_audit(
             T, product_names=products, auto_fix=args.auto_fix,
         )
+    elif args.workflow_only:
+        run_workflow_tests(T, product_names=products)
     else:
         if not args.smoke_only:
             run_django_tests(T, product_names=products)
@@ -175,7 +185,11 @@ def main():
         if not args.unit_only:
             run_smoke_tests(T, product_names=products, live=args.live)
 
-        # UI audit runs as part of the full suite (unless --smoke-only or --unit-only)
+        # Workflow tests run after smoke tests
+        if not args.smoke_only and not args.unit_only:
+            run_workflow_tests(T, product_names=products)
+
+        # UI audit runs as part of the full suite
         if not args.smoke_only and not args.unit_only:
             run_ui_audit(T)
 
