@@ -196,9 +196,10 @@ def _notify_admins_api(cr):
         admins = list(KeelUser.objects.filter(
             is_superuser=True, is_active=True,
         ))
+        logger.info('Notifying %d admin(s) about change request: %s', len(admins), cr.title)
 
         if admins:
-            notify(
+            result = notify(
                 event='change_request_submitted',
                 recipients=admins,
                 title=f'New {cr.get_category_display()}: {cr.title}',
@@ -210,8 +211,13 @@ def _notify_admins_api(cr):
                 priority='medium',
                 link=f'/keel/requests/{cr.id}/',
             )
+            logger.info('Notification result: sent=%s, skipped=%s, errors=%s, details=%s',
+                        result.get('sent'), result.get('skipped'), result.get('errors'),
+                        result.get('details'))
+        else:
+            logger.warning('No active superusers found — cannot notify about change request')
     except Exception:
-        logger.debug('Could not send admin notification for API ingest', exc_info=True)
+        logger.exception('Failed to send admin notification for API ingest')
 
 
 def _notify_admins(cr, request):
