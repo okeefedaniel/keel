@@ -51,7 +51,7 @@ def request_widget(context):
     # so change requests are centralized in one database.
     is_keel_site = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower() == 'keel'
     local_submit = is_keel_site and 'keel.requests' in settings.INSTALLED_APPS
-    keel_api_url = getattr(settings, 'KEEL_API_URL', 'https://keel.docklabs.ai')
+    keel_api_url = getattr(settings, 'KEEL_API_URL', 'https://keel.docklabs.ai').rstrip('/')
     keel_api_key = getattr(settings, 'KEEL_API_KEY', '')
 
     return {
