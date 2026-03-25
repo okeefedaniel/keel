@@ -26,8 +26,11 @@ class Product(models.TextChoices):
         KEEL_EXTRA_PRODUCTS = [('my_app', 'My App')]
     """
     BEACON = 'beacon', _('Beacon CRM')
+    ADMIRALTY = 'admiralty', _('Admiralty FOIA')
     HARBOR = 'harbor', _('Harbor Grants')
+    MANIFEST = 'manifest', _('Manifest Signing')
     LOOKOUT = 'lookout', _('Lookout Legislative')
+    BOUNTY = 'bounty', _('Bounty Federal Grants')
     KEEL = 'keel', _('Keel Admin')
 
 
@@ -39,13 +42,17 @@ PRODUCT_ROLES = {
         ('system_admin', 'System Administrator'),
         ('agency_admin', 'Agency Administrator'),
         ('relationship_manager', 'Relationship Manager'),
-        ('foia_officer', 'FOIA Officer'),
-        ('foia_attorney', 'FOIA Attorney'),
         ('analyst', 'Analyst'),
         ('executive', 'Executive (Read-Only)'),
         ('quasi_admin', 'Quasi Administrator'),
         ('quasi_relationship_manager', 'Quasi Relationship Manager'),
         ('quasi_analyst', 'Quasi Analyst'),
+    ],
+    'admiralty': [
+        ('system_admin', 'System Administrator'),
+        ('foia_manager', 'FOIA Manager'),
+        ('foia_officer', 'FOIA Officer'),
+        ('foia_attorney', 'FOIA Attorney'),
     ],
     'harbor': [
         ('system_admin', 'System Administrator'),
@@ -57,10 +64,21 @@ PRODUCT_ROLES = {
         ('applicant', 'Applicant'),
         ('auditor', 'Auditor'),
     ],
+    'manifest': [
+        ('admin', 'Admin'),
+        ('staff', 'Staff'),
+        ('signer', 'Signer'),
+    ],
     'lookout': [
         ('admin', 'Admin'),
         ('legislative_aid', 'Legislative Aid'),
         ('stakeholder', 'Stakeholder'),
+    ],
+    'bounty': [
+        ('admin', 'Admin'),
+        ('coordinator', 'Federal Fund Coordinator'),
+        ('analyst', 'Analyst'),
+        ('viewer', 'Viewer'),
     ],
     'keel': [
         ('admin', 'Admin'),
@@ -353,6 +371,86 @@ class Invitation(models.Model):
         if self.status == self.Status.PENDING:
             self.status = self.Status.REVOKED
             self.save(update_fields=['status'])
+
+
+# ---------------------------------------------------------------------------
+# Notification — concrete notification for the Keel admin console
+# ---------------------------------------------------------------------------
+class Notification(models.Model):
+    """In-app notification for the Keel admin console."""
+
+    class Priority(models.TextChoices):
+        LOW = 'low', _('Low')
+        MEDIUM = 'medium', _('Medium')
+        HIGH = 'high', _('High')
+        URGENT = 'urgent', _('Urgent')
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey(
+        KeelUser, on_delete=models.CASCADE,
+        related_name='keel_notifications',
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField(blank=True)
+    link = models.CharField(max_length=500, blank=True)
+    priority = models.CharField(
+        max_length=10, choices=Priority.choices, default=Priority.MEDIUM,
+    )
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'keel_notification'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'is_read', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{'[Read]' if self.is_read else '[New]'} {self.title}"
+
+    def mark_read(self):
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=['is_read', 'read_at'])
+
+
+class NotificationPreference(models.Model):
+    """Per-user, per-notification-type channel preferences for Keel."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        KeelUser, on_delete=models.CASCADE,
+        related_name='keel_notification_preferences',
+    )
+    notification_type = models.CharField(max_length=100)
+    channel_in_app = models.BooleanField(default=True)
+    channel_email = models.BooleanField(default=True)
+    channel_sms = models.BooleanField(default=False)
+    is_muted = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'keel_notification_preference'
+        unique_together = [('user', 'notification_type')]
+
+
+class NotificationLog(models.Model):
+    """Delivery tracking for Keel notifications."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey(KeelUser, on_delete=models.CASCADE, related_name='+')
+    notification_type = models.CharField(max_length=100)
+    channel = models.CharField(max_length=20)
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'keel_notification_log'
+        ordering = ['-created_at']
 
 
 # ---------------------------------------------------------------------------

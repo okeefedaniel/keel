@@ -158,6 +158,11 @@ STORAGES = {
 # ---------------------------------------------------------------------------
 KEEL_PRODUCT_NAME = 'keel'
 KEEL_GATE_ACCESS = False  # Keel admin console doesn't gate itself
+
+# Notification system — point to concrete models in keel_accounts
+KEEL_NOTIFICATION_MODEL = 'keel_accounts.Notification'
+KEEL_NOTIFICATION_PREFERENCE_MODEL = 'keel_accounts.NotificationPreference'
+KEEL_NOTIFICATION_LOG_MODEL = 'keel_accounts.NotificationLog'
 KEEL_API_KEY = os.environ.get('KEEL_API_KEY', '')  # Shared key for product → Keel API
 DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
 DEMO_ROLES = ['admin']

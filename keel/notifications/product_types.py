@@ -15,6 +15,7 @@ def register_all_product_types():
     _register_harbor_types()
     _register_beacon_types()
     _register_lookout_types()
+    _register_bounty_types()
     _register_keel_types()
 
 
@@ -270,6 +271,37 @@ def _register_lookout_types():
         category='Lookout — Bills',
         default_channels=['in_app', 'email'],
         default_roles=['admin', 'analyst', 'staff'],
+        priority='medium',
+    ))
+
+
+def _register_bounty_types():
+    """Bounty Federal Grants — discovery and matching notifications."""
+    register(NotificationType(
+        key='grant_match_high_score',
+        label='High-Score Grant Match',
+        description='The AI matching engine found a highly relevant federal grant opportunity.',
+        category='Bounty — Matching',
+        default_channels=['in_app', 'email'],
+        default_roles=['coordinator', 'analyst'],
+        priority='high',
+    ))
+    register(NotificationType(
+        key='opportunity_status_changed',
+        label='Tracked Opportunity Status Changed',
+        description='A federal opportunity you are tracking has changed status.',
+        category='Bounty — Tracking',
+        default_channels=['in_app'],
+        default_roles=['coordinator', 'analyst'],
+        priority='medium',
+    ))
+    register(NotificationType(
+        key='harbor_push_completed',
+        label='Opportunity Pushed to Harbor',
+        description='An awarded opportunity has been successfully pushed to Harbor as a GrantProgram.',
+        category='Bounty — Integration',
+        default_channels=['in_app'],
+        default_roles=['coordinator', 'admin'],
         priority='medium',
     ))
 
