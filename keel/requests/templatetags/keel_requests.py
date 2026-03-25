@@ -46,9 +46,11 @@ def request_widget(context):
                     or getattr(user, 'role', '') in ('admin', 'system_admin')
                 )
 
-    # Determine submission mode: local if keel.requests is installed in this
-    # product (has its own ChangeRequest table), else cross-origin API to Keel.
-    local_submit = 'keel.requests' in settings.INSTALLED_APPS
+    # Determine submission mode: only submit locally if this IS the Keel
+    # admin console. All other products send cross-origin to Keel's API
+    # so change requests are centralized in one database.
+    is_keel_site = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower() == 'keel'
+    local_submit = is_keel_site and 'keel.requests' in settings.INSTALLED_APPS
     keel_api_url = getattr(settings, 'KEEL_API_URL', 'https://keel.docklabs.ai')
     keel_api_key = getattr(settings, 'KEEL_API_KEY', '')
 
