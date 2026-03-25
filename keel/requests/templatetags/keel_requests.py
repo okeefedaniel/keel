@@ -46,7 +46,9 @@ def request_widget(context):
                     or getattr(user, 'role', '') in ('admin', 'system_admin')
                 )
 
-    # Keel API URL and key for cross-origin submission
+    # Determine submission mode: local if keel.requests is installed in this
+    # product (has its own ChangeRequest table), else cross-origin API to Keel.
+    local_submit = 'keel.requests' in settings.INSTALLED_APPS
     keel_api_url = getattr(settings, 'KEEL_API_URL', 'https://keel.docklabs.ai')
     keel_api_key = getattr(settings, 'KEEL_API_KEY', '')
 
@@ -55,6 +57,7 @@ def request_widget(context):
         'show_widget': show_widget,
         'product': product,
         'csrf_token': context.get('csrf_token'),
+        'local_submit': local_submit,
         'keel_api_url': f'{keel_api_url}/api/requests/ingest/',
         'keel_api_key': keel_api_key,
     }

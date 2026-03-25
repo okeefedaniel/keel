@@ -74,8 +74,10 @@
 
 <script>
 (function() {
+  var LOCAL = {{ local_submit|yesno:"true,false" }};
   var KEEL_API = '{{ keel_api_url }}';
   var KEEL_KEY = '{{ keel_api_key }}';
+  var CSRF = '{{ csrf_token }}';
   var userName = '{{ user.get_full_name|default:user.username }}';
   var userEmail = '{{ user.email|default:"" }}';
 
@@ -107,15 +109,25 @@
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
 
-    fetch(KEEL_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + KEEL_KEY
-      },
-      body: JSON.stringify(payload)
+    var url, headers;
+    if (LOCAL) {
+      // POST to the local keel_requests:submit_request endpoint
+      url = '/feedback/submit/';
+      headers = {'Content-Type': 'application/json', 'X-CSRFToken': CSRF};
+    } else {
+      // Cross-origin POST to central Keel API
+      url = KEEL_API;
+      headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + KEEL_KEY};
+    }
+
+    fetch(url, {method: 'POST', headers: headers, body: JSON.stringify(payload)})
+    .then(function(resp) {
+      // Local POST may redirect (302) on success — handle both JSON and redirect
+      if (resp.redirected || resp.status === 302) {
+        return {ok: true, data: {message: 'Submitted'}};
+      }
+      return resp.json().then(function(d) { return {ok: resp.ok, data: d}; });
     })
-    .then(function(resp) { return resp.json().then(function(d) { return {ok: resp.ok, data: d}; }); })
     .then(function(result) {
       if (result.ok) {
         alertBox.className = 'alert alert-success';
