@@ -22,6 +22,7 @@ urlpatterns = [
 
     # Public API (cross-origin, API-key authenticated)
     path('api/requests/ingest/', api_ingest, name='api_ingest'),
+    path('api/notifications/config/', notifications_admin.api_notification_config, name='api_notification_config'),
 
     # Auth
     path('accounts/login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),

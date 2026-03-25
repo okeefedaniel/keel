@@ -17,7 +17,7 @@ class APICorsMiddleware:
             from django.http import HttpResponse
             response = HttpResponse()
             response['Access-Control-Allow-Origin'] = self._get_origin(request)
-            response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+            response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
             response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
             response['Access-Control-Max-Age'] = '86400'
             return response
@@ -27,7 +27,7 @@ class APICorsMiddleware:
         # Add CORS headers to API responses
         if request.path.startswith('/api/'):
             response['Access-Control-Allow-Origin'] = self._get_origin(request)
-            response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+            response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
             response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
 
         return response

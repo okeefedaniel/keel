@@ -13,4 +13,7 @@ class KeelNotificationsConfig(AppConfig):
         # Products also register their own types at runtime for dispatch,
         # but this gives Keel visibility into the full catalog.
         from .product_types import register_all_product_types
+        from .registry import apply_overrides
         register_all_product_types()
+        # Load admin overrides from the database on top of hardcoded defaults.
+        apply_overrides()

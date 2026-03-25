@@ -454,6 +454,51 @@ class NotificationLog(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# NotificationTypeOverride — admin overrides to notification routing
+# ---------------------------------------------------------------------------
+class NotificationTypeOverride(models.Model):
+    """Admin overrides to notification type routing.
+
+    Stores fields that differ from the hardcoded defaults in product_types.py.
+    On startup, these are loaded and applied on top of the registry defaults.
+    """
+
+    key = models.CharField(
+        max_length=100, unique=True, db_index=True,
+        help_text=_('Notification type key (e.g., application_submitted).'),
+    )
+    channels = models.JSONField(
+        default=list, blank=True,
+        help_text=_('Override default_channels (e.g., ["in_app", "email"]).'),
+    )
+    roles = models.JSONField(
+        default=list, blank=True,
+        help_text=_('Override default_roles (e.g., ["admin", "program_officer"]).'),
+    )
+    priority = models.CharField(
+        max_length=10, blank=True,
+        help_text=_('Override priority (low, medium, high, urgent).'),
+    )
+    allow_mute = models.BooleanField(
+        null=True,
+        help_text=_('Override allow_mute. Null means use hardcoded default.'),
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        KeelUser, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+',
+    )
+
+    class Meta:
+        db_table = 'keel_notification_type_override'
+        verbose_name = _('notification type override')
+        verbose_name_plural = _('notification type overrides')
+
+    def __str__(self):
+        return f"Override: {self.key}"
+
+
+# ---------------------------------------------------------------------------
 # AuditLog — concrete audit log for the Keel admin console
 # ---------------------------------------------------------------------------
 class AuditLog(models.Model):

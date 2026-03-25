@@ -94,6 +94,30 @@ def get_types_by_category() -> dict[str, list[NotificationType]]:
     return by_cat
 
 
+def apply_overrides():
+    """Load persisted overrides from the database and patch the registry.
+
+    Called once during AppConfig.ready(), after hardcoded types are registered.
+    Silently skips if the database table doesn't exist yet (pre-migration).
+    """
+    try:
+        from keel.accounts.models import NotificationTypeOverride
+        for override in NotificationTypeOverride.objects.all():
+            ntype = _registry.get(override.key)
+            if ntype is None:
+                continue
+            if override.channels:
+                ntype.default_channels = override.channels
+            if override.roles:
+                ntype.default_roles = override.roles
+            if override.priority:
+                ntype.priority = override.priority
+            if override.allow_mute is not None:
+                ntype.allow_mute = override.allow_mute
+    except Exception:
+        logger.debug('Could not load notification overrides (table may not exist yet)', exc_info=True)
+
+
 def clear_registry():
     """Clear all registered types. Used in testing."""
     _registry.clear()
