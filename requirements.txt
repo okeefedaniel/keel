@@ -9,6 +9,9 @@ psycopg2-binary>=2.9
 twilio>=9.0
 requests>=2.30
 
+# Email (Resend HTTP API — Railway blocks outbound SMTP)
+django-resend>=3.0
+
 # Optional (uncomment as needed)
 # django-allauth>=65.0   # SSO via Microsoft Entra ID
 # anthropic>=0.40         # AI features
