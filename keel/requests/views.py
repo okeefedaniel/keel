@@ -166,13 +166,19 @@ def api_ingest(request):
         page_url=(data.get('page_url') or '').strip(),
     )
 
-    # Notify Keel admins
-    _notify_admins_api(cr)
-
     logger.info(
         'API ingest: change request "%s" from %s (%s)',
         cr.title, cr.submitted_by_name, cr.product,
     )
+
+    # Return success immediately — notify admins in background thread
+    # so SMTP timeouts don't block the API response.
+    import threading
+    threading.Thread(
+        target=_notify_admins_api,
+        args=(cr,),
+        daemon=True,
+    ).start()
 
     return JsonResponse({
         'id': str(cr.id),
