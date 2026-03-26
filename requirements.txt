@@ -10,7 +10,7 @@ twilio>=9.0
 requests>=2.30
 
 # Email (Resend HTTP API — Railway blocks outbound SMTP)
-django-resend>=3.0
+resend>=2.0
 
 # Optional (uncomment as needed)
 # django-allauth>=65.0   # SSO via Microsoft Entra ID
