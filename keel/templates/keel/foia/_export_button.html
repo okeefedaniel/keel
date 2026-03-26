@@ -1,0 +1,50 @@
+{% if show_button %}
+<form method="post" action="{% url 'keel_foia:foia_export' %}" class="d-inline foia-export-form">
+  {% csrf_token %}
+  <input type="hidden" name="product" value="{{ product_name }}">
+  <input type="hidden" name="record_type" value="{{ record_type }}">
+  <input type="hidden" name="record_id" value="{{ record_id }}">
+  <button type="submit" class="btn btn-outline-warning btn-sm"
+          title="Export to FOIA queue for Admiralty review"
+          onclick="return confirm('Export this {{ record_type }} to FOIA for review?');">
+    <i class="bi bi-shield-lock me-1"></i>Export to FOIA
+  </button>
+</form>
+
+<script>
+(function() {
+  document.querySelectorAll('.foia-export-form').forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var btn = form.querySelector('button');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting...';
+
+      fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.status === 'exported') {
+          btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Exported';
+          btn.classList.remove('btn-outline-warning');
+          btn.classList.add('btn-success');
+        } else {
+          btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + (data.error || 'Error');
+          btn.classList.remove('btn-outline-warning');
+          btn.classList.add('btn-danger');
+          btn.disabled = false;
+        }
+      })
+      .catch(function() {
+        btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Failed';
+        btn.classList.add('btn-danger');
+        btn.disabled = false;
+      });
+    });
+  });
+})();
+</script>
+{% endif %}
