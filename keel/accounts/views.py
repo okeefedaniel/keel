@@ -211,6 +211,7 @@ def send_invitation(request):
     email = request.POST.get('email', '').strip().lower()
     product = request.POST.get('product', '').strip()
     role = request.POST.get('role', '').strip()
+    is_beta_tester = request.POST.get('is_beta_tester') == '1'
 
     if not email or not product or not role:
         messages.error(request, 'Email, product, and role are required.')
@@ -241,6 +242,7 @@ def send_invitation(request):
             email=email,
             product=prod,
             role=role,
+            is_beta_tester=is_beta_tester,
             invited_by=request.user,
             expires_at=expires_at,
         )

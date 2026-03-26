@@ -314,6 +314,11 @@ class Invitation(models.Model):
         max_length=10, choices=Status.choices, default=Status.PENDING,
     )
 
+    is_beta_tester = models.BooleanField(
+        default=False,
+        help_text=_('Grant beta tester status when invitation is accepted.'),
+    )
+
     invited_by = models.ForeignKey(
         KeelUser, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='sent_invitations',
@@ -352,13 +357,21 @@ class Invitation(models.Model):
             product=self.product,
             defaults={
                 'role': self.role,
+                'is_beta_tester': self.is_beta_tester,
                 'granted_by': self.invited_by,
             },
         )
-        if not created and not access.is_active:
-            access.is_active = True
-            access.role = self.role
-            access.save(update_fields=['is_active', 'role'])
+        if not created:
+            updated_fields = []
+            if not access.is_active:
+                access.is_active = True
+                access.role = self.role
+                updated_fields.extend(['is_active', 'role'])
+            if self.is_beta_tester and not access.is_beta_tester:
+                access.is_beta_tester = True
+                updated_fields.append('is_beta_tester')
+            if updated_fields:
+                access.save(update_fields=updated_fields)
 
         self.status = self.Status.ACCEPTED
         self.accepted_by = user
