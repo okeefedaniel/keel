@@ -178,3 +178,25 @@ class AbstractArchivedRecord(models.Model):
 
     def __str__(self):
         return f"Archived {self.entity_type} - {self.entity_id}"
+
+
+# ---------------------------------------------------------------------------
+# KeelBaseModel — standard abstract base for all new Keel and product models
+# ---------------------------------------------------------------------------
+class KeelBaseModel(models.Model):
+    """Standard abstract base providing UUID PK, timestamps, and created_by.
+
+    All new Keel module models and product-specific models should inherit
+    from this to ensure consistent field patterns across the DockLabs suite.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='%(app_label)s_%(class)s_created',
+    )
+
+    class Meta:
+        abstract = True

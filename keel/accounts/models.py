@@ -31,6 +31,7 @@ class Product(models.TextChoices):
     MANIFEST = 'manifest', _('Manifest Signing')
     LOOKOUT = 'lookout', _('Lookout Legislative')
     BOUNTY = 'bounty', _('Bounty Federal Grants')
+    PURSER = 'purser', _('Purser Finance')
     KEEL = 'keel', _('Keel Admin')
 
 
@@ -79,6 +80,14 @@ PRODUCT_ROLES = {
         ('coordinator', 'Federal Fund Coordinator'),
         ('analyst', 'Analyst'),
         ('viewer', 'Viewer'),
+    ],
+    'purser': [
+        ('purser_admin', 'Purser Admin'),
+        ('purser_submitter', 'Submitter'),
+        ('purser_reviewer', 'Reviewer'),
+        ('purser_compliance_officer', 'Compliance Officer'),
+        ('purser_readonly', 'Read-Only'),
+        ('external_submitter', 'External Submitter'),
     ],
     'keel': [
         ('admin', 'Admin'),
