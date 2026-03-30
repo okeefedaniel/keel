@@ -45,7 +45,10 @@ def send_email(recipient, title, message, link='', priority='medium',
     if not email_addr:
         return False, 'Recipient has no email address'
 
-    subject = email_subject.format(title=title) if email_subject else title
+    fmt_vars = {'title': title}
+    if context:
+        fmt_vars.update(context)
+    subject = email_subject.format(**fmt_vars) if email_subject else title
     from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@docklabs.ai')
 
     # Build template context
