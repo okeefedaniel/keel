@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'keel.periods',
     'keel.reporting',
     'keel.compliance',
+    'keel.calendar',
 ]
 
 # ---------------------------------------------------------------------------
@@ -177,6 +178,11 @@ KEEL_SMS_BACKEND = os.environ.get('KEEL_SMS_BACKEND', None)  # Set to 'twilio' t
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
 TWILIO_FROM_NUMBER = os.environ.get('TWILIO_FROM_NUMBER', '')
+
+# Calendar sync (keel.calendar)
+KEEL_CALENDAR_PROVIDER = os.environ.get('KEEL_CALENDAR_PROVIDER', None)  # 'google' or 'microsoft'
+KEEL_CALENDAR_EVENT_MODEL = None  # Products set this to their concrete model
+KEEL_CALENDAR_SYNC_LOG_MODEL = None
 
 # ---------------------------------------------------------------------------
 # Security
