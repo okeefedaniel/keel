@@ -422,7 +422,7 @@ def _register_keel_types():
         label='Change Request Submitted',
         description='A beta user has submitted a change request from any product.',
         category='Keel — Platform',
-        default_channels=['in_app', 'email'],
+        default_channels=['in_app', 'email', 'boswell'],
         default_roles=['admin', 'system_admin'],
         priority='high',
     ))

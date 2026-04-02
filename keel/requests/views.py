@@ -210,6 +210,7 @@ def _notify_admins_api(cr):
                 ),
                 priority='medium',
                 link=f'/keel/requests/{cr.id}/',
+                context={'change_request': cr},
             )
             logger.info('Notification result: sent=%s, skipped=%s, errors=%s, details=%s',
                         result.get('sent'), result.get('skipped'), result.get('errors'),
@@ -225,18 +226,24 @@ def _notify_admins(cr, request):
     try:
         from keel.notifications.dispatch import notify
         from keel.accounts.models import ProductAccess
+        from django.contrib.auth import get_user_model
 
+        User = get_user_model()
         admin_ids = ProductAccess.objects.filter(
             role__in=('admin', 'system_admin'), is_active=True,
         ).values_list('user_id', flat=True).distinct()
+        admins = list(User.objects.filter(pk__in=admin_ids, is_active=True))
 
-        for admin_id in admin_ids:
+        if admins:
             notify(
-                recipient_id=admin_id,
+                event='change_request_submitted',
+                actor=request.user,
+                recipients=admins,
                 title=f'New {cr.get_category_display()}: {cr.title}',
                 message=f'{cr.submitted_by_name} submitted a {cr.get_category_display().lower()} for {cr.product.title()}.',
                 priority='medium',
                 link=f'/keel/requests/{cr.id}/',
+                context={'change_request': cr},
             )
     except Exception:
         logger.debug('Could not send admin notification (notifications module may not be configured)')
