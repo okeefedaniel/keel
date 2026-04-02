@@ -28,6 +28,8 @@ def site_context(request):
     """
     context = {
         'SITE_NAME': getattr(settings, 'KEEL_PRODUCT_NAME', 'DockLabs'),
+        'PRODUCT_ICON': getattr(settings, 'KEEL_PRODUCT_ICON', 'bi-gear'),
+        'PRODUCT_SUBTITLE': getattr(settings, 'KEEL_PRODUCT_SUBTITLE', ''),
         'CURRENT_YEAR': timezone.now().year,
         'DEMO_MODE': getattr(settings, 'DEMO_MODE', False),
     }
