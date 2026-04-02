@@ -60,10 +60,14 @@ def admin_required(view_func):
 def dashboard(request):
     """Admin console home — overview of users and products."""
     product_choices = get_product_choices()
+    superuser_count = KeelUser.objects.filter(is_active=True, is_superuser=True).count()
     product_stats = []
     for value, label in product_choices:
         count = ProductAccess.objects.filter(product=value, is_active=True).count()
-        product_stats.append({'code': value, 'name': label, 'user_count': count})
+        product_stats.append({
+            'code': value, 'name': label,
+            'user_count': count + superuser_count,
+        })
 
     context = {
         'total_users': KeelUser.objects.filter(is_active=True).count(),

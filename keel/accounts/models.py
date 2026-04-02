@@ -32,6 +32,7 @@ class Product(models.TextChoices):
     LOOKOUT = 'lookout', _('Lookout Legislative')
     BOUNTY = 'bounty', _('Bounty Federal Grants')
     PURSER = 'purser', _('Purser Finance')
+    YEOMAN = 'yeoman', _('Yeoman Scheduling')
     KEEL = 'keel', _('Keel Admin')
 
 
@@ -88,6 +89,12 @@ PRODUCT_ROLES = {
         ('purser_compliance_officer', 'Compliance Officer'),
         ('purser_readonly', 'Read-Only'),
         ('external_submitter', 'External Submitter'),
+    ],
+    'yeoman': [
+        ('yeoman_admin', 'Administrator'),
+        ('yeoman_scheduler', 'Scheduler'),
+        ('yeoman_viewer', 'Viewer'),
+        ('yeoman_delegate', 'Delegate'),
     ],
     'keel': [
         ('admin', 'Admin'),

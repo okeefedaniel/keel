@@ -129,17 +129,29 @@ def preferences(request):
             'prefs_enabled': False,
         })
 
+    # Filter to only the current product's notification types.
+    product_name = getattr(settings, 'KEEL_PRODUCT_NAME', '')
+    product_prefixes = getattr(settings, 'KEEL_NOTIFICATION_CATEGORIES', None)
     types_by_category = get_types_by_category()
+    if product_prefixes:
+        types_by_category = {
+            cat: types for cat, types in types_by_category.items()
+            if any(cat.startswith(p) for p in product_prefixes)
+        }
 
     if request.method == 'POST':
         _save_preferences(request, PrefModel, types_by_category)
         return redirect('keel_notifications:preferences')
 
-    # Load current preferences
-    user_prefs = {
-        p.notification_type: p
-        for p in PrefModel.objects.filter(user=request.user)
-    }
+    try:
+        # Load current preferences
+        user_prefs = {
+            p.notification_type: p
+            for p in PrefModel.objects.filter(user=request.user)
+        }
+    except Exception:
+        logger.exception('Failed to load notification preferences')
+        user_prefs = {}
 
     context = {
         'categories': types_by_category,

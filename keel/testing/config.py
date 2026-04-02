@@ -174,6 +174,36 @@ _BOUNTY_STAFF = [
     '/integration/harbor/settings/',
 ]
 
+_YEOMAN_PUBLIC = [
+    '/invite/',
+    '/invite/success/',
+]
+
+_YEOMAN_COMMON = [
+    '/dashboard/',
+    '/invitations/',
+    '/calendar/',
+    '/map/',
+]
+
+_YEOMAN_STAFF = [
+    '/reports/',
+    '/reports/export/',
+]
+
+_PURSER_COMMON = [
+    '/purser/',
+]
+
+_PURSER_STAFF = [
+    '/purser/review/',
+    '/purser/compliance/',
+]
+
+_PURSER_ADMIN = [
+    '/purser/admin/programs/',
+]
+
 
 PRODUCTS = {
     'lookout': Product(
@@ -330,6 +360,42 @@ PRODUCTS = {
             'test_opportunity_tracking',
             'test_matching_preferences',
             'test_collaborator_flow',
+        ],
+    ),
+    'yeoman': Product(
+        name='Yeoman',
+        repo_dir='yeoman',
+        settings_module='yeoman_project.settings',
+        live_url='https://yeoman.docklabs.ai',
+        demo_roles=['yeoman_admin', 'yeoman_scheduler', 'yeoman_viewer', 'yeoman_delegate'],
+        public_urls=_YEOMAN_PUBLIC + ['/auth/login/'],
+        auth_urls={
+            'yeoman_admin': _YEOMAN_COMMON + _YEOMAN_STAFF,
+            'yeoman_scheduler': _YEOMAN_COMMON + _YEOMAN_STAFF,
+            'yeoman_viewer': _YEOMAN_COMMON,
+            'yeoman_delegate': _YEOMAN_COMMON,
+        },
+        workflows=[
+            'test_invitation_workflow',
+            'test_delegation_flow',
+        ],
+    ),
+    'purser': Product(
+        name='Purser',
+        repo_dir='purser',
+        settings_module='purser_site.settings',
+        live_url='https://purser.docklabs.ai',
+        demo_roles=['purser_admin', 'purser_submitter', 'purser_reviewer', 'purser_compliance_officer'],
+        public_urls=['/accounts/login/'],
+        auth_urls={
+            'purser_admin': _PURSER_COMMON + _PURSER_STAFF + _PURSER_ADMIN,
+            'purser_submitter': _PURSER_COMMON,
+            'purser_reviewer': _PURSER_COMMON + _PURSER_STAFF,
+            'purser_compliance_officer': _PURSER_COMMON + _PURSER_STAFF,
+        },
+        workflows=[
+            'test_submission_workflow',
+            'test_compliance_workflow',
         ],
     ),
 }
