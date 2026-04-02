@@ -181,6 +181,70 @@ class AbstractArchivedRecord(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# StatusHistory — immutable workflow transition audit trail
+# ---------------------------------------------------------------------------
+class AbstractStatusHistory(models.Model):
+    """Immutable record of a workflow status transition.
+
+    Products subclass and add a ForeignKey to their domain model:
+
+        class ApplicationStatusHistory(AbstractStatusHistory):
+            application = models.ForeignKey(Application, ...)
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    old_status = models.CharField(max_length=50)
+    new_status = models.CharField(max_length=50)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='%(app_label)s_%(class)s_changes',
+    )
+    comment = models.TextField(blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f"{self.old_status} → {self.new_status} ({self.changed_at:%Y-%m-%d %H:%M})"
+
+
+# ---------------------------------------------------------------------------
+# InternalNote — staff comments with visibility control
+# ---------------------------------------------------------------------------
+class AbstractInternalNote(models.Model):
+    """Internal staff note/comment on a record.
+
+    Products subclass and add a ForeignKey to their domain model:
+
+        class ApplicationComment(AbstractInternalNote):
+            application = models.ForeignKey(Application, ...)
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='%(app_label)s_%(class)s_authored',
+    )
+    content = models.TextField()
+    is_internal = models.BooleanField(
+        default=True,
+        help_text=_('If True, only visible to staff. If False, visible to external users.'),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+
+    def __str__(self):
+        author_name = self.author.get_full_name() if self.author else 'System'
+        return f"{author_name} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+# ---------------------------------------------------------------------------
 # KeelBaseModel — standard abstract base for all new Keel and product models
 # ---------------------------------------------------------------------------
 class KeelBaseModel(models.Model):

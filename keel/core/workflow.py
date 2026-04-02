@@ -70,8 +70,11 @@ class WorkflowEngine:
         'company_moderator': 'can_moderate_companies',
     }
 
-    def __init__(self, transitions: list[Transition] | None = None):
+    def __init__(self, transitions: list[Transition] | None = None,
+                 history_model=None, history_fk_field=None):
         self.transitions = transitions or []
+        self._history_model = history_model      # dotted path or model class
+        self._history_fk_field = history_fk_field  # FK field name on history model
         self._index: dict[str, list[Transition]] = {}
         self._rebuild_index()
 
@@ -122,6 +125,9 @@ class WorkflowEngine:
             obj.__class__.__name__, old_status, target_status, user,
         )
 
+        # Auto-create status history record if configured
+        self._record_history(obj, old_status, target_status, user, comment)
+
         if transition.on_complete:
             transition.on_complete(obj, user, comment)
 
@@ -132,6 +138,35 @@ class WorkflowEngine:
         for t in self.transitions:
             graph.setdefault(t.from_status, []).append(t.to_status)
         return graph
+
+    def _resolve_history_model(self):
+        """Lazily resolve the history model from a dotted path string."""
+        if self._history_model is None:
+            return None
+        if isinstance(self._history_model, str):
+            from django.apps import apps
+            try:
+                self._history_model = apps.get_model(self._history_model)
+            except LookupError:
+                logger.warning('History model %s not found', self._history_model)
+                self._history_model = None
+        return self._history_model
+
+    def _record_history(self, obj, old_status, new_status, user, comment):
+        """Create a status history record if a history model is configured."""
+        model = self._resolve_history_model()
+        if model is None or not self._history_fk_field:
+            return
+        try:
+            model.objects.create(
+                **{self._history_fk_field: obj},
+                old_status=old_status,
+                new_status=new_status,
+                changed_by=user,
+                comment=comment,
+            )
+        except Exception:
+            logger.exception('Failed to create status history record')
 
     def _rebuild_index(self):
         self._index = {}
