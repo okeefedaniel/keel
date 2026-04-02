@@ -25,10 +25,8 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
-from .providers import PROVIDERS
 from .registry import get_type
 
 logger = logging.getLogger(__name__)
@@ -36,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 def _get_provider(provider_key):
     """Look up a provider by key. Returns the provider namespace or None."""
+    from .providers import PROVIDERS
     provider = PROVIDERS.get(provider_key)
     if not provider:
         logger.error("Unknown calendar provider: %s", provider_key)
@@ -65,6 +64,7 @@ def _save_event(user, event_type, title, description, location,
 
     try:
         from django.apps import apps
+        from django.contrib.contenttypes.models import ContentType
         EventModel = apps.get_model(model_path)
 
         ct = None
