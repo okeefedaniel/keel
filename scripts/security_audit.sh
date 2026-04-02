@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/opt/homebrew/bin/bash
 # =============================================================================
 # DockLabs Security Audit
 # Runs at 3:00 AM ET daily via cron. Scans all products for vulnerabilities,

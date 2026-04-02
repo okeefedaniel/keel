@@ -1,22 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
 # DockLabs Nightly Test Suite
-# Runs at 2:00 AM ET via cron. Executes all product tests, then invokes
-# Claude Code to auto-fix any failures.
+# Runs at 2:00 AM via cron.
 #
-# Cron entry (add via: crontab -e):
+# Cron entry:
 #   0 2 * * * /Users/dok/SynologyDrive/Work/CT/Web/keel/scripts/nightly.sh >> /Users/dok/SynologyDrive/Work/CT/Web/keel/logs/nightly.log 2>&1
 #
 # What it does:
-#   1. Run Django unit tests for all products
-#   2. Run smoke tests (every URL, every user type, every product)
-#   3. Generate a report
-#   4. If failures: invoke Claude Code per product to diagnose and fix
-#   5. Re-run tests on fixed products to verify
-#   6. Commit and push fixes
+#   1. Run full test suite with --auto-fix --json --notify-dashboard
+#   2. If auto-fix changed files, commit and push
+#   3. POST unfixable failures to Keel dashboard API
 # =============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 # --- Configuration ---
 KEEL_DIR="/Users/dok/SynologyDrive/Work/CT/Web/keel"
@@ -24,181 +20,183 @@ BASE_DIR="/Users/dok/SynologyDrive/Work/CT/Web"
 LOG_DIR="${KEEL_DIR}/logs"
 REPORT_DIR="${KEEL_DIR}/reports"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-REPORT_FILE="${REPORT_DIR}/nightly_${TIMESTAMP}.txt"
 JSON_FILE="${REPORT_DIR}/nightly_${TIMESTAMP}.json"
-PROMPT_FILE="${REPORT_DIR}/nightly_${TIMESTAMP}.prompt"
+
+KEEL_API_URL="https://keel.docklabs.ai/api/requests/ingest/"
+
+# Load KEEL_API_KEY from .env or .zshrc
+if [ -f "${KEEL_DIR}/.env" ]; then
+    export $(grep -E '^KEEL_API_KEY=' "${KEEL_DIR}/.env" | xargs)
+fi
+if [ -z "${KEEL_API_KEY:-}" ] && [ -f "$HOME/.zshrc" ]; then
+    eval "$(grep -E '^export KEEL_API_KEY=' "$HOME/.zshrc" 2>/dev/null)" || true
+fi
+if [ -z "${KEEL_API_KEY:-}" ]; then
+    echo "ERROR: KEEL_API_KEY not set. Add it to ~/.zshrc or ${KEEL_DIR}/.env"
+    exit 1
+fi
 
 # Ensure directories exist
 mkdir -p "${LOG_DIR}" "${REPORT_DIR}"
 
-# Use keel's own Python (or system python3)
-PYTHON="${KEEL_DIR}/venv/bin/python"
+# Python from keel's venv
+PYTHON="${KEEL_DIR}/.venv/bin/python"
 if [ ! -f "${PYTHON}" ]; then
-    PYTHON=$(which python3)
+    echo "ERROR: Keel venv not found at ${KEEL_DIR}/.venv"
+    exit 1
 fi
 
 echo "============================================"
 echo "DockLabs Nightly Tests — $(date)"
 echo "============================================"
 
-# --- Phase 1: Run all tests ---
+# --- Phase 1: Run full test suite ---
 echo ""
-echo "Phase 1: Running test suite..."
+echo "Phase 1: Running test suite with --auto-fix --json --notify-dashboard..."
 echo ""
 
 cd "${KEEL_DIR}"
+source .venv/bin/activate
 
-# Run tests, capture exit code
 set +e
-${PYTHON} -m keel.testing \
-    --report-file "${REPORT_FILE}" \
-    --fix-prompt \
-    2>"${LOG_DIR}/nightly_stderr_${TIMESTAMP}.log"
+python -m keel.testing --auto-fix --json --notify-dashboard > "${JSON_FILE}" 2>"${LOG_DIR}/nightly_stderr_${TIMESTAMP}.log"
 TEST_EXIT=$?
 set -e
 
-# Also generate JSON report
-${PYTHON} -m keel.testing --json > "${JSON_FILE}" 2>/dev/null || true
-
-echo ""
-echo "Report written to: ${REPORT_FILE}"
 echo "Test exit code: ${TEST_EXIT}"
+echo "JSON report: ${JSON_FILE}"
+
+# --- Phase 2: If auto-fix changed files, commit and push ---
+echo ""
+echo "Phase 2: Checking for auto-fix changes..."
 echo ""
 
-# --- Phase 2: Auto-fix failures with Claude Code ---
-if [ ${TEST_EXIT} -ne 0 ] && [ -f "${PROMPT_FILE}" ]; then
-    echo "============================================"
-    echo "Phase 2: Auto-fixing failures with Claude..."
-    echo "============================================"
-    echo ""
+# Product directories to check for changes
+declare -a PRODUCT_DIRS=(
+    "${BASE_DIR}/beacon"
+    "${BASE_DIR}/harbor"
+    "${BASE_DIR}/lookout"
+    "${BASE_DIR}/keel"
+)
 
-    # Check if claude CLI is available
-    if ! command -v claude &>/dev/null; then
-        echo "WARNING: claude CLI not found. Skipping auto-fix."
-        echo "Install: npm install -g @anthropic-ai/claude-code"
-        cat "${REPORT_FILE}"
-        exit ${TEST_EXIT}
+for PRODUCT_DIR in "${PRODUCT_DIRS[@]}"; do
+    if [ ! -d "${PRODUCT_DIR}/.git" ] && [ ! -d "${PRODUCT_DIR}" ]; then
+        continue
     fi
 
-    # Parse which products have failures from the JSON report
-    FAILED_PRODUCTS=$(${PYTHON} -c "
-import json, sys
-try:
-    data = json.load(open('${JSON_FILE}'))
-    products = set()
-    for f in data.get('failures', []):
-        products.add(f.get('product', ''))
-    print(' '.join(products))
-except:
-    print('')
-" 2>/dev/null)
+    cd "${PRODUCT_DIR}"
 
-    echo "Products with failures: ${FAILED_PRODUCTS}"
-    echo ""
-
-    # Map product names to repo directories
-    declare -A PRODUCT_DIRS
-    PRODUCT_DIRS[Lookout]="${BASE_DIR}/lookout"
-    PRODUCT_DIRS[Beacon]="${BASE_DIR}/beacon"
-    PRODUCT_DIRS[Admiralty]="${BASE_DIR}/beacon"
-    PRODUCT_DIRS[Harbor]="${BASE_DIR}/harbor"
-    PRODUCT_DIRS[Manifest]="${BASE_DIR}/harbor"
-
-    PROMPT=$(cat "${PROMPT_FILE}")
-
-    for PRODUCT in ${FAILED_PRODUCTS}; do
-        PRODUCT_DIR="${PRODUCT_DIRS[${PRODUCT}]:-}"
-        if [ -z "${PRODUCT_DIR}" ]; then
-            echo "Unknown product: ${PRODUCT}, skipping"
-            continue
-        fi
-
-        echo "--- Fixing ${PRODUCT} in ${PRODUCT_DIR} ---"
-
-        # Extract just this product's failures for a focused prompt
-        PRODUCT_PROMPT=$(${PYTHON} -c "
-import json
-data = json.load(open('${JSON_FILE}'))
-failures = [f for f in data.get('failures', []) if f.get('product') == '${PRODUCT}']
-if failures:
-    print('The nightly test suite found these failures in ${PRODUCT}:')
-    print()
-    for f in failures:
-        print(f'- [{f[\"section\"]}] {f[\"label\"]}')
-        if f.get('detail'):
-            print(f'  Detail: {f[\"detail\"]}')
-    print()
-    print('Investigate each failure, identify the root cause, and fix it.')
-    print('After fixing, run: python manage.py test --verbosity=2')
-    print('Commit fixes with a descriptive message.')
-" 2>/dev/null)
-
-        if [ -z "${PRODUCT_PROMPT}" ]; then
-            echo "No failures extracted for ${PRODUCT}, skipping"
-            continue
-        fi
-
-        # Run Claude Code in the product directory
-        # --print for non-interactive, --dangerously-skip-permissions for unattended
-        cd "${PRODUCT_DIR}"
-        echo "${PRODUCT_PROMPT}" | claude --print --dangerously-skip-permissions \
-            2>>"${LOG_DIR}/claude_fix_${PRODUCT}_${TIMESTAMP}.log" || true
-        cd "${KEEL_DIR}"
-
-        echo "Claude fix attempt for ${PRODUCT} complete"
-        echo ""
-    done
-
-    # --- Phase 3: Re-run tests on fixed products ---
-    echo "============================================"
-    echo "Phase 3: Verification run..."
-    echo "============================================"
-    echo ""
-
-    VERIFY_FILE="${REPORT_DIR}/verify_${TIMESTAMP}.txt"
-    set +e
-    ${PYTHON} -m keel.testing \
-        --report-file "${VERIFY_FILE}" \
-        2>/dev/null
-    VERIFY_EXIT=$?
-    set -e
-
-    echo ""
-    echo "Verification report: ${VERIFY_FILE}"
-    echo "Verification exit code: ${VERIFY_EXIT}"
-
-    if [ ${VERIFY_EXIT} -eq 0 ]; then
-        echo ""
-        echo "ALL FIXES VERIFIED — pushing changes"
-        echo ""
-        # Push any committed fixes
-        for PRODUCT_DIR in $(echo "${PRODUCT_DIRS[@]}" | tr ' ' '\n' | sort -u); do
-            if [ -d "${PRODUCT_DIR}/.git" ]; then
-                cd "${PRODUCT_DIR}"
-                # Check if there are unpushed commits
-                UNPUSHED=$(git log origin/main..HEAD --oneline 2>/dev/null | wc -l)
-                if [ "${UNPUSHED}" -gt 0 ]; then
-                    echo "Pushing ${UNPUSHED} fix commit(s) from ${PRODUCT_DIR}"
-                    git push origin main 2>/dev/null || true
-                fi
-                cd "${KEEL_DIR}"
-            fi
-        done
-    else
-        echo ""
-        echo "WARNING: Some failures remain after auto-fix."
-        echo "Manual intervention required."
-        echo ""
+    # Check for uncommitted changes
+    if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
+        continue
     fi
+
+    # Describe the changes
+    CHANGED_FILES=$(git diff --name-only 2>/dev/null)
+    PRODUCT_NAME=$(basename "${PRODUCT_DIR}")
+
+    DESCRIPTION=""
+    if echo "${CHANGED_FILES}" | grep -q '\.css\|tokens\|style'; then
+        DESCRIPTION="${DESCRIPTION}CSS token fixes, "
+    fi
+    if echo "${CHANGED_FILES}" | grep -q 'version\|setup\|pyproject\|package'; then
+        DESCRIPTION="${DESCRIPTION}version updates, "
+    fi
+    if echo "${CHANGED_FILES}" | grep -q 'a11y\|accessibility\|aria\|alt'; then
+        DESCRIPTION="${DESCRIPTION}accessibility fixes, "
+    fi
+    if echo "${CHANGED_FILES}" | grep -q 'settings\|config\|security'; then
+        DESCRIPTION="${DESCRIPTION}security settings, "
+    fi
+    if [ -z "${DESCRIPTION}" ]; then
+        DESCRIPTION="auto-detected issues, "
+    fi
+    DESCRIPTION="${DESCRIPTION%, }"  # trim trailing comma
+
+    echo "  ${PRODUCT_NAME}: committing auto-fix changes (${DESCRIPTION})"
+    git add -A
+    git commit -m "Nightly auto-fix: ${DESCRIPTION} in ${PRODUCT_NAME}" 2>/dev/null || true
+    git push origin HEAD 2>/dev/null || echo "  WARNING: push failed for ${PRODUCT_NAME}"
+
+    cd "${KEEL_DIR}"
+done
+
+# --- Phase 3: POST unfixable failures to Keel dashboard API ---
+echo ""
+echo "Phase 3: Reporting unfixable failures to dashboard..."
+echo ""
+
+if [ ${TEST_EXIT} -ne 0 ] && [ -f "${JSON_FILE}" ]; then
+    # Parse failures and POST each one
+    python3 -c "
+import json, sys, urllib.request, urllib.error, os
+
+with open('${JSON_FILE}') as f:
+    data = json.load(f)
+
+failures = data.get('failures', [])
+if not failures:
+    print('No failures to report.')
+    sys.exit(0)
+
+api_url = '${KEEL_API_URL}'
+api_key = os.environ['KEEL_API_KEY']
+posted = 0
+skipped = 0
+
+for f in failures:
+    section = f.get('section', '')
+    label = f.get('label', 'Unknown test')
+    detail = f.get('detail', '')
+    product = f.get('product', 'Beacon')
+    severity = f.get('severity', 'medium')
+
+    # Skip if auto-fixed
+    if f.get('auto_fixed', False):
+        skipped += 1
+        continue
+
+    is_security = 'security' in section.lower() or severity.upper() in ('CRITICAL', 'HIGH')
+    priority = 'high' if is_security else 'medium'
+
+    payload = json.dumps({
+        'title': f'Nightly Test Failure: {label}',
+        'description': f'**Section:** {section}\n**Product:** {product}\n**Severity:** {severity}\n\n{detail}',
+        'category': 'bug',
+        'priority': priority,
+        'product': product.lower(),
+        'submitted_by_name': 'Nightly Test Bot',
+        'submitted_by_email': 'info@docklabs.ai',
+    }).encode()
+
+    req = urllib.request.Request(
+        api_url,
+        data=payload,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+
+    try:
+        resp = urllib.request.urlopen(req, timeout=30)
+        posted += 1
+        print(f'  Posted: {label} ({priority} priority)')
+    except urllib.error.HTTPError as e:
+        print(f'  FAILED to post {label}: HTTP {e.code} - {e.read().decode()[:200]}', file=sys.stderr)
+    except Exception as e:
+        print(f'  FAILED to post {label}: {e}', file=sys.stderr)
+
+print(f'\n{posted} failure(s) posted, {skipped} auto-fixed (skipped).')
+"
 else
-    echo "All tests passed — no fixes needed."
+    echo "All tests passed — nothing to report."
 fi
 
 # --- Cleanup old reports (keep 30 days) ---
 find "${REPORT_DIR}" -name "nightly_*" -mtime +30 -delete 2>/dev/null || true
-find "${REPORT_DIR}" -name "verify_*" -mtime +30 -delete 2>/dev/null || true
 find "${LOG_DIR}" -name "nightly_*" -mtime +30 -delete 2>/dev/null || true
-find "${LOG_DIR}" -name "claude_fix_*" -mtime +30 -delete 2>/dev/null || true
 
 echo ""
 echo "Nightly test run complete — $(date)"
