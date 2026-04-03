@@ -47,8 +47,9 @@ Optional context:
                 </div>
                 {% endif %}
 
-                {# Username / Login field — products may use either field name #}
-                {% with login_field=form.login|default:form.username %}
+                {# Username / Login field — allauth uses "login", Django auth uses "username" #}
+                {% firstof form.login form.username as login_field %}
+                {% with login_field=login_field %}
                 {% if login_field %}
                 <div class="mb-3">
                     <label for="{{ login_field.id_for_label }}" class="form-label fw-semibold">
