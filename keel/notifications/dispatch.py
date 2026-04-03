@@ -67,6 +67,10 @@ def notify(event, actor=None, recipients=None, context=None,
     _priority = priority or (ntype.priority if ntype else 'medium')
     _channels = channels or (ntype.default_channels if ntype else ['in_app'])
 
+    # Auto-resolve link from link_template if no explicit link provided
+    if not link and ntype and ntype.link_template:
+        link = _resolve_link_template(ntype.link_template, context)
+
     # Resolve recipients
     if recipients is None:
         recipients = _resolve_recipients(ntype, context)
@@ -154,6 +158,34 @@ def _resolve_dotpath(context, path):
             return None
         obj = getattr(obj, part, None)
     return obj
+
+
+def _resolve_link_template(template, context):
+    """Resolve a link template string using the context dict.
+
+    Supports dot-paths: ``'{application.pk}'`` resolves to
+    ``context['application'].pk``.  If any placeholder can't be resolved,
+    returns the empty string (no broken links).
+
+    Examples:
+        _resolve_link_template('/apps/{application.pk}/', {'application': app})
+        # -> '/apps/42/'
+    """
+    import re
+
+    def _replace(match):
+        path = match.group(1)
+        return str(_resolve_dotpath(context, path) or '')
+
+    try:
+        resolved = re.sub(r'\{([^}]+)\}', _replace, template)
+        # If any placeholder resolved to empty, skip the link entirely
+        if '//' in resolved.replace('://', '') or resolved.endswith('/None/'):
+            return ''
+        return resolved
+    except Exception:
+        logger.debug('Failed to resolve link template: %s', template, exc_info=True)
+        return ''
 
 
 def _dispatch_to_recipient(recipient, event, ntype, title, message, link,

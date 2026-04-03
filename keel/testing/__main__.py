@@ -39,6 +39,7 @@ import json as json_module
 import sys
 
 from .config import PRODUCTS
+from .notification_audit import run_notification_audit
 from .result import TestResult
 from .security_audit import run_security_audit
 from .smoke import run_smoke_tests
@@ -138,6 +139,10 @@ def main():
         help='Run only workflow integration tests (POST-based state transitions)',
     )
     parser.add_argument(
+        '--notification-only', action='store_true',
+        help='Run only the notification catalog audit (registry validation)',
+    )
+    parser.add_argument(
         '--auto-fix', action='store_true',
         help='Automatically fix safe security issues (e.g., missing settings)',
     )
@@ -178,6 +183,8 @@ def main():
         )
     elif args.workflow_only:
         run_workflow_tests(T, product_names=products)
+    elif args.notification_only:
+        run_notification_audit(T)
     else:
         if not args.smoke_only:
             run_django_tests(T, product_names=products)
@@ -198,6 +205,10 @@ def main():
             critical_findings = run_security_audit(
                 T, product_names=products, auto_fix=args.auto_fix,
             )
+
+        # Notification catalog audit runs as part of the full suite
+        if not args.smoke_only and not args.unit_only:
+            run_notification_audit(T)
 
     # --- Notify Keel dashboard of critical findings ---
     if critical_findings and (args.notify_dashboard or args.security_only):

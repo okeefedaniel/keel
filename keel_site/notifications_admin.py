@@ -51,6 +51,16 @@ def notification_flow(request):
     all_types = get_all_types()
     product_roles = get_product_roles()
 
+    # Load database overrides to highlight customized types
+    override_keys = set()
+    override_count = 0
+    try:
+        overrides = NotificationTypeOverride.objects.values_list('key', flat=True)
+        override_keys = set(overrides)
+        override_count = len(override_keys)
+    except Exception:
+        pass
+
     # Build structured data for the diagram
     flow_data = []
     for key, ntype in sorted(all_types.items(), key=lambda x: (x[1].category, x[0])):
@@ -66,6 +76,8 @@ def notification_flow(request):
             'has_email_template': bool(ntype.email_template),
             'has_custom_resolver': bool(ntype.recipient_resolver),
             'agency_scoped': ntype.agency_scoped,
+            'has_link_template': bool(ntype.link_template),
+            'has_override': key in override_keys,
         })
 
     # Group by category for display
@@ -74,8 +86,8 @@ def notification_flow(request):
         cat = item['category']
         categories.setdefault(cat, []).append(item)
 
-    # Channel summary stats
-    channel_stats = {'in_app': 0, 'email': 0, 'sms': 0}
+    # Channel summary stats (include boswell)
+    channel_stats = {'in_app': 0, 'email': 0, 'sms': 0, 'boswell': 0}
     for ntype in all_types.values():
         for ch in ntype.default_channels:
             channel_stats[ch] = channel_stats.get(ch, 0) + 1
@@ -105,8 +117,12 @@ def notification_flow(request):
             'label': item['label'],
             'category': item['category'],
             'priority': item['priority'],
+            'has_override': item['has_override'],
             'cells': cells,  # parallel with matrix_roles
         })
+
+    # Orphaned overrides: DB overrides for types no longer in registry
+    orphaned_overrides = override_keys - set(all_types.keys())
 
     context = {
         'categories': categories,
@@ -119,6 +135,9 @@ def notification_flow(request):
         'email_backend': email_backend,
         'matrix_rows': matrix_rows,
         'matrix_roles': all_roles,
+        'override_count': override_count,
+        'override_keys': override_keys,
+        'orphaned_overrides': orphaned_overrides,
     }
     return render(request, 'notifications/flow.html', context)
 

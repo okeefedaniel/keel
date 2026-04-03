@@ -52,6 +52,36 @@
     </div>
   </div>
 
+  <!-- Maintenance -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-bell me-1"></i>Notification Catalog Sync</h6>
+          <p class="card-text text-muted" style="font-size: 0.85rem;">
+            Audit notification types — orphaned overrides, invalid roles/channels, coverage gaps. Use --fix to clean up.
+          </p>
+          <button class="btn btn-primary btn-sm run-btn" data-tool="notification-sync">
+            <i class="bi bi-play-fill me-1"></i>Run Sync
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-bell-slash me-1"></i>Notification Catalog Fix</h6>
+          <p class="card-text text-muted" style="font-size: 0.85rem;">
+            Run the catalog sync with --fix to remove orphaned database overrides and clean up stale entries.
+          </p>
+          <button class="btn btn-warning btn-sm run-btn" data-tool="notification-fix">
+            <i class="bi bi-play-fill me-1"></i>Sync &amp; Fix
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Security Audit -->
   <div class="row g-3 mb-4">
     <div class="col-md-6 col-lg-4">
@@ -220,6 +250,8 @@ const TOOL_LABELS = {
   'unit': 'Unit Tests',
   'security': 'Security Audit',
   'security-fix': 'Security Audit + Auto-Fix',
+  'notification-sync': 'Notification Catalog Sync',
+  'notification-fix': 'Notification Catalog Sync + Fix',
   'full': 'Full Test Suite'
 };
 

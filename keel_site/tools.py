@@ -103,6 +103,10 @@ def run_tool(request):
         cmd.extend(['--security-only', '--notify-dashboard'])
     elif tool == 'security-fix':
         cmd.extend(['--security-only', '--auto-fix', '--notify-dashboard'])
+    elif tool in ('notification-sync', 'notification-fix'):
+        cmd = [PYTHON, 'manage.py', 'sync_notification_catalog', '--json']
+        if tool == 'notification-fix':
+            cmd.append('--fix')
     # else: full suite
 
     if products:

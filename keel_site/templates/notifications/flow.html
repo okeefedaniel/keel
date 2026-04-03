@@ -55,6 +55,12 @@
               <span class="badge bg-success">{{ channel_stats.sms }}</span>
               <div class="text-muted" style="font-size: 0.7rem;">SMS</div>
             </div>
+            {% if channel_stats.boswell %}
+            <div>
+              <span class="badge bg-dark">{{ channel_stats.boswell }}</span>
+              <div class="text-muted" style="font-size: 0.7rem;">Boswell</div>
+            </div>
+            {% endif %}
           </div>
           <p class="text-muted small mb-0 mt-1">Channel Coverage</p>
         </div>
@@ -73,10 +79,27 @@
         <div class="card-body text-center">
           <h3 class="fw-bold mb-0" style="color: var(--ct-dark-blue);">{{ categories|length }}</h3>
           <p class="text-muted small mb-0">Categories</p>
+          {% if override_count %}
+          <span class="badge bg-warning text-dark mt-1" style="font-size: 0.7rem;">
+            <i class="bi bi-pencil-square me-1"></i>{{ override_count }} customized
+          </span>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
+
+  {% if orphaned_overrides %}
+  <div class="alert alert-warning mb-4" style="font-size: 0.85rem;">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>Orphaned overrides detected:</strong>
+    {{ orphaned_overrides|length }} database override(s) reference notification types no longer in the registry.
+    Run <code>python manage.py sync_notification_catalog --fix</code> to clean up.
+    <div class="mt-1 text-muted">
+      Keys: {% for k in orphaned_overrides %}<code>{{ k }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <div class="tab-content">
 
@@ -89,6 +112,7 @@
           <span><span class="badge bg-primary"><i class="bi bi-bell"></i></span> In-App</span>
           <span><span class="badge bg-info"><i class="bi bi-envelope"></i></span> Email</span>
           <span><span class="badge bg-success"><i class="bi bi-phone"></i></span> SMS</span>
+          <span><span class="badge bg-dark"><i class="bi bi-send"></i></span> Boswell</span>
           <span class="text-muted"><i class="bi bi-dash-circle"></i> None</span>
         </div>
       </div>
@@ -111,6 +135,7 @@
               <tr>
                 <td style="position: sticky; left: 0; background: #fff; z-index: 1;">
                   <strong>{{ row.label }}</strong>
+                  {% if row.has_override %}<span class="badge bg-warning text-dark" style="font-size: 0.55rem;" title="Customized via admin override"><i class="bi bi-pencil-square"></i></span>{% endif %}
                   <div class="text-muted" style="font-size: 0.7rem;">{{ row.category }}</div>
                 </td>
                 <td class="text-center">
@@ -125,6 +150,7 @@
                     {% if ch == 'in_app' %}<span class="badge bg-primary" style="font-size: 0.6rem;"><i class="bi bi-bell"></i></span>{% endif %}
                     {% if ch == 'email' %}<span class="badge bg-info" style="font-size: 0.6rem;"><i class="bi bi-envelope"></i></span>{% endif %}
                     {% if ch == 'sms' %}<span class="badge bg-success" style="font-size: 0.6rem;"><i class="bi bi-phone"></i></span>{% endif %}
+                    {% if ch == 'boswell' %}<span class="badge bg-dark" style="font-size: 0.6rem;"><i class="bi bi-send"></i></span>{% endif %}
                     {% endfor %}
                   {% else %}
                     <i class="bi bi-dash-circle text-muted" style="font-size: 0.7rem;"></i>
@@ -169,6 +195,7 @@
                   <th>Channels</th>
                   <th>Recipients (Roles)</th>
                   <th>Priority</th>
+                  <th class="text-center">Clickable</th>
                   <th class="text-center">Mutable</th>
                   <th></th>
                 </tr>
@@ -178,14 +205,15 @@
                 <tr data-key="{{ t.key }}">
                   <td>
                     <strong>{{ t.label }}</strong>
+                    {% if t.has_override %}<span class="badge bg-warning text-dark ms-1" style="font-size: 0.55rem;" title="Customized via admin override"><i class="bi bi-pencil-square"></i></span>{% endif %}
                     {% if t.description %}
                     <div class="text-muted" style="font-size: 0.75rem;">{{ t.description|truncatewords:15 }}</div>
                     {% endif %}
                   </td>
                   <td>
                     {% for ch in t.channels %}
-                    <span class="badge {% if ch == 'in_app' %}bg-primary{% elif ch == 'email' %}bg-info{% elif ch == 'sms' %}bg-success{% endif %} me-1">
-                      {% if ch == 'in_app' %}<i class="bi bi-bell"></i>{% elif ch == 'email' %}<i class="bi bi-envelope"></i>{% elif ch == 'sms' %}<i class="bi bi-phone"></i>{% endif %}
+                    <span class="badge {% if ch == 'in_app' %}bg-primary{% elif ch == 'email' %}bg-info{% elif ch == 'sms' %}bg-success{% elif ch == 'boswell' %}bg-dark{% endif %} me-1">
+                      {% if ch == 'in_app' %}<i class="bi bi-bell"></i>{% elif ch == 'email' %}<i class="bi bi-envelope"></i>{% elif ch == 'sms' %}<i class="bi bi-phone"></i>{% elif ch == 'boswell' %}<i class="bi bi-send"></i>{% endif %}
                       {{ ch }}
                     </span>
                     {% endfor %}
@@ -202,6 +230,13 @@
                     <span class="badge {% if t.priority == 'urgent' %}bg-danger{% elif t.priority == 'high' %}bg-warning text-dark{% elif t.priority == 'medium' %}bg-info{% else %}bg-secondary{% endif %}">
                       {{ t.priority }}
                     </span>
+                  </td>
+                  <td class="text-center">
+                    {% if t.has_link_template %}
+                    <i class="bi bi-link-45deg text-primary" title="Clickable — links to record"></i>
+                    {% else %}
+                    <i class="bi bi-dash text-muted" title="No link template"></i>
+                    {% endif %}
                   </td>
                   <td class="text-center">
                     {% if t.allow_mute %}
@@ -317,6 +352,12 @@
               <br><small>Set <code>KEEL_SMS_BACKEND=twilio</code> + Twilio env vars on Railway</small>
               {% endif %}
             </dd>
+
+            <dt><i class="bi bi-send me-1"></i> Boswell (Telegram)</dt>
+            <dd class="text-muted">
+              Structured alerts via <code>boswell@docklabs.ai</code>.
+              {% if channel_stats.boswell %}<span class="badge bg-dark">{{ channel_stats.boswell }} types</span>{% endif %}
+            </dd>
           </dl>
         </div>
       </div>
@@ -358,6 +399,10 @@
             <div class="form-check">
               <input class="form-check-input" type="checkbox" name="channels" value="sms" id="ch-sms">
               <label class="form-check-label" for="ch-sms"><i class="bi bi-phone me-1"></i>SMS (Twilio)</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="channels" value="boswell" id="ch-boswell">
+              <label class="form-check-label" for="ch-boswell"><i class="bi bi-send me-1"></i>Boswell (Telegram)</label>
             </div>
           </div>
 
@@ -412,7 +457,7 @@
       document.getElementById('edit-mutable').checked = data.allow_mute;
 
       // Set channel checkboxes
-      ['in_app', 'email', 'sms'].forEach(ch => {
+      ['in_app', 'email', 'sms', 'boswell'].forEach(ch => {
         document.getElementById('ch-' + ch).checked = data.channels.includes(ch);
       });
 

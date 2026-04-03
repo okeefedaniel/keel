@@ -18,6 +18,8 @@ def register_all_product_types():
     _register_manifest_types()
     _register_lookout_types()
     _register_bounty_types()
+    _register_yeoman_types()
+    _register_purser_types()
     _register_keel_types()
 
 
@@ -35,6 +37,7 @@ def _register_beacon_types():
         default_channels=['in_app'],
         default_roles=['system_admin', 'agency_admin', 'relationship_manager'],
         priority='low',
+        link_template='/contacts/{contact.pk}/',
     ))
     register(NotificationType(
         key='pipeline_stage_changed',
@@ -44,6 +47,7 @@ def _register_beacon_types():
         default_channels=['in_app'],
         default_roles=['system_admin', 'agency_admin', 'relationship_manager', 'analyst'],
         priority='medium',
+        link_template='/pipeline/{opportunity.pk}/',
     ))
     register(NotificationType(
         key='company_assigned',
@@ -53,6 +57,7 @@ def _register_beacon_types():
         default_channels=['in_app', 'email'],
         default_roles=['relationship_manager'],
         priority='medium',
+        link_template='/companies/{company.pk}/',
     ))
     register(NotificationType(
         key='company_approval_needed',
@@ -62,6 +67,7 @@ def _register_beacon_types():
         default_channels=['in_app'],
         default_roles=['system_admin', 'agency_admin'],
         priority='medium',
+        link_template='/companies/{company.pk}/',
     ))
 
 
@@ -79,6 +85,7 @@ def _register_admiralty_types():
         default_channels=['in_app', 'email'],
         default_roles=['foia_manager', 'foia_officer'],
         priority='high',
+        link_template='/foia/{foia_request.pk}/',
     ))
     register(NotificationType(
         key='foia_deadline_approaching',
@@ -89,6 +96,7 @@ def _register_admiralty_types():
         default_roles=['foia_manager', 'foia_officer'],
         priority='urgent',
         allow_mute=False,
+        link_template='/foia/{foia_request.pk}/',
     ))
     register(NotificationType(
         key='foia_scope_defined',
@@ -98,6 +106,7 @@ def _register_admiralty_types():
         default_channels=['in_app'],
         default_roles=['foia_officer', 'foia_manager'],
         priority='medium',
+        link_template='/foia/{foia_request.pk}/',
     ))
     register(NotificationType(
         key='foia_review_complete',
@@ -107,6 +116,7 @@ def _register_admiralty_types():
         default_channels=['in_app', 'email'],
         default_roles=['foia_manager'],
         priority='high',
+        link_template='/foia/{foia_request.pk}/',
     ))
     register(NotificationType(
         key='foia_response_ready',
@@ -116,6 +126,7 @@ def _register_admiralty_types():
         default_channels=['in_app', 'email'],
         default_roles=['foia_manager', 'system_admin'],
         priority='high',
+        link_template='/foia/{foia_request.pk}/',
     ))
     register(NotificationType(
         key='foia_appeal_filed',
@@ -126,6 +137,7 @@ def _register_admiralty_types():
         default_roles=['foia_manager', 'foia_attorney', 'system_admin'],
         priority='urgent',
         allow_mute=False,
+        link_template='/foia/{foia_request.pk}/',
     ))
 
 
@@ -144,6 +156,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['system_admin', 'agency_admin', 'program_officer'],
         priority='medium',
+        link_template='/applications/{application.pk}/',
     ))
     register(NotificationType(
         key='application_status_changed',
@@ -153,6 +166,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['applicant'],
         priority='high',
+        link_template='/applications/{application.pk}/',
     ))
 
     # --- Awards ---
@@ -164,6 +178,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['applicant'],
         priority='high',
+        link_template='/awards/{award.pk}/',
     ))
     register(NotificationType(
         key='amendment_requested',
@@ -173,6 +188,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['system_admin', 'agency_admin', 'program_officer'],
         priority='medium',
+        link_template='/awards/amendment/{amendment.pk}/',
     ))
 
     # --- Financial ---
@@ -184,6 +200,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['system_admin', 'agency_admin', 'fiscal_officer'],
         priority='medium',
+        link_template='/financial/drawdowns/{drawdown.pk}/',
     ))
     register(NotificationType(
         key='drawdown_status_changed',
@@ -193,6 +210,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['applicant'],
         priority='high',
+        link_template='/financial/drawdowns/{drawdown.pk}/',
     ))
 
     # --- Reporting ---
@@ -204,6 +222,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['system_admin', 'agency_admin', 'program_officer'],
         priority='medium',
+        link_template='/reporting/{report.pk}/',
     ))
     register(NotificationType(
         key='report_reviewed',
@@ -213,6 +232,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['applicant'],
         priority='high',
+        link_template='/reporting/{report.pk}/',
     ))
 
     # --- Closeout ---
@@ -224,6 +244,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['applicant'],
         priority='high',
+        link_template='/closeout/{closeout.pk}/',
     ))
 
     # --- Organizations ---
@@ -235,6 +256,7 @@ def _register_harbor_types():
         default_channels=['in_app'],
         default_roles=['system_admin', 'agency_admin', 'program_officer'],
         priority='medium',
+        link_template='/auth/organization-claims/',
     ))
     register(NotificationType(
         key='organization_claim_reviewed',
@@ -244,6 +266,7 @@ def _register_harbor_types():
         default_channels=['in_app'],
         default_roles=['applicant'],
         priority='high',
+        link_template='/dashboard/',
     ))
 
     # --- Users ---
@@ -255,6 +278,7 @@ def _register_harbor_types():
         default_channels=['in_app'],
         default_roles=['system_admin'],
         priority='medium',
+        link_template='/auth/users/{user.pk}/role/',
     ))
 
     # --- AI Matching ---
@@ -266,6 +290,7 @@ def _register_harbor_types():
         default_channels=['in_app', 'email'],
         default_roles=['applicant', 'federal_fund_coordinator'],
         priority='medium',
+        link_template='/matching/recommendations/',
     ))
 
 
@@ -284,6 +309,7 @@ def _register_manifest_types():
         default_roles=['applicant', 'system_admin', 'agency_admin', 'signer', 'staff'],
         priority='high',
         allow_mute=False,
+        link_template='/signatures/packets/{packet.pk}/',
     ))
     register(NotificationType(
         key='signing_complete',
@@ -293,6 +319,7 @@ def _register_manifest_types():
         default_channels=['in_app', 'email'],
         default_roles=['system_admin', 'agency_admin', 'program_officer', 'admin', 'staff'],
         priority='high',
+        link_template='/signatures/packets/{packet.pk}/',
     ))
     register(NotificationType(
         key='signing_declined',
@@ -302,6 +329,7 @@ def _register_manifest_types():
         default_channels=['in_app', 'email'],
         default_roles=['system_admin', 'agency_admin', 'program_officer', 'admin', 'staff'],
         priority='high',
+        link_template='/signatures/packets/{packet.pk}/',
     ))
     register(NotificationType(
         key='signature_reminder',
@@ -311,6 +339,7 @@ def _register_manifest_types():
         default_channels=['in_app', 'email'],
         default_roles=['applicant', 'system_admin', 'agency_admin', 'signer', 'staff'],
         priority='high',
+        link_template='/signatures/packets/{packet.pk}/',
     ))
 
 
@@ -328,6 +357,7 @@ def _register_lookout_types():
         default_channels=['in_app', 'email'],
         default_roles=['admin', 'legislative_aid', 'stakeholder'],
         priority='high',
+        link_template='/bills/{bill.pk}/',
     ))
     register(NotificationType(
         key='hearing_scheduled',
@@ -337,6 +367,7 @@ def _register_lookout_types():
         default_channels=['in_app', 'email', 'sms'],
         default_roles=['admin', 'legislative_aid'],
         priority='high',
+        link_template='/bills/{bill.pk}/',
     ))
     register(NotificationType(
         key='testimony_deadline',
@@ -346,6 +377,7 @@ def _register_lookout_types():
         default_channels=['in_app', 'email', 'sms'],
         default_roles=['admin', 'legislative_aid'],
         priority='urgent',
+        link_template='/testimony/{testimony.pk}/',
     ))
     register(NotificationType(
         key='new_bill_matched',
@@ -355,6 +387,7 @@ def _register_lookout_types():
         default_channels=['in_app', 'email'],
         default_roles=['admin', 'legislative_aid', 'stakeholder'],
         priority='medium',
+        link_template='/bills/{bill.pk}/',
     ))
     register(NotificationType(
         key='collaborator_added',
@@ -364,6 +397,7 @@ def _register_lookout_types():
         default_channels=['in_app', 'email'],
         default_roles=['admin', 'legislative_aid', 'stakeholder'],
         priority='medium',
+        link_template='/bills/{bill.pk}/',
     ))
 
 
@@ -381,6 +415,7 @@ def _register_bounty_types():
         default_channels=['in_app', 'email'],
         default_roles=['coordinator', 'analyst'],
         priority='high',
+        link_template='/matching/recommendations/',
     ))
     register(NotificationType(
         key='opportunity_status_changed',
@@ -390,6 +425,7 @@ def _register_bounty_types():
         default_channels=['in_app'],
         default_roles=['coordinator', 'analyst'],
         priority='medium',
+        link_template='/opportunities/{opportunity.pk}/',
     ))
     register(NotificationType(
         key='harbor_push_completed',
@@ -399,6 +435,7 @@ def _register_bounty_types():
         default_channels=['in_app'],
         default_roles=['coordinator', 'admin'],
         priority='medium',
+        link_template='/opportunities/{opportunity.pk}/',
     ))
     register(NotificationType(
         key='opportunity_closing_soon',
@@ -408,6 +445,249 @@ def _register_bounty_types():
         default_channels=['in_app', 'email'],
         default_roles=['coordinator', 'analyst'],
         priority='high',
+        link_template='/opportunities/{opportunity.pk}/',
+    ))
+
+
+# =========================================================================
+# Yeoman Invitations
+# =========================================================================
+def _register_yeoman_types():
+    """Yeoman — invitation management notifications."""
+
+    register(NotificationType(
+        key='invitation_received',
+        label='New Invitation Received',
+        description='A new invitation has been submitted via the public form.',
+        category='Yeoman — Invitations',
+        default_channels=['in_app', 'email'],
+        default_roles=['yeoman_admin', 'yeoman_scheduler'],
+        priority='medium',
+        email_subject='New invitation: {title}',
+        link_template='/invitations/{invitation.pk}/',
+    ))
+    register(NotificationType(
+        key='invitation_assigned',
+        label='Invitation Assigned',
+        description='An invitation has been assigned to you.',
+        category='Yeoman — Invitations',
+        default_channels=['in_app', 'email'],
+        default_roles=['yeoman_scheduler'],
+        priority='medium',
+        email_subject='Invitation assigned to you: {title}',
+        link_template='/invitations/{invitation.pk}/',
+    ))
+    register(NotificationType(
+        key='invitation_delegated',
+        label='Invitation Delegated',
+        description='An invitation has been delegated to you.',
+        category='Yeoman — Invitations',
+        default_channels=['in_app', 'email'],
+        default_roles=['yeoman_delegate'],
+        priority='medium',
+        email_subject='Invitation delegated to you: {title}',
+        link_template='/invitations/{invitation.pk}/',
+    ))
+    register(NotificationType(
+        key='invitation_accepted',
+        label='Invitation Accepted',
+        description='An invitation has been accepted.',
+        category='Yeoman — Invitations',
+        default_channels=['email'],
+        default_roles=['yeoman_admin', 'yeoman_scheduler'],
+        priority='medium',
+        email_subject='Invitation accepted: {title}',
+        link_template='/invitations/{invitation.pk}/',
+    ))
+    register(NotificationType(
+        key='invitation_declined',
+        label='Invitation Declined',
+        description='An invitation has been declined.',
+        category='Yeoman — Invitations',
+        default_channels=['email'],
+        default_roles=['yeoman_admin', 'yeoman_scheduler'],
+        priority='medium',
+        email_subject='Invitation declined: {title}',
+        link_template='/invitations/{invitation.pk}/',
+    ))
+    register(NotificationType(
+        key='invitation_scheduled',
+        label='Invitation Scheduled',
+        description='An invitation has been pushed to the calendar.',
+        category='Yeoman — Invitations',
+        default_channels=['in_app', 'email'],
+        default_roles=['yeoman_admin', 'yeoman_scheduler'],
+        priority='medium',
+        email_subject='Invitation scheduled: {title}',
+        link_template='/invitations/{invitation.pk}/',
+    ))
+    register(NotificationType(
+        key='invitation_status_changed',
+        label='Invitation Status Changed',
+        description='The status of an invitation you are assigned to has changed.',
+        category='Yeoman — Invitations',
+        default_channels=['in_app'],
+        default_roles=['yeoman_scheduler', 'yeoman_delegate'],
+        priority='low',
+        email_subject='Invitation update: {title}',
+        link_template='/invitations/{invitation.pk}/',
+    ))
+
+
+# =========================================================================
+# Purser Financial Close
+# =========================================================================
+def _register_purser_types():
+    """Purser — financial close and compliance notifications."""
+
+    # --- Financial Close ---
+    register(NotificationType(
+        key='purser_submission_due',
+        label='Submission Due',
+        description='Reminder that a program submission is due.',
+        category='Purser — Financial Close',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_submitter'],
+        priority='medium',
+        email_subject='{period_label} close: your {program_name} submission is due by {deadline}',
+        link_template='/purser/submit/{program.pk}/{period.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_submission_overdue',
+        label='Submission Overdue',
+        description='A program submission is past its deadline.',
+        category='Purser — Financial Close',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_submitter', 'purser_reviewer'],
+        priority='high',
+        email_subject='OVERDUE: {program_name} has not submitted for {period_label}',
+        allow_mute=False,
+        link_template='/purser/submit/{program.pk}/{period.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_submission_ready_for_review',
+        label='Submission Ready for Review',
+        description='A new submission is ready for review.',
+        category='Purser — Financial Close',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_reviewer'],
+        priority='medium',
+        email_subject='New submission from {program_name} ready for review',
+        link_template='/purser/review/{submission.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_revision_requested',
+        label='Revision Requested',
+        description='A submission needs revision.',
+        category='Purser — Financial Close',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_submitter'],
+        priority='high',
+        email_subject='Your {program_name} submission needs revision',
+        link_template='/purser/submit/{program.pk}/{period.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_close_package_ready',
+        label='Close Package Ready',
+        description='All submissions approved, close package ready.',
+        category='Purser — Financial Close',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_admin', 'purser_reviewer'],
+        priority='medium',
+        email_subject='All programs submitted for {period_label}. Close package ready.',
+        link_template='/purser/close/{period.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_variance_alert',
+        label='Variance Alert',
+        description='A line item exceeds budget variance threshold.',
+        category='Purser — Financial Close',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_reviewer', 'purser_admin'],
+        priority='high',
+        email_subject='{program_name} {line_item} is {pct}% over budget for {period_label}',
+        link_template='/purser/review/{submission.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_close_package_signed',
+        label='Close Package Signed',
+        description='Close package has been signed in Manifest.',
+        category='Purser — Financial Close',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_readonly'],
+        priority='medium',
+        email_subject='{period_label} close package signed and available',
+        link_template='/purser/close/{period.pk}/',
+    ))
+
+    # --- Compliance ---
+    register(NotificationType(
+        key='purser_compliance_reminder',
+        label='Compliance Reminder',
+        description='Upcoming compliance deadline.',
+        category='Purser — Compliance',
+        default_channels=['email'],
+        default_roles=['external_submitter'],
+        priority='medium',
+        email_subject='Reminder: {item_label} is due on {due_date}',
+        link_template='/purser/compliance/{item.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_compliance_overdue',
+        label='Compliance Overdue',
+        description='A compliance item is past its due date.',
+        category='Purser — Compliance',
+        default_channels=['in_app', 'email'],
+        default_roles=['external_submitter', 'purser_compliance_officer'],
+        priority='high',
+        email_subject='OVERDUE: {item_label} from {recipient_name}',
+        allow_mute=False,
+        link_template='/purser/compliance/{item.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_compliance_escalation',
+        label='Compliance Escalation',
+        description='Compliance item escalated past grace period.',
+        category='Purser — Compliance',
+        default_channels=['email'],
+        default_roles=['purser_admin'],
+        priority='urgent',
+        email_subject='ESCALATION: {recipient_name} is {days} days overdue on {item_label}',
+        allow_mute=False,
+        link_template='/purser/compliance/{item.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_compliance_submitted',
+        label='Compliance Document Submitted',
+        description='A grant recipient submitted a compliance document.',
+        category='Purser — Compliance',
+        default_channels=['in_app', 'email'],
+        default_roles=['purser_compliance_officer'],
+        priority='medium',
+        email_subject='New compliance submission from {recipient_name} for {item_label}',
+        link_template='/purser/compliance/{item.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_compliance_accepted',
+        label='Compliance Accepted',
+        description='A compliance submission was accepted.',
+        category='Purser — Compliance',
+        default_channels=['email'],
+        default_roles=['external_submitter'],
+        priority='low',
+        email_subject='Your {item_label} has been accepted',
+        link_template='/purser/compliance/{item.pk}/',
+    ))
+    register(NotificationType(
+        key='purser_compliance_rejected',
+        label='Compliance Rejected',
+        description='A compliance submission was rejected and needs resubmission.',
+        category='Purser — Compliance',
+        default_channels=['email'],
+        default_roles=['external_submitter'],
+        priority='high',
+        email_subject='Your {item_label} needs resubmission: {notes}',
+        link_template='/purser/compliance/{item.pk}/',
     ))
 
 
@@ -425,6 +705,7 @@ def _register_keel_types():
         default_channels=['in_app', 'email', 'boswell'],
         default_roles=['admin', 'system_admin'],
         priority='high',
+        link_template='/keel/requests/{change_request.id}/',
     ))
     register(NotificationType(
         key='security_alert',
@@ -444,6 +725,7 @@ def _register_keel_types():
         default_channels=['in_app'],
         default_roles=['admin', 'system_admin'],
         priority='low',
+        link_template='/accounts/users/{user.pk}/',
     ))
     register(NotificationType(
         key='test_suite_failure',
@@ -453,6 +735,7 @@ def _register_keel_types():
         default_channels=['in_app', 'email'],
         default_roles=['admin', 'system_admin'],
         priority='high',
+        link_template='/tools/',
     ))
     register(NotificationType(
         key='collaborator_added_cross_product',

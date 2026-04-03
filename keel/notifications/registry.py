@@ -38,6 +38,14 @@ class NotificationType:
         recipient_resolver: Optional callable(event_context) -> list[User].
             When provided, overrides role-based resolution.
             Receives the full context dict passed to notify().
+        link_template: URL path template for auto-generating the
+            notification link from context. Uses Python str.format() syntax
+            with dot-path resolution, e.g.:
+                '/applications/{application.pk}/'
+                '/awards/{award.pk}/amendments/{amendment.pk}/'
+            Dot-paths are resolved from the context dict passed to notify().
+            If the caller passes an explicit ``link`` kwarg, it takes
+            precedence over link_template.
         agency_scoped: If True, role-based resolution filters by the
             agency associated with the context object.
         agency_field: Dot-path to extract agency from context for scoping.
@@ -55,6 +63,7 @@ class NotificationType:
     email_template: Optional[str] = None
     email_subject: Optional[str] = None
     recipient_resolver: Optional[Callable] = None
+    link_template: Optional[str] = None
     agency_scoped: bool = False
     agency_field: str = ''
     allow_mute: bool = True
