@@ -49,6 +49,11 @@ ROLE_DISPLAY = {
     'reviewer': {'label': 'Reviewer', 'icon': 'bi-clipboard-check', 'color': 'info'},
     # Manifest
     'signer': {'label': 'Signer', 'icon': 'bi-pen', 'color': 'primary'},
+    # Yeoman
+    'yeoman_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
+    'yeoman_scheduler': {'label': 'Scheduler', 'icon': 'bi-calendar-check', 'color': 'primary'},
+    'yeoman_viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'info'},
+    'yeoman_delegate': {'label': 'Delegate', 'icon': 'bi-person-check', 'color': 'success'},
 }
 
 
