@@ -54,6 +54,20 @@ ROLE_DISPLAY = {
     'yeoman_scheduler': {'label': 'Scheduler', 'icon': 'bi-calendar-check', 'color': 'primary'},
     'yeoman_viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'info'},
     'yeoman_delegate': {'label': 'Delegate', 'icon': 'bi-person-check', 'color': 'success'},
+    # Purser
+    'purser_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
+    'purser_submitter': {'label': 'Submitter', 'icon': 'bi-upload', 'color': 'primary'},
+    'purser_reviewer': {'label': 'Reviewer', 'icon': 'bi-clipboard-check', 'color': 'info'},
+    # Helm
+    'helm_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
+    'helm_director': {'label': 'Director', 'icon': 'bi-compass', 'color': 'primary'},
+    'helm_viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'info'},
+    # Bounty
+    'coordinator': {'label': 'Coordinator', 'icon': 'bi-diagram-3', 'color': 'primary'},
+    'analyst': {'label': 'Analyst', 'icon': 'bi-graph-up', 'color': 'info'},
+    'viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'secondary'},
+    # Admiralty
+    'foia_officer': {'label': 'FOIA Officer', 'icon': 'bi-file-earmark-text', 'color': 'primary'},
 }
 
 
