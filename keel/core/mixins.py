@@ -4,6 +4,7 @@ import logging
 from urllib.parse import quote
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db.models import Count
 from django.db.models.expressions import BaseExpression
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
@@ -195,3 +196,59 @@ class BulkActionMixin:
             writer.writerow(row)
 
         return response
+
+
+class WorkQueueMixin:
+    """Add work-queue context to a dashboard TemplateView.
+
+    Provides status counts, unassigned (claimable) items, and per-user
+    assignment tracking for any model with ``status`` and ``assigned_to``
+    fields.
+
+    Usage:
+        class DashboardView(WorkQueueMixin, LoginRequiredMixin, TemplateView):
+            work_queue_model = Invitation
+            terminal_statuses = ('completed', 'declined', 'cancelled')
+            assigned_to_field = 'assigned_to'  # default
+
+    Adds to context: status_counts, total_count, unassigned_count,
+    my_assignment_count, my_assignments.
+    """
+
+    work_queue_model = None
+    terminal_statuses = ()
+    assigned_to_field = 'assigned_to'
+
+    def get_work_queue_queryset(self):
+        return self.work_queue_model.objects.all()
+
+    def get_work_queue_context(self):
+        qs = self.get_work_queue_queryset()
+        user = self.request.user
+        ctx = {}
+
+        # Status counts
+        counts = qs.values('status').annotate(count=Count('id'))
+        status_counts = {row['status']: row['count'] for row in counts}
+        ctx['status_counts'] = status_counts
+        ctx['total_count'] = sum(status_counts.values())
+
+        # Unassigned (claimable)
+        ctx['unassigned_count'] = qs.filter(
+            **{f'{self.assigned_to_field}__isnull': True},
+        ).exclude(status__in=self.terminal_statuses).count()
+
+        # My assignments
+        my_qs = qs.filter(
+            **{self.assigned_to_field: user},
+        ).exclude(status__in=self.terminal_statuses)
+        ctx['my_assignment_count'] = my_qs.count()
+        ctx['my_assignments'] = my_qs.order_by('-created_at')[:10]
+
+        return ctx
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        if self.work_queue_model:
+            ctx.update(self.get_work_queue_context())
+        return ctx

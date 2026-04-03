@@ -245,6 +245,37 @@ class AbstractInternalNote(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# WorkflowModelMixin — standard workflow interface for any status-based model
+# ---------------------------------------------------------------------------
+class WorkflowModelMixin:
+    """Mixin for models managed by a WorkflowEngine.
+
+    Products define a ``WORKFLOW`` class attribute pointing to their engine:
+
+        from keel.core.models import WorkflowModelMixin, KeelBaseModel
+
+        class Invitation(WorkflowModelMixin, KeelBaseModel):
+            WORKFLOW = INVITATION_WORKFLOW
+            status = models.CharField(max_length=50, default='received')
+
+    This provides ``transition()``, ``get_available_transitions()``, and
+    ``can_transition()`` without per-model boilerplate.
+    """
+
+    def get_available_transitions(self, user=None):
+        """Return Transition objects available from the current status."""
+        return self.WORKFLOW.get_available_transitions(self.status, user)
+
+    def transition(self, target_status, user=None, comment=''):
+        """Execute a workflow transition. Validates state and roles."""
+        return self.WORKFLOW.execute(self, target_status, user=user, comment=comment)
+
+    def can_transition(self, target_status, user=None):
+        """Check if a transition to target_status is allowed."""
+        return self.WORKFLOW.can_transition(self.status, target_status, user)
+
+
+# ---------------------------------------------------------------------------
 # KeelBaseModel — standard abstract base for all new Keel and product models
 # ---------------------------------------------------------------------------
 class KeelBaseModel(models.Model):

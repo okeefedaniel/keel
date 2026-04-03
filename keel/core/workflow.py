@@ -61,13 +61,23 @@ class WorkflowEngine:
     ``_user_has_role``.
     """
 
-    # Map of role keyword -> user property to check
+    # Map of role keyword -> user property to check.
+    # Products define these properties on their User model; products that
+    # don't have a property are unaffected (getattr returns False).
     ROLE_PROPERTY_MAP = {
+        # Cross-product
         'agency_staff': 'is_agency_staff',
+        # Beacon (CRM / FOIA)
         'foia_staff': 'is_foia_staff',
         'foia_manager': 'can_manage_foia',
         'company_manager': 'can_manage_companies',
         'company_moderator': 'can_moderate_companies',
+        # Harbor (grants)
+        'grant_manager': 'can_manage_grants',
+        'reviewer': 'is_reviewer',
+        'federal_coordinator': 'is_federal_coordinator',
+        # Purser (financial)
+        'purser_reviewer': 'is_purser_reviewer',
     }
 
     def __init__(self, transitions: list[Transition] | None = None,
