@@ -1,24 +1,16 @@
 """
-Keel FOIA Module — Extractable FOIA compliance workflow.
+Keel FOIA Module — Cross-product FOIA compliance infrastructure.
 
-This module can be used standalone or integrated with Beacon CRM.
-It provides:
-- FOIA request intake and tracking
-- Search scope definition
-- Record search across data zones
-- AI-powered classification review
-- Attorney determination workflow
-- Response package compilation
-- Appeal tracking
-- Statutory exemption management
+Provides the export pipeline that enables any DockLabs product to submit
+records for FOIA review in Admiralty (the standalone FOIA request manager).
 
-Standalone usage:
-    INSTALLED_APPS = [
-        ...
-        'keel.foia',
-    ]
+Components:
+- AbstractFOIAExportItem: Queue model for cross-product record export
+- FOIAExportRegistry: Products register exportable record types at startup
+- submit_to_foia / bulk_submit_to_foia: Export service functions
+- FOIAExportMixin: View mixin for "Export to Admiralty" buttons
+- foia_audit management command: CI/CD FOIA readiness check
 
-Integrated usage (in Beacon):
-    The Beacon CRM includes this as part of its FOIA workflow,
-    with zone-aware search across interactions and notes.
+The full FOIA *workflow* (request intake, scope, search, determination,
+response, appeal) lives in Admiralty: github.com/okeefedaniel/admiralty
 """
