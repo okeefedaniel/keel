@@ -1,0 +1,64 @@
+{% comment %}
+Dashboard layout — standard DockLabs dashboard structure.
+
+Products extend this and fill in blocks. The layout provides:
+- Page title with optional subtitle
+- Stat cards row (4-card grid)
+- Two-column layout: main content (8-col) + sidebar (4-col)
+- Optional full-width section below
+
+Usage:
+    {% extends "keel/layouts/dashboard.html" %}
+    {% block page_title %}My Dashboard{% endblock %}
+    {% block page_subtitle %}Overview of your activity{% endblock %}
+
+    {% block stat_cards %}
+        {% include "keel/components/stat_card.html" with ... %}
+    {% endblock %}
+
+    {% block main_content %}
+        <!-- Primary content: tables, charts, lists -->
+    {% endblock %}
+
+    {% block sidebar %}
+        <!-- Secondary: quick actions, recent activity, deadlines -->
+    {% endblock %}
+
+    {% block full_width %}
+        <!-- Optional: below the two-column area -->
+    {% endblock %}
+{% endcomment %}
+
+{% block dashboard_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-0">{% block page_title %}Dashboard{% endblock %}</h2>
+        {% block page_subtitle_block %}
+        {% with subtitle=page_subtitle %}
+        {% if subtitle %}<p class="text-muted mb-0">{{ subtitle }}</p>{% endif %}
+        {% endwith %}
+        {% endblock %}
+    </div>
+    <div>{% block page_actions %}{% endblock %}</div>
+</div>
+
+<!-- Stat Cards Row -->
+{% block stat_cards_row %}
+<div class="row g-3 mb-4">
+    {% block stat_cards %}{% endblock %}
+</div>
+{% endblock %}
+
+<!-- Two-Column Layout -->
+<div class="row g-4">
+    <div class="col-lg-8">
+        {% block main_content %}{% endblock %}
+    </div>
+    <div class="col-lg-4">
+        {% block sidebar %}{% endblock %}
+    </div>
+</div>
+
+<!-- Optional Full-Width Section -->
+{% block full_width %}{% endblock %}
+{% endblock dashboard_content %}

@@ -1,0 +1,22 @@
+{% comment %}
+Stat card component — a single KPI metric card.
+
+Usage:
+    {% include "keel/components/stat_card.html" with value=42 label="Active Awards" icon="bi-trophy" color="green" %}
+    {% include "keel/components/stat_card.html" with value="$1.2M" label="Total Funding" icon="bi-currency-dollar" color="blue" url="/awards/" %}
+
+Colors: green, gold, red, blue, purple, orange (maps to .accent-* in docklabs.css)
+{% endcomment %}
+{% if url %}<a href="{{ url }}" class="text-decoration-none">{% endif %}
+<div class="card stat-card accent-{{ color|default:'blue' }} h-100{% if url %} stat-card-link{% endif %}">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="stat-value">{{ value }}</div>
+                <div class="stat-label">{{ label }}</div>
+            </div>
+            {% if icon %}<i class="bi {{ icon }} fs-2 opacity-50"></i>{% endif %}
+        </div>
+    </div>
+</div>
+{% if url %}</a>{% endif %}

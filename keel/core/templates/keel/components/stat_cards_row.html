@@ -1,0 +1,19 @@
+{% comment %}
+Stat cards row — wraps multiple stat_card includes in a responsive grid.
+
+Usage:
+    {% include "keel/components/stat_cards_row.html" %}
+    Override block stat_cards in your template to fill in cards:
+
+    Or use directly with context variable 'stats' (list of dicts):
+    {% include "keel/components/stat_cards_row.html" with stats=dashboard_stats %}
+
+    Each stat dict: {value, label, icon, color, url (optional)}
+{% endcomment %}
+<div class="row g-3 mb-4">
+    {% for stat in stats %}
+    <div class="col-sm-6 col-xl-3">
+        {% include "keel/components/stat_card.html" with value=stat.value label=stat.label icon=stat.icon color=stat.color url=stat.url %}
+    </div>
+    {% endfor %}
+</div>

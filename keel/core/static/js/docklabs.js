@@ -241,3 +241,39 @@
   }
 
 })();
+
+
+/* ---------------------------------------------------------------------------
+   DockLabs namespace — shared helpers available to all products
+   --------------------------------------------------------------------------- */
+window.DockLabs = window.DockLabs || {};
+
+/**
+ * Read embedded JSON data for a Chart.js chart.
+ * Expects a <script type="application/json" id="{chartId}-data"> element.
+ *
+ * Usage:
+ *   var data = DockLabs.chartData('statusChart');
+ *   new Chart(ctx, { type: 'doughnut', data: data });
+ */
+DockLabs.chartData = function(chartId) {
+    var el = document.getElementById(chartId + '-data');
+    return el ? JSON.parse(el.textContent) : {};
+};
+
+/**
+ * Format a number as compact currency (e.g., $1.2M, $500K).
+ */
+DockLabs.formatCurrency = function(value) {
+    if (value >= 1e9) return '$' + (value / 1e9).toFixed(1) + 'B';
+    if (value >= 1e6) return '$' + (value / 1e6).toFixed(1) + 'M';
+    if (value >= 1e3) return '$' + (value / 1e3).toFixed(0) + 'K';
+    return '$' + value.toLocaleString();
+};
+
+/**
+ * Format a number with commas.
+ */
+DockLabs.formatNumber = function(value) {
+    return Number(value).toLocaleString();
+};

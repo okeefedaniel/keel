@@ -736,3 +736,31 @@ footer hr {
     .stat-card .stat-value { font-size: 1.25rem; }
     .table { font-size: 0.85rem; }
 }
+
+
+/* ---------------------------------------------------------------------------
+   Shared product components (extracted from Harbor + Bounty)
+   --------------------------------------------------------------------------- */
+
+/* Opportunity/grant card — used by Harbor, Bounty, and any product displaying grants */
+.opportunity-card {
+    border-left: 4px solid var(--ct-blue);
+    margin-bottom: 1rem;
+    transition: box-shadow 0.15s ease;
+}
+.opportunity-card:hover { box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.08); }
+.opportunity-card .deadline { color: var(--ct-red); font-weight: 600; }
+.opportunity-card .funding { color: var(--ct-green); font-weight: 700; font-size: 1.1rem; }
+
+/* Grant type badge */
+.badge-grant-type {
+    background-color: var(--ct-pale-blue);
+    color: var(--ct-dark-blue) !important;
+}
+
+/* Tracking status badges — universal pipeline statuses */
+.badge-watching   { background-color: #6C757D; }
+.badge-preparing  { background-color: var(--ct-yellow); color: var(--ct-dark-gray) !important; }
+.badge-applied    { background-color: var(--ct-blue); }
+.badge-awarded    { background-color: var(--ct-green); }
+.badge-declined   { background-color: var(--ct-red); }

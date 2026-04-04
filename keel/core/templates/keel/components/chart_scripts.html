@@ -1,0 +1,23 @@
+{% comment %}
+Chart.js CDN include + DockLabs defaults. Include once per page, before chart init scripts.
+
+Usage (in your template's extra_js block or at bottom of body):
+    {% include "keel/components/chart_scripts.html" %}
+{% endcomment %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+    // DockLabs Chart.js defaults
+    Chart.defaults.font.family = "'Poppins', sans-serif";
+    Chart.defaults.font.size = 13;
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.padding = 16;
+    Chart.defaults.responsive = true;
+    Chart.defaults.maintainAspectRatio = false;
+
+    // Helper: read embedded JSON data for a chart
+    window.DockLabs = window.DockLabs || {};
+    DockLabs.chartData = function(chartId) {
+        var el = document.getElementById(chartId + '-data');
+        return el ? JSON.parse(el.textContent) : {};
+    };
+</script>

@@ -1,0 +1,25 @@
+{% comment %}
+Chart.js chart container — renders a responsive canvas with optional title.
+
+Usage:
+    {% include "keel/components/chart.html" with chart_id="statusChart" title="Application Status" height="300" %}
+
+The calling template must:
+1. Include chart_scripts.html in the page (once, for Chart.js CDN)
+2. Embed chart data via: {{ chart_data|json_script:"statusChart-data" }}
+3. Initialize the chart in a <script> block using DockLabs.initChart() or raw Chart.js
+
+Height defaults to 300px. chart_id must be unique per page.
+{% endcomment %}
+<div class="card border-0 shadow-sm mb-4">
+    {% if title %}
+    <div class="card-header bg-white fw-bold">
+        {% if icon %}<i class="bi {{ icon }} me-1"></i>{% endif %}{{ title }}
+    </div>
+    {% endif %}
+    <div class="card-body">
+        <div style="position: relative; height: {{ height|default:'300' }}px;">
+            <canvas id="{{ chart_id }}"></canvas>
+        </div>
+    </div>
+</div>

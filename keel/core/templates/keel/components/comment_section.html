@@ -1,0 +1,65 @@
+{% comment %}
+Comment section — displays a list of comments with an add-comment form.
+Supports internal/external visibility (staff-only comments).
+
+Usage:
+    {% include "keel/components/comment_section.html" with comments=application.comments.all form_action=add_comment_url show_internal=True csrf_token=csrf_token %}
+
+Each comment object must have: author, content, created_at, is_internal (optional).
+Set show_internal=True to show the "Internal comment" checkbox (staff views).
+{% endcomment %}
+{% load humanize %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white fw-bold">
+        <i class="bi bi-chat-left-text me-1"></i>Comments
+        {% if comments %}<span class="badge bg-secondary ms-1">{{ comments|length }}</span>{% endif %}
+    </div>
+    <div class="card-body">
+        {% if comments %}
+        <div class="comment-list">
+            {% for comment in comments %}
+            <div class="d-flex mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
+                <div class="flex-shrink-0 me-3">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 0.85rem;">
+                        {{ comment.author.first_name|default:comment.author.username|first|upper }}
+                    </div>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
+                            {% if comment.is_internal %}<span class="badge bg-warning text-dark ms-1">Internal</span>{% endif %}
+                        </div>
+                        <small class="text-muted">{{ comment.created_at|naturaltime }}</small>
+                    </div>
+                    <div class="mt-1">{{ comment.content|linebreaksbr }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted mb-0"><i class="bi bi-chat me-1"></i>No comments yet.</p>
+        {% endif %}
+
+        {% if form_action %}
+        <hr>
+        <form method="post" action="{{ form_action }}">
+            {% csrf_token %}
+            <div class="mb-2">
+                <textarea name="content" class="form-control" rows="3" placeholder="Add a comment..." required></textarea>
+            </div>
+            {% if show_internal %}
+            <div class="form-check mb-2">
+                <input type="checkbox" name="is_internal" class="form-check-input" id="id_is_internal">
+                <label for="id_is_internal" class="form-check-label text-muted small">
+                    <i class="bi bi-lock me-1"></i>Internal comment (visible only to staff)
+                </label>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-sm btn-primary">
+                <i class="bi bi-send me-1"></i>Post Comment
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>

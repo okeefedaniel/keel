@@ -1,0 +1,17 @@
+{% comment %}
+Empty state — centered message shown when a list or section has no data.
+
+Usage:
+    {% include "keel/components/empty_state.html" with icon="bi-inbox" message="No applications yet" %}
+    {% include "keel/components/empty_state.html" with icon="bi-search" message="No results found" action_url="/create/" action_label="Create New" %}
+{% endcomment %}
+<div class="text-center py-5">
+    {% if icon %}<i class="bi {{ icon }} display-4 text-muted mb-3 d-block"></i>{% endif %}
+    <p class="text-muted mb-3">{{ message|default:"Nothing here yet." }}</p>
+    {% if action_url %}
+    <a href="{{ action_url }}" class="btn btn-primary btn-sm">
+        {% if action_icon %}<i class="bi {{ action_icon }} me-1"></i>{% endif %}
+        {{ action_label|default:"Get Started" }}
+    </a>
+    {% endif %}
+</div>
