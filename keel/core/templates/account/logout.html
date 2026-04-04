@@ -1,0 +1,22 @@
+{% extends "keel/layouts/auth.html" %}
+
+{% block title %}Sign Out{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5 col-xl-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center p-4 p-md-5">
+        <i class="bi bi-box-arrow-right display-4 text-muted d-block mb-3"></i>
+        <h2 class="fw-bold">Sign Out</h2>
+        <p class="text-muted">Are you sure you want to sign out?</p>
+        <form method="post" action="{% url 'account_logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary btn-lg px-4">Sign Out</button>
+          <a href="/" class="btn btn-outline-secondary btn-lg ms-2">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
