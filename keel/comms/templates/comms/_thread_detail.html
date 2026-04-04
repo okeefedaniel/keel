@@ -1,0 +1,66 @@
+{% load humanize %}
+{# Thread detail — rendered into #comms-thread-view by htmx.
+   Context: thread, messages, mailbox
+#}
+
+<div class="border-top">
+  <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-light border-bottom">
+    <div>
+      <strong>{{ thread.subject }}</strong>
+      <small class="text-muted ms-2">{{ messages|length }} message{{ messages|length|pluralize }}</small>
+    </div>
+    <div class="d-flex gap-1">
+      <a href="{% url 'comms:export_thread' thread.pk %}" class="btn btn-sm btn-outline-secondary" title="Export transcript">
+        <i class="bi bi-download"></i>
+      </a>
+      <button class="btn btn-sm btn-outline-primary"
+              hx-get="{% url 'comms:compose' mailbox.pk %}?reply_to={{ thread.pk }}"
+              hx-target="#comms-compose-area"
+              hx-swap="innerHTML">
+        <i class="bi bi-reply me-1"></i> Reply
+      </button>
+    </div>
+  </div>
+
+  <div class="comms-messages" style="max-height: 500px; overflow-y: auto;">
+    {% for msg in messages %}
+      <div class="px-3 py-3 border-bottom {% if msg.direction == 'outbound' %}bg-light{% endif %}">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            {% if msg.direction == 'inbound' %}
+              <span class="badge bg-secondary-subtle text-secondary me-1">Received</span>
+              <strong>{{ msg.from_name|default:msg.from_address }}</strong>
+            {% else %}
+              <span class="badge bg-primary-subtle text-primary me-1">Sent</span>
+              <strong>{{ msg.sent_by.get_full_name|default:msg.from_address }}</strong>
+            {% endif %}
+          </div>
+          <small class="text-muted text-nowrap">{{ msg.sent_at|date:"M j, Y g:i A" }}</small>
+        </div>
+
+        {% if msg.direction == 'outbound' and msg.delivery_status != 'delivered' and msg.delivery_status != 'sent' %}
+          <div class="mb-1">
+            <span class="badge bg-{{ msg.delivery_status|default:'secondary' }}-subtle text-{{ msg.delivery_status|default:'secondary' }}">
+              {{ msg.get_delivery_status_display }}
+            </span>
+          </div>
+        {% endif %}
+
+        <div class="comms-body mt-2">
+          {{ msg.body_text|linebreaksbr }}
+        </div>
+
+        {% if msg.attachments.all %}
+          <div class="mt-2">
+            {% for att in msg.attachments.all %}
+              <a href="{{ att.file.url }}" class="badge bg-light text-dark border me-1" target="_blank">
+                <i class="bi bi-paperclip"></i> {{ att.filename }}
+                <small class="text-muted">({{ att.size_bytes|filesizeformat }})</small>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>

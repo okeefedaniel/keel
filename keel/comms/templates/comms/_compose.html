@@ -1,0 +1,64 @@
+{# Compose / reply form — rendered into #comms-compose-area by htmx.
+   Context: mailbox, reply_thread (optional), reply_message (optional)
+#}
+
+<div class="border-bottom p-3 bg-white">
+  <form hx-post="{% url 'comms:send' mailbox.pk %}"
+        hx-target="#comms-thread-view"
+        hx-swap="innerHTML"
+        hx-on::after-request="if(event.detail.successful) this.reset(); document.getElementById('comms-compose-area').innerHTML='';">
+
+    {% csrf_token %}
+
+    {% if reply_thread %}
+      <input type="hidden" name="thread_id" value="{{ reply_thread.pk }}">
+      <div class="mb-2">
+        <small class="text-muted">
+          Replying to: <strong>{{ reply_thread.subject }}</strong>
+        </small>
+      </div>
+    {% endif %}
+
+    <div class="mb-2">
+      <label for="comms-to" class="form-label form-label-sm mb-0">To</label>
+      <input type="text" class="form-control form-control-sm" id="comms-to" name="to"
+             placeholder="recipient@example.com"
+             {% if reply_message and reply_message.direction == 'inbound' %}
+               value="{{ reply_message.from_address }}"
+             {% endif %}
+             required>
+    </div>
+
+    {% if not reply_thread %}
+      <div class="mb-2">
+        <label for="comms-subject" class="form-label form-label-sm mb-0">Subject</label>
+        <input type="text" class="form-control form-control-sm" id="comms-subject" name="subject"
+               required>
+      </div>
+    {% else %}
+      <input type="hidden" name="subject" value="Re: {{ reply_thread.subject }}">
+    {% endif %}
+
+    <div class="mb-2">
+      <label for="comms-cc" class="form-label form-label-sm mb-0">CC <span class="text-muted">(optional)</span></label>
+      <input type="text" class="form-control form-control-sm" id="comms-cc" name="cc"
+             placeholder="cc@example.com">
+    </div>
+
+    <div class="mb-2">
+      <label for="comms-body" class="form-label form-label-sm mb-0">Message</label>
+      <textarea class="form-control form-control-sm" id="comms-body" name="body"
+                rows="5" required></textarea>
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="document.getElementById('comms-compose-area').innerHTML='';">
+        Cancel
+      </button>
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="bi bi-send me-1"></i> Send
+      </button>
+    </div>
+  </form>
+</div>
