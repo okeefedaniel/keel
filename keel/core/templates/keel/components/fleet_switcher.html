@@ -1,0 +1,19 @@
+{% comment %}
+Fleet switcher — product chips in sidebar footer.
+Reads FLEET_PRODUCTS and CURRENT_PRODUCT from template context
+(injected by keel.core.context_processors.fleet_context).
+{% endcomment %}
+{% if FLEET_PRODUCTS %}
+<div class="fleet-row">
+  {% for product in FLEET_PRODUCTS %}
+    {% if forloop.counter <= 5 %}
+    <a class="fleet-chip{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
+       href="{{ product.url }}"
+       title="{{ product.name }}">{{ product.label }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if FLEET_PRODUCTS|length > 5 %}
+  <a class="fleet-chip" title="More products">+{{ FLEET_PRODUCTS|length|add:"-5" }}</a>
+  {% endif %}
+</div>
+{% endif %}

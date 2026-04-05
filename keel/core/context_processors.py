@@ -110,3 +110,33 @@ def site_context(request):
                     break
 
     return context
+
+
+def fleet_context(request):
+    """Inject fleet-switching template variables.
+
+    Provides:
+        FLEET_PRODUCTS — list of dicts with name, label, code, url keys
+        CURRENT_PRODUCT — code of the current product (e.g., 'harbor')
+
+    Usage in settings.py:
+        TEMPLATES = [{
+            'OPTIONS': {
+                'context_processors': [
+                    ...
+                    'keel.core.context_processors.fleet_context',
+                ],
+            },
+        }]
+
+        KEEL_PRODUCT_CODE = 'harbor'
+        KEEL_FLEET_PRODUCTS = [
+            {'name': 'Helm', 'label': 'Helm', 'code': 'helm', 'url': 'https://helm.docklabs.ai'},
+            {'name': 'Beacon', 'label': 'Beacon', 'code': 'beacon', 'url': 'https://beacon.docklabs.ai'},
+            ...
+        ]
+    """
+    return {
+        'FLEET_PRODUCTS': getattr(settings, 'KEEL_FLEET_PRODUCTS', []),
+        'CURRENT_PRODUCT': getattr(settings, 'KEEL_PRODUCT_CODE', ''),
+    }

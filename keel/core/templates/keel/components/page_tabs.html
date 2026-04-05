@@ -1,0 +1,15 @@
+{% comment %}
+Page tabs — horizontal tab row below topbar.
+Used by keel/layouts/app.html when the page has multiple views.
+
+Products override {% block page_tabs %} in their templates:
+    {% block page_tabs %}
+    <div class="dl-page-tabs">
+      <a class="page-tab active" href="?tab=overview"
+         hx-get="?tab=overview" hx-target="#page-content" hx-push-url="true">Overview</a>
+      <a class="page-tab" href="?tab=programs"
+         hx-get="?tab=programs" hx-target="#page-content" hx-push-url="true">Programs</a>
+    </div>
+    {% endblock %}
+{% endcomment %}
+{% block page_tabs %}{% endblock %}

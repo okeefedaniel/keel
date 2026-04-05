@@ -1,0 +1,61 @@
+{% comment %}
+Sidebar — Notion-style workspace navigator.
+Used by keel/layouts/app.html. Products override blocks to customize.
+{% endcomment %}
+<aside class="dl-sidebar" id="dl-sidebar">
+  <!-- Header: brand + collapse -->
+  <div class="sidebar-header">
+    <a class="sidebar-brand" href="{% block sidebar_brand_href %}/{% endblock %}">
+      <div class="sidebar-brand-icon">
+        <i class="bi {% block sidebar_brand_icon %}bi-gear{% endblock %}"></i>
+      </div>
+      <div class="sidebar-brand-text">{% block sidebar_brand_name %}DockLabs{% endblock %}</div>
+    </a>
+    <button class="sidebar-collapse-btn" onclick="dlToggleSidebar()" title="Collapse sidebar">&laquo;</button>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="sidebar-quick">
+    <button class="sidebar-quick-btn" title="Search" onclick="document.querySelector('.search-trigger')?.click()">
+      <i class="bi bi-search" style="font-size:11px"></i> Search
+    </button>
+    {% block sidebar_quick_new %}{% endblock %}
+  </div>
+
+  <!-- Scrollable nav body -->
+  <div class="sidebar-body">
+    {% block sidebar_favorites %}{% endblock %}
+    {% block sidebar_tree %}{% endblock %}
+    {% block sidebar_recent %}{% endblock %}
+    {% block sidebar_extra_sections %}{% endblock %}
+    {% block sidebar_admin %}{% endblock %}
+  </div>
+
+  <!-- Footer: fleet switcher + user -->
+  <div class="sidebar-footer">
+    {% include "keel/components/fleet_switcher.html" %}
+
+    {% if user.is_authenticated %}
+    <div class="sidebar-user" id="sidebar-user-menu" data-bs-toggle="dropdown" aria-expanded="false">
+      <div class="sidebar-avatar">{{ user.first_name|make_list|first|default:"?" }}{{ user.last_name|make_list|first|default:"" }}</div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
+        <div class="sidebar-user-role">{% block sidebar_user_role %}{{ user.role|default:"User" }}{% endblock %}</div>
+      </div>
+      <span class="sb-item-action" style="opacity:1; color:var(--text-tertiary)">&ctdot;</span>
+    </div>
+    <ul class="dropdown-menu" aria-labelledby="sidebar-user-menu">
+      {% block sidebar_user_menu %}
+      <li><a class="dropdown-item" href="{% block profile_url %}#{% endblock %}"><i class="bi bi-gear me-2"></i>Profile</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</button>
+        </form>
+      </li>
+      {% endblock %}
+    </ul>
+    {% endif %}
+  </div>
+</aside>

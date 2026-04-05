@@ -79,6 +79,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'keel.core.context_processors.site_context',
+                'keel.core.context_processors.fleet_context',
             ],
         },
     },
@@ -165,8 +166,16 @@ STORAGES = {
 # Keel configuration
 # ---------------------------------------------------------------------------
 KEEL_PRODUCT_NAME = 'Keel'
+KEEL_PRODUCT_CODE = 'keel'
 KEEL_PRODUCT_ICON = 'bi-gear-wide-connected'
 KEEL_PRODUCT_SUBTITLE = 'DockLabs Admin Console'
+KEEL_FLEET_PRODUCTS = [
+    {'name': 'Helm', 'label': 'Helm', 'code': 'helm', 'url': '/'},
+    {'name': 'Beacon', 'label': 'Beacon', 'code': 'beacon', 'url': '/'},
+    {'name': 'Harbor', 'label': 'Harbor', 'code': 'harbor', 'url': '/'},
+    {'name': 'Bounty', 'label': 'Bounty', 'code': 'bounty', 'url': '/'},
+    {'name': 'Lookout', 'label': 'Lookout', 'code': 'lookout', 'url': '/'},
+]
 KEEL_GATE_ACCESS = False  # Keel admin console doesn't gate itself
 
 # Notification system — point to concrete models in keel_accounts
