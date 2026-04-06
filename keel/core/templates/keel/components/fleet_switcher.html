@@ -1,19 +1,20 @@
 {% comment %}
-Fleet switcher — product chips in sidebar footer.
+Fleet switcher — vertical product list with icons in sidebar footer.
 Reads FLEET_PRODUCTS and CURRENT_PRODUCT from template context
 (injected by keel.core.context_processors.fleet_context).
+
+Each product in FLEET_PRODUCTS should have: name, label, code, url, icon
 {% endcomment %}
 {% if FLEET_PRODUCTS %}
-<div class="fleet-row">
+<div class="sb-section" style="margin-top:6px">
+  <div class="sb-section-label">Fleet</div>
   {% for product in FLEET_PRODUCTS %}
-    {% if forloop.counter <= 5 %}
-    <a class="fleet-chip{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
-       href="{{ product.url }}"
-       title="{{ product.name }}">{{ product.label }}</a>
-    {% endif %}
+  <a class="sb-item{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
+     href="{{ product.url }}"
+     title="{{ product.name }}">
+    <span class="sb-icon"><i class="bi {{ product.icon|default:'bi-app' }}"></i></span>
+    <span class="sb-item-label">{{ product.name }}</span>
+  </a>
   {% endfor %}
-  {% if FLEET_PRODUCTS|length > 5 %}
-  <a class="fleet-chip" title="More products">+{{ FLEET_PRODUCTS|length|add:"-5" }}</a>
-  {% endif %}
 </div>
 {% endif %}

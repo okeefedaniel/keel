@@ -390,12 +390,12 @@ h6, .h6 { font-size: 12px; }
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 8px;
     color: var(--text-tertiary);
     cursor: pointer;
     border-radius: 3px;
     flex-shrink: 0;
-    transition: all 0.15s;
+    transition: transform 0.2s ease, background 0.15s, color 0.15s;
 }
 .sb-toggle:hover {
     background: var(--bg-hover);

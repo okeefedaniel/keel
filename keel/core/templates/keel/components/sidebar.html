@@ -46,14 +46,7 @@ Used by keel/layouts/app.html. Products override blocks to customize.
     </div>
     <ul class="dropdown-menu" aria-labelledby="sidebar-user-menu">
       {% block sidebar_user_menu %}
-      <li><a class="dropdown-item" href="{% block profile_url %}#{% endblock %}"><i class="bi bi-gear me-2"></i>Profile</a></li>
-      <li><hr class="dropdown-divider"></li>
-      <li>
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</button>
-        </form>
-      </li>
+      {# Products MUST override this block with their own profile link and logout form. #}
       {% endblock %}
     </ul>
     {% endif %}

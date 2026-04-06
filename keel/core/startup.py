@@ -53,7 +53,7 @@ def run_startup(extra_commands=None):
 
     Args:
         extra_commands: Optional list of management command arg lists to run
-            after the standard commands (e.g., [['seed_demo_users']]).
+            after the standard commands (e.g., [['seed_keel_users']]).
     """
     import subprocess
     import sys
@@ -68,7 +68,7 @@ def run_startup(extra_commands=None):
 
     # Seed demo users when DEMO_MODE is enabled
     if os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes'):
-        commands.append([sys.executable, 'manage.py', 'seed_demo_users'])
+        commands.append([sys.executable, 'manage.py', 'seed_keel_users'])
 
     if extra_commands:
         for cmd_args in extra_commands:

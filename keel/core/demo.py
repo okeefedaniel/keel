@@ -34,46 +34,81 @@ from .utils import rate_limit
 
 DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo2026!')
 
-# Display labels and icons for common roles across DockLabs products
+# Display labels and icons for common roles across DockLabs products.
+# Roles missing from this dict still work — get_role_display() generates
+# a sensible default — but explicit entries give nicer icons and colors.
 ROLE_DISPLAY = {
-    # Lookout
+    # Shared / cross-product
     'admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
-    'legislative_aid': {'label': 'Legislative Aid', 'icon': 'bi-person-badge', 'color': 'primary'},
-    'stakeholder': {'label': 'Stakeholder', 'icon': 'bi-people', 'color': 'info'},
+    'system_admin': {'label': 'System Admin', 'icon': 'bi-shield-lock', 'color': 'danger'},
+    'agency_admin': {'label': 'Agency Admin', 'icon': 'bi-building-gear', 'color': 'warning'},
     # Beacon
     'relationship_manager': {'label': 'Relationship Manager', 'icon': 'bi-person-lines-fill', 'color': 'primary'},
     'foia_attorney': {'label': 'FOIA Attorney', 'icon': 'bi-briefcase', 'color': 'warning'},
+    'analyst': {'label': 'Analyst', 'icon': 'bi-graph-up', 'color': 'info'},
+    'executive': {'label': 'Executive', 'icon': 'bi-bar-chart-line', 'color': 'secondary'},
+    'act_admin': {'label': 'AdvanceCT Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
+    'act_relationship_mgr': {'label': 'AdvanceCT RM', 'icon': 'bi-person-lines-fill', 'color': 'primary'},
+    'act_analyst': {'label': 'AdvanceCT Analyst', 'icon': 'bi-graph-up', 'color': 'info'},
     'quasi_rm': {'label': 'Quasi RM', 'icon': 'bi-building', 'color': 'secondary'},
+    # Admiralty
+    'foia_manager': {'label': 'FOIA Manager', 'icon': 'bi-folder2-open', 'color': 'warning'},
+    'foia_officer': {'label': 'FOIA Officer', 'icon': 'bi-file-earmark-text', 'color': 'primary'},
     # Harbor
+    'program_officer': {'label': 'Program Officer', 'icon': 'bi-clipboard-data', 'color': 'primary'},
+    'fiscal_officer': {'label': 'Fiscal Officer', 'icon': 'bi-cash-stack', 'color': 'success'},
+    'federal_fund_coordinator': {'label': 'Federal Fund Coordinator', 'icon': 'bi-bank', 'color': 'primary'},
     'grants_manager': {'label': 'Grants Manager', 'icon': 'bi-cash-stack', 'color': 'success'},
     'reviewer': {'label': 'Reviewer', 'icon': 'bi-clipboard-check', 'color': 'info'},
+    'applicant': {'label': 'Applicant', 'icon': 'bi-person-raised-hand', 'color': 'secondary'},
+    'auditor': {'label': 'Auditor', 'icon': 'bi-search', 'color': 'warning'},
+    # Lookout
+    'legislative_aid': {'label': 'Legislative Aid', 'icon': 'bi-person-badge', 'color': 'primary'},
+    'stakeholder': {'label': 'Stakeholder', 'icon': 'bi-people', 'color': 'info'},
     # Manifest
+    'staff': {'label': 'Staff', 'icon': 'bi-person', 'color': 'primary'},
     'signer': {'label': 'Signer', 'icon': 'bi-pen', 'color': 'primary'},
+    # Bounty
+    'coordinator': {'label': 'Coordinator', 'icon': 'bi-diagram-3', 'color': 'primary'},
+    'viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'secondary'},
+    # Purser
+    'purser_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
+    'purser_submitter': {'label': 'Submitter', 'icon': 'bi-upload', 'color': 'primary'},
+    'purser_reviewer': {'label': 'Reviewer', 'icon': 'bi-clipboard-check', 'color': 'info'},
+    'purser_compliance_officer': {'label': 'Compliance Officer', 'icon': 'bi-check2-square', 'color': 'warning'},
+    'purser_readonly': {'label': 'Read-Only', 'icon': 'bi-eye', 'color': 'secondary'},
+    'external_submitter': {'label': 'External Submitter', 'icon': 'bi-box-arrow-in-right', 'color': 'secondary'},
     # Yeoman
     'yeoman_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
     'yeoman_scheduler': {'label': 'Scheduler', 'icon': 'bi-calendar-check', 'color': 'primary'},
     'yeoman_viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'info'},
     'yeoman_delegate': {'label': 'Delegate', 'icon': 'bi-person-check', 'color': 'success'},
-    # Purser
-    'purser_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
-    'purser_submitter': {'label': 'Submitter', 'icon': 'bi-upload', 'color': 'primary'},
-    'purser_reviewer': {'label': 'Reviewer', 'icon': 'bi-clipboard-check', 'color': 'info'},
     # Helm
     'helm_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
     'helm_director': {'label': 'Director', 'icon': 'bi-compass', 'color': 'primary'},
     'helm_viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'info'},
-    # Bounty
-    'coordinator': {'label': 'Coordinator', 'icon': 'bi-diagram-3', 'color': 'primary'},
-    'analyst': {'label': 'Analyst', 'icon': 'bi-graph-up', 'color': 'info'},
-    'viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'secondary'},
-    # Admiralty
-    'foia_officer': {'label': 'FOIA Officer', 'icon': 'bi-file-earmark-text', 'color': 'primary'},
 }
 
 
 def get_demo_roles():
-    """Return the list of demo roles configured for this product."""
-    return getattr(settings, 'DEMO_ROLES', ['admin'])
+    """Return the list of demo roles configured for this product.
+
+    Falls back to PRODUCT_ROLES for the current KEEL_PRODUCT_NAME when
+    DEMO_ROLES is not explicitly set, so products don't need to duplicate
+    their role list.
+    """
+    explicit = getattr(settings, 'DEMO_ROLES', None)
+    if explicit is not None:
+        return explicit
+
+    product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+    if product:
+        from keel.accounts.models import PRODUCT_ROLES
+        roles = PRODUCT_ROLES.get(product, [])
+        if roles:
+            return [slug for slug, _label in roles]
+
+    return ['admin']
 
 
 def get_role_display(role):

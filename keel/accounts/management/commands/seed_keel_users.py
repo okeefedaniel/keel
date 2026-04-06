@@ -1,7 +1,7 @@
 """Seed demo users with product access for all DockLabs products.
 
-Replaces per-product seed_demo_users commands with a single centralized
-command that creates users and grants product access in one step.
+Dynamically reads roles from PRODUCT_ROLES so every product gets demo
+users without maintaining a separate hardcoded list.
 
 Usage:
     python manage.py seed_keel_users
@@ -12,34 +12,12 @@ import os
 
 from django.core.management.base import BaseCommand
 
-from keel.accounts.models import Agency, KeelUser, ProductAccess
+from keel.accounts.models import Agency, KeelUser, PRODUCT_ROLES, ProductAccess
 
 DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
 
-# Default demo users per product with their roles
-PRODUCT_DEMO_CONFIGS = {
-    'beacon': [
-        {'role': 'system_admin', 'is_superuser': True},
-        {'role': 'agency_admin'},
-        {'role': 'relationship_manager'},
-        {'role': 'foia_attorney'},
-        {'role': 'analyst'},
-        {'role': 'executive'},
-    ],
-    'harbor': [
-        {'role': 'system_admin', 'is_superuser': True},
-        {'role': 'agency_admin'},
-        {'role': 'program_officer'},
-        {'role': 'fiscal_officer'},
-        {'role': 'reviewer'},
-        {'role': 'applicant'},
-    ],
-    'lookout': [
-        {'role': 'admin', 'is_superuser': True},
-        {'role': 'legislative_aid'},
-        {'role': 'stakeholder'},
-    ],
-}
+# Roles that indicate a superuser / admin account (first match wins).
+_ADMIN_ROLE_KEYWORDS = ('system_admin', 'admin')
 
 
 class Command(BaseCommand):
@@ -64,7 +42,13 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING('DRY RUN — no changes will be made.\n'))
 
-        configs = PRODUCT_DEMO_CONFIGS
+        # Derive configs dynamically from the canonical PRODUCT_ROLES registry.
+        configs = {
+            product: self._roles_to_configs(roles)
+            for product, roles in PRODUCT_ROLES.items()
+            if product != 'keel'  # skip keel-internal roles
+        }
+
         if product_filter:
             if product_filter not in configs:
                 self.stderr.write(
@@ -75,7 +59,7 @@ class Command(BaseCommand):
             configs = {product_filter: configs[product_filter]}
 
         # Create a shared admin user that has access to everything
-        self._ensure_superadmin(dry_run)
+        self._ensure_superadmin(configs, dry_run)
 
         for product, roles in configs.items():
             self.stdout.write(f'\n--- {product.upper()} ---')
@@ -84,7 +68,26 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('\nDone.'))
 
-    def _ensure_superadmin(self, dry_run):
+    @staticmethod
+    def _roles_to_configs(role_tuples):
+        """Convert PRODUCT_ROLES tuples to seed configs.
+
+        The first role whose slug contains an admin keyword is marked as
+        superuser.  All roles get a demo user.
+        """
+        configs = []
+        found_admin = False
+        for slug, _label in role_tuples:
+            is_admin = (
+                not found_admin
+                and any(kw in slug for kw in _ADMIN_ROLE_KEYWORDS)
+            )
+            if is_admin:
+                found_admin = True
+            configs.append({'role': slug, 'is_superuser': is_admin})
+        return configs
+
+    def _ensure_superadmin(self, configs, dry_run):
         """Create a shared admin user with access to all products."""
         username = 'admin'
         if dry_run:
@@ -106,12 +109,17 @@ class Command(BaseCommand):
         user.set_password(DEMO_PASSWORD)
         user.save()
 
-        # Grant access to all products
-        for product in PRODUCT_DEMO_CONFIGS:
+        # Grant access to all products being seeded
+        for product in configs:
+            # Use the first admin role for this product, fallback to first role
+            admin_role = next(
+                (c['role'] for c in configs[product] if c.get('is_superuser')),
+                configs[product][0]['role'],
+            )
             ProductAccess.objects.update_or_create(
                 user=user,
                 product=product,
-                defaults={'role': 'system_admin', 'is_active': True},
+                defaults={'role': admin_role, 'is_active': True},
             )
 
         action = 'Created' if created else 'Updated'

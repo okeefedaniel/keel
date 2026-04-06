@@ -2,6 +2,9 @@
 DockLabs App Shell — Warm Harbor v2
 Authenticated layout with sidebar + contextual topbar.
 
+IMPORTANT: Sidebar and topbar are inlined (not {% include %}'d) because
+Django's {% block %} inheritance only works within the extends chain.
+
 Products extend this and override blocks:
     {% extends "keel/layouts/app.html" %}
     {% block title %}Harbor | Dashboard{% endblock %}
@@ -40,15 +43,107 @@ Products extend this and override blocks:
 
   <div class="dl-app">
     {% if user.is_authenticated %}
-    <!-- Sidebar -->
-    {% include "keel/components/sidebar.html" %}
+    <!-- ============================================
+         SIDEBAR — inlined for block inheritance
+         ============================================ -->
+    <aside class="dl-sidebar" id="dl-sidebar">
+      <div class="sidebar-header">
+        <a class="sidebar-brand" href="{% block sidebar_brand_href %}/{% endblock %}">
+          <div class="sidebar-brand-icon">
+            <i class="bi {% block sidebar_brand_icon %}bi-gear{% endblock %}"></i>
+          </div>
+          <div class="sidebar-brand-text">{% block sidebar_brand_name %}DockLabs{% endblock %}</div>
+        </a>
+        <button class="sidebar-collapse-btn" onclick="dlToggleSidebar()" title="Collapse sidebar">&laquo;</button>
+      </div>
+
+      <div class="sidebar-quick">
+        <button class="sidebar-quick-btn" title="Search" onclick="document.querySelector('.search-trigger')?.click()">
+          <i class="bi bi-search" style="font-size:11px"></i> Search
+        </button>
+        {% block sidebar_quick_new %}{% endblock %}
+      </div>
+
+      <div class="sidebar-body">
+        {% block sidebar_favorites %}{% endblock %}
+        {% block sidebar_tree %}{% endblock %}
+        {% block sidebar_recent %}{% endblock %}
+        {% block sidebar_extra_sections %}{% endblock %}
+        {% block sidebar_admin %}{% endblock %}
+      </div>
+
+      <div class="sidebar-footer">
+        {% include "keel/components/fleet_switcher.html" %}
+
+        {% if user.is_authenticated %}
+        <div class="sidebar-user" id="sidebar-user-menu" data-bs-toggle="dropdown" aria-expanded="false">
+          <div class="sidebar-avatar">{{ user.first_name|make_list|first|default:"?" }}{{ user.last_name|make_list|first|default:"" }}</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
+            <div class="sidebar-user-role">{% block sidebar_user_role %}{{ user.role|default:"User" }}{% endblock %}</div>
+          </div>
+          <span class="sb-item-action" style="opacity:1; color:var(--text-tertiary)">&ctdot;</span>
+        </div>
+        <ul class="dropdown-menu" aria-labelledby="sidebar-user-menu">
+          {% block sidebar_user_menu %}{% endblock %}
+        </ul>
+        {% endif %}
+      </div>
+    </aside>
     {% endif %}
 
     <!-- Main area -->
     <div class="dl-main">
       {% if user.is_authenticated %}
-      <!-- Contextual top bar -->
-      {% include "keel/components/topbar.html" %}
+      <!-- ============================================
+           TOPBAR — inlined for block inheritance
+           ============================================ -->
+      <div class="dl-topbar">
+        <button class="topbar-expand" onclick="dlToggleSidebar()" title="Open sidebar">&#9776;</button>
+
+        <div class="dl-breadcrumb">
+          {% block breadcrumb_items %}
+          {% for crumb in auto_breadcrumbs %}
+            {% if not forloop.last %}
+              {% if crumb.url %}<a href="{{ crumb.url }}">{{ crumb.label }}</a>{% else %}<span>{{ crumb.label }}</span>{% endif %}
+              <span class="breadcrumb-sep">&rsaquo;</span>
+            {% else %}
+              <span class="breadcrumb-current">{{ crumb.label }}</span>
+            {% endif %}
+          {% empty %}
+            <a href="/">{{ SITE_NAME|default:"DockLabs" }}</a>
+            <span class="breadcrumb-sep">&rsaquo;</span>
+            <span class="breadcrumb-current">Dashboard</span>
+          {% endfor %}
+          {% endblock %}
+        </div>
+
+        <div class="topbar-actions">
+          <button class="search-trigger" title="Search">
+            <i class="bi bi-search" style="font-size:11px"></i>&nbsp;Search&hellip;
+            <span class="search-kbd">&thinsp;&#8984;K&thinsp;</span>
+          </button>
+
+          <div class="tb-divider"></div>
+
+          {% block topbar_notifications %}
+          {% if user.is_authenticated %}
+          <a class="icon-btn" href="{% block notifications_url %}#{% endblock %}" title="Notifications">
+            <i class="bi bi-bell"></i>
+            {% if unread_notification_count %}<span class="notif-dot"></span>{% endif %}
+          </a>
+          {% endif %}
+          {% endblock %}
+
+          <a class="icon-btn" href="{% block help_url %}#{% endblock %}" title="Help">
+            <i class="bi bi-question-circle"></i>
+          </a>
+
+          {% block topbar_extra_actions %}{% endblock %}
+
+          {% block topbar_primary_action %}{% endblock %}
+        </div>
+      </div>
 
       <!-- Page tabs (optional) -->
       {% block page_tabs %}{% endblock %}

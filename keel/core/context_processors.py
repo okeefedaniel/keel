@@ -140,3 +140,85 @@ def fleet_context(request):
         'FLEET_PRODUCTS': getattr(settings, 'KEEL_FLEET_PRODUCTS', []),
         'CURRENT_PRODUCT': getattr(settings, 'KEEL_PRODUCT_CODE', ''),
     }
+
+
+def breadcrumb_context(request):
+    """Auto-generate breadcrumbs from the current URL resolver match.
+
+    Provides:
+        auto_breadcrumbs — list of {'label': str, 'url': str|None} dicts.
+
+    The last item has url=None (current page, not a link).
+    Products can override the breadcrumb_items block in app.html to
+    use these, or provide their own breadcrumbs entirely.
+    """
+    product_name = getattr(settings, 'KEEL_PRODUCT_NAME', 'DockLabs')
+    crumbs = [{'label': product_name, 'url': '/'}]
+
+    # Namespaces to skip (internal implementation detail, not user-facing)
+    skip_namespaces = {'admin', 'core', 'portal', 'keel_notifications',
+                       'keel_accounts', 'keel_requests'}
+
+    match = getattr(request, 'resolver_match', None)
+    if match:
+        url_name = match.url_name or ''
+        namespace = match.namespace or ''
+
+        # Convert url_name like 'program-list' to 'Program List'
+        label = url_name.replace('-', ' ').replace('_', ' ').title()
+
+        # Clean up common suffixes to get the section name
+        for suffix in (' List', ' Index', ' Home'):
+            if label.endswith(suffix) and len(label) > len(suffix):
+                label = label[:-len(suffix)].strip()
+                break
+
+        # Also strip "List" when it IS the entire label (url_name='list')
+        if label == 'List':
+            # Use namespace as the label instead
+            if namespace:
+                label = namespace.replace('_', ' ').replace('-', ' ').title()
+            else:
+                label = ''
+
+        # Pluralize / rename common section names
+        plurals = {
+            'Program': 'Programs', 'Application': 'Applications',
+            'Award': 'Awards', 'Report': 'Reports', 'Packet': 'Packets',
+            'Flow': 'Flows', 'Closeout': 'Closeouts', 'Drawdown': 'Cash Requests',
+            'Opportunity': 'Opportunities', 'Bill': 'Bills',
+            'User': 'Users', 'Invitation': 'Invitations',
+            'Notification': 'Notifications', 'Request': 'Requests',
+            'Reporting': 'Reports', 'Financial': 'Financial',
+            'Closeout': 'Closeouts', 'Keel Notifications': 'Notifications',
+            'Applications': 'Applications', 'Awards': 'Awards',
+        }
+        label = plurals.get(label, label)
+
+        # Add namespace as middle crumb if it's user-facing and distinct
+        if namespace and namespace.lower() not in skip_namespaces:
+            ns_label = namespace.replace('_', ' ').replace('-', ' ').title()
+            # Skip if namespace is same as product, same as label, or
+            # label is a plural/variant of namespace (e.g. Reporting/Reports)
+            # Normalize for comparison: strip trailing s/ing
+            ns_lower = ns_label.lower().rstrip('s')
+            label_lower = label.lower().rstrip('s')
+            if ns_lower.endswith('ing'):
+                ns_lower = ns_lower[:-3]
+            if (ns_label.lower() != product_name.lower()
+                    and ns_label.lower() != label.lower()
+                    and ns_lower != label_lower):
+                # Try to resolve a list/index URL for this namespace
+                ns_url = None
+                for suffix in ('list', 'index', 'dashboard'):
+                    ns_url = _safe_reverse(f'{namespace}:{suffix}')
+                    if ns_url:
+                        break
+                crumbs.append({'label': ns_label, 'url': ns_url})
+
+        if label and label.lower() not in ('home', 'dashboard', product_name.lower()):
+            crumbs.append({'label': label, 'url': None})
+        elif label.lower() == 'dashboard':
+            crumbs.append({'label': 'Dashboard', 'url': None})
+
+    return {'auto_breadcrumbs': crumbs}
