@@ -4,6 +4,7 @@ from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
 from django.urls import include, path
 
+from keel.accounts.forms import LoginForm
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
 
@@ -25,7 +26,10 @@ urlpatterns = [
     path('api/notifications/config/', notifications_admin.api_notification_config, name='api_notification_config'),
 
     # Auth
-    path('accounts/login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
+    path('accounts/login/', auth_views.LoginView.as_view(
+        template_name='login.html',
+        authentication_form=LoginForm,
+    ), name='login'),
     path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('accounts/password/', auth_views.PasswordChangeView.as_view(
         template_name='password_change.html',
