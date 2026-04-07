@@ -12,6 +12,9 @@ requests>=2.30
 # Email (Resend HTTP API — Railway blocks outbound SMTP)
 resend>=2.0
 
+# OIDC identity provider — Keel as IdP for the DockLabs suite (Phase 2b)
+django-oauth-toolkit>=2.4
+
 # Optional (uncomment as needed)
 # django-allauth>=65.0   # SSO via Microsoft Entra ID
 # anthropic>=0.40         # AI features

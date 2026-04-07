@@ -53,6 +53,16 @@ urlpatterns = [
         template_name='password_reset_complete.html',
     ), name='password_reset_complete'),
 
+    # OAuth2/OIDC identity provider (Phase 2b — Keel as IdP)
+    # Provides:
+    #   /oauth/authorize/                            authorization endpoint
+    #   /oauth/token/                                token endpoint
+    #   /oauth/revoke_token/                         token revocation
+    #   /oauth/userinfo/                             OIDC userinfo endpoint
+    #   /oauth/.well-known/openid-configuration      OIDC discovery
+    #   /oauth/.well-known/jwks.json                 public signing keys
+    path('oauth/', include('oauth2_provider.urls', namespace='oauth2_provider')),
+
     # Keel admin modules
     path('keel/accounts/', include('keel.accounts.urls')),
     path('keel/requests/', include('keel.requests.urls')),

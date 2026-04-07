@@ -45,6 +45,24 @@ def _microsoft_login_url(request):
         return None
 
 
+def _keel_oidc_login_url(request):
+    """Resolve the Keel OIDC ("Sign in with DockLabs") login URL.
+
+    Returns ``None`` unless the product has configured the Keel OIDC
+    provider via ``KEEL_OIDC_CLIENT_ID`` / ``SOCIALACCOUNT_PROVIDERS``.
+    Phase 2b: this is the canonical suite-mode entry point; the Microsoft
+    button should be suppressed when this one is active.
+    """
+    if not getattr(settings, 'KEEL_OIDC_CLIENT_ID', ''):
+        return None
+    try:
+        from allauth.socialaccount.providers import registry
+        provider = registry.by_id('keel', request)
+        return provider.get_login_url(request, process='login')
+    except Exception:
+        return None
+
+
 def site_context(request):
     """Inject site-wide template variables into every template context.
 
@@ -79,9 +97,16 @@ def site_context(request):
     if reset_password_url:
         context['reset_password_url'] = reset_password_url
 
-    ms_url = _microsoft_login_url(request)
-    if ms_url:
-        context['microsoft_login_url'] = ms_url
+    # Keel OIDC takes precedence over direct Microsoft SSO when both are
+    # configured: the suite flow runs product → Keel → Microsoft, so the
+    # product should show exactly one "Sign in with DockLabs" button.
+    keel_url = _keel_oidc_login_url(request)
+    if keel_url:
+        context['keel_login_url'] = keel_url
+    else:
+        ms_url = _microsoft_login_url(request)
+        if ms_url:
+            context['microsoft_login_url'] = ms_url
 
     if hasattr(request, 'user') and request.user.is_authenticated:
         # Try to resolve the notification count via the configured model

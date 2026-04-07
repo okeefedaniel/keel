@@ -31,6 +31,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    # Third party
+    'oauth2_provider',  # Phase 2b: Keel as OIDC IdP
     # Keel modules
     'keel.accounts',
     'keel.requests',
@@ -41,6 +43,7 @@ INSTALLED_APPS = [
     'keel.reporting',
     'keel.compliance',
     'keel.calendar',
+    'keel.oidc.apps.KeelOIDCConfig',  # Phase 2b: OIDC validator + claims
 ]
 
 # ---------------------------------------------------------------------------
@@ -142,6 +145,54 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_PASSWORD_VALIDATORS[1]['OPTIONS'] = {'min_length': 10}
 
 # ---------------------------------------------------------------------------
+# OIDC Identity Provider (Phase 2b)
+# ---------------------------------------------------------------------------
+# Keel acts as the OAuth2/OIDC provider for the entire DockLabs suite.
+# Each product is a confidential client that authenticates by redirecting
+# users here. The signing key is required in production; in dev a temporary
+# key is generated on first run if KEEL_OIDC_PRIVATE_KEY is not set.
+#
+# To generate a signing key (one-time, run locally):
+#   openssl genrsa -out keel_oidc_key.pem 2048
+#   cat keel_oidc_key.pem  # paste into Railway env var KEEL_OIDC_PRIVATE_KEY
+
+KEEL_OIDC_PRIVATE_KEY = os.environ.get('KEEL_OIDC_PRIVATE_KEY', '')
+
+if not KEEL_OIDC_PRIVATE_KEY and DEBUG:
+    # Auto-generate an ephemeral key for local development. NEVER do this
+    # in production — every restart would invalidate previously issued tokens.
+    try:
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+        _key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        KEEL_OIDC_PRIVATE_KEY = _key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode()
+    except ImportError:
+        pass  # cryptography not installed; OIDC will be unavailable in dev
+
+OAUTH2_PROVIDER = {
+    'OIDC_ENABLED': True,
+    'OIDC_RSA_PRIVATE_KEY': KEEL_OIDC_PRIVATE_KEY,
+    'OIDC_ISS_ENDPOINT': os.environ.get('KEEL_OIDC_ISSUER', 'https://keel.docklabs.ai'),
+    'PKCE_REQUIRED': True,
+    'OAUTH2_VALIDATOR_CLASS': 'keel.oidc.validators.KeelOIDCValidator',
+    'SCOPES': {
+        'openid': 'OpenID Connect',
+        'profile': 'User profile',
+        'email': 'Email address',
+        'product_access': 'DockLabs per-product role assignments',
+    },
+    'DEFAULT_SCOPES': ['openid', 'profile', 'email', 'product_access'],
+    # 1 hour access tokens, 14 day refresh tokens
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 3600,
+    'REFRESH_TOKEN_EXPIRE_SECONDS': 14 * 24 * 3600,
+    'ROTATE_REFRESH_TOKEN': True,
+}
+
+# ---------------------------------------------------------------------------
 # Internationalization
 # ---------------------------------------------------------------------------
 LANGUAGE_CODE = 'en-us'
@@ -207,7 +258,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 # ---------------------------------------------------------------------------
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Railway's proxy handles HTTP→HTTPS redirect; don't do it in Django
+    # (breaks Railway's internal healthcheck which sends plain HTTP)
+    SECURE_SSL_REDIRECT = False
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True

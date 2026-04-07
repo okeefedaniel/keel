@@ -11,9 +11,14 @@ Expects from the view:
   form             — Django AuthenticationForm (fields: username/login + password)
 
 Optional context:
-  microsoft_login_url — URL for Microsoft SSO button
+  keel_login_url      — URL for "Sign in with DockLabs" (Keel OIDC, Phase 2b)
+  microsoft_login_url — URL for direct Microsoft SSO button (standalone mode)
   register_url        — URL for registration link
   reset_password_url  — URL for forgot password link
+
+When both keel_login_url and microsoft_login_url are available, only the
+Keel button is shown: the suite flow is product → Keel → Microsoft and
+users should see one consistent entry point.
 {% endcomment %}
 {% load keel_demo %}
 
@@ -96,8 +101,26 @@ Optional context:
                 </div>
             </form>
 
-            {# ── Microsoft SSO ── #}
-            {% if microsoft_login_url %}
+            {# ── Keel OIDC SSO (Phase 2b, suite mode) ── #}
+            {% if keel_login_url %}
+            <div class="d-flex align-items-center my-4">
+                <hr class="flex-grow-1">
+                <span class="px-3 text-muted small">OR</span>
+                <hr class="flex-grow-1">
+            </div>
+            <div class="d-grid">
+                <a href="{{ keel_login_url }}"
+                   class="btn btn-outline-primary btn-lg d-flex align-items-center justify-content-center">
+                    <i class="bi bi-shield-lock-fill me-2"></i>
+                    Sign in with DockLabs
+                </a>
+            </div>
+            <p class="text-center text-muted small mt-2">
+                Single sign-on for the entire DockLabs suite
+            </p>
+
+            {# ── Direct Microsoft SSO (standalone mode only) ── #}
+            {% elif microsoft_login_url %}
             <div class="d-flex align-items-center my-4">
                 <hr class="flex-grow-1">
                 <span class="px-3 text-muted small">OR</span>

@@ -48,29 +48,43 @@ class ProductAccessMiddleware:
         user = getattr(request, 'user', None)
 
         if user and user.is_authenticated and self.product:
-            # Look up this user's access for the current product
-            from keel.accounts.models import ProductAccess
-            access = ProductAccess.objects.filter(
-                user=user,
-                product=self.product,
-                is_active=True,
-            ).first()
+            role = None
 
-            if access:
-                user._product_role = access.role
-            else:
-                user._product_role = None
+            # 1. Prefer JWT claim from session (set by allauth OIDC adapter
+            #    after a successful Keel-IdP login). Phase 2b: this lets
+            #    products skip the database lookup entirely when running
+            #    against an OIDC issuer like Keel.
+            claims = request.session.get('keel_oidc_claims') if hasattr(request, 'session') else None
+            if claims and isinstance(claims, dict):
+                product_access = claims.get('product_access') or {}
+                if isinstance(product_access, dict):
+                    role = product_access.get(self.product)
 
-                # Optionally block users who lack product access
-                if self.gate_access and not user.is_superuser:
-                    if not self._is_exempt(request.path):
-                        logger.warning(
-                            'User %s denied access to %s (no ProductAccess)',
-                            user, self.product,
-                        )
-                        raise PermissionDenied(
-                            'You do not have access to this application.'
-                        )
+            # 2. Fall back to direct database lookup. This path keeps
+            #    standalone deployments working (no Keel IdP) and is also
+            #    the path used until Phase 2b OIDC migration is complete.
+            if role is None:
+                from keel.accounts.models import ProductAccess
+                access = ProductAccess.objects.filter(
+                    user=user,
+                    product=self.product,
+                    is_active=True,
+                ).first()
+                if access:
+                    role = access.role
+
+            user._product_role = role
+
+            # Optionally block users who lack product access
+            if role is None and self.gate_access and not user.is_superuser:
+                if not self._is_exempt(request.path):
+                    logger.warning(
+                        'User %s denied access to %s (no ProductAccess)',
+                        user, self.product,
+                    )
+                    raise PermissionDenied(
+                        'You do not have access to this application.'
+                    )
 
         return self.get_response(request)
 
