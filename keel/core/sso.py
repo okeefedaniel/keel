@@ -32,7 +32,14 @@ logger = logging.getLogger(__name__)
 
 
 class KeelAccountAdapter(DefaultAccountAdapter):
-    """Base account adapter with standard redirects."""
+    """Base account adapter with standard redirects.
+
+    Suppresses outbound confirmation emails when the user authenticated
+    via the Keel OIDC IdP — Keel has already verified the address (and
+    products may not have an email backend configured at all). This
+    keeps the OIDC callback from 500-ing during signup just because we
+    can't reach a mail server.
+    """
 
     login_redirect_url = '/dashboard/'
     signup_redirect_url = '/dashboard/'
@@ -42,6 +49,26 @@ class KeelAccountAdapter(DefaultAccountAdapter):
 
     def get_signup_redirect_url(self, request):
         return self.signup_redirect_url
+
+    def send_confirmation_mail(self, request, emailconfirmation, signup):
+        # Skip the confirmation mail for users coming from Keel OIDC.
+        # We detect this by looking for the claims we stash in session.
+        try:
+            if request.session.get('keel_oidc_claims'):
+                return
+        except Exception:
+            pass
+        return super().send_confirmation_mail(request, emailconfirmation, signup)
+
+    def send_mail(self, template_prefix, email, context):
+        # Defensive: if EMAIL_BACKEND import or send fails for any reason
+        # (e.g., misconfigured Resend in dev), don't blow up the request.
+        # Real product code should still wire EMAIL_BACKEND properly.
+        try:
+            return super().send_mail(template_prefix, email, context)
+        except Exception:
+            logger.exception('Failed to send mail %s to %s', template_prefix, email)
+            return None
 
 
 #: Provider slug used for the Keel OIDC provider (matches provider_id in
@@ -64,14 +91,39 @@ def _is_keel_provider(sociallogin) -> bool:
 def _extract_keel_claims(sociallogin) -> dict:
     """Pull OIDC claims out of the sociallogin extra_data.
 
-    Allauth stores the ID token claims on `sociallogin.account.extra_data`
-    after a successful OIDC exchange. We defensively return an empty dict
-    if anything is missing.
+    allauth's openid_connect provider stores the ID token claims and the
+    userinfo response under nested keys::
+
+        extra_data = {
+            "userinfo": {"email": ..., "product_access": ..., ...},
+            "id_token": {"email": ..., "product_access": ..., ...},
+        }
+
+    We prefer userinfo (it usually has the most fields), fall back to
+    id_token, and as a final fallback return the top-level dict for
+    backwards compatibility with older allauth versions that flattened.
     """
     try:
         data = sociallogin.account.extra_data or {}
-        if isinstance(data, dict):
-            return data
+        if not isinstance(data, dict):
+            return {}
+        # New layout (allauth 65+)
+        userinfo = data.get('userinfo')
+        if isinstance(userinfo, dict) and userinfo:
+            # Merge id_token claims on top so product_access from the
+            # signed token wins over anything userinfo might omit.
+            merged = dict(userinfo)
+            id_token = data.get('id_token')
+            if isinstance(id_token, dict):
+                for k, v in id_token.items():
+                    if v is not None and k not in merged:
+                        merged[k] = v
+            return merged
+        id_token = data.get('id_token')
+        if isinstance(id_token, dict) and id_token:
+            return id_token
+        # Legacy flat layout
+        return data
     except Exception:
         pass
     return {}
