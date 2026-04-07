@@ -101,16 +101,17 @@ def site_context(request):
     if reset_password_url:
         context['reset_password_url'] = reset_password_url
 
-    # Keel OIDC takes precedence over direct Microsoft SSO when both are
-    # configured: the suite flow runs product → Keel → Microsoft, so the
-    # product should show exactly one "Sign in with DockLabs" button.
+    # Show both SSO entry points when configured. "Sign in with DockLabs"
+    # is the suite SSO (product → Keel → wherever Keel routes you), and
+    # "Sign in with Microsoft" remains the direct Microsoft Entra path
+    # for users who prefer the standalone flow or whose browser already
+    # has a Microsoft session.
     keel_url = _keel_oidc_login_url(request)
     if keel_url:
         context['keel_login_url'] = keel_url
-    else:
-        ms_url = _microsoft_login_url(request)
-        if ms_url:
-            context['microsoft_login_url'] = ms_url
+    ms_url = _microsoft_login_url(request)
+    if ms_url:
+        context['microsoft_login_url'] = ms_url
 
     if hasattr(request, 'user') and request.user.is_authenticated:
         # Try to resolve the notification count via the configured model

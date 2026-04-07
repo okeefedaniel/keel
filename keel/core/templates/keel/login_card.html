@@ -101,31 +101,25 @@ users should see one consistent entry point.
                 </div>
             </form>
 
-            {# ── Keel OIDC SSO (Phase 2b, suite mode) ── #}
-            {% if keel_login_url %}
+            {# ── Single sign-on options ── #}
+            {% if keel_login_url or microsoft_login_url %}
             <div class="d-flex align-items-center my-4">
                 <hr class="flex-grow-1">
                 <span class="px-3 text-muted small">OR</span>
                 <hr class="flex-grow-1">
             </div>
-            <div class="d-grid">
+
+            {% if keel_login_url %}
+            <div class="d-grid mb-2">
                 <a href="{{ keel_login_url }}"
                    class="btn btn-outline-primary btn-lg d-flex align-items-center justify-content-center">
                     <i class="bi bi-shield-lock-fill me-2"></i>
                     Sign in with DockLabs
                 </a>
             </div>
-            <p class="text-center text-muted small mt-2">
-                Single sign-on for the entire DockLabs suite
-            </p>
+            {% endif %}
 
-            {# ── Direct Microsoft SSO (standalone mode only) ── #}
-            {% elif microsoft_login_url %}
-            <div class="d-flex align-items-center my-4">
-                <hr class="flex-grow-1">
-                <span class="px-3 text-muted small">OR</span>
-                <hr class="flex-grow-1">
-            </div>
+            {% if microsoft_login_url %}
             <div class="d-grid">
                 <a href="{{ microsoft_login_url }}"
                    class="btn btn-outline-dark btn-lg d-flex align-items-center justify-content-center">
@@ -138,8 +132,10 @@ users should see one consistent entry point.
                     Sign in with Microsoft
                 </a>
             </div>
+            {% endif %}
+
             <p class="text-center text-muted small mt-2">
-                State employees: use your DOK.gov account
+                {% if keel_login_url %}Single sign-on for the entire DockLabs suite{% else %}State employees: use your DOK.gov account{% endif %}
             </p>
             {% endif %}
 
