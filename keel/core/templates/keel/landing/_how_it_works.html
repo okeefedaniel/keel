@@ -1,0 +1,33 @@
+{% comment %}
+Reusable "How It Works" section for landing pages.
+
+Usage:
+    {% include "keel/landing/_how_it_works.html" with steps=my_steps %}
+
+Where my_steps is a list of dicts:
+    [
+      {"title": "Register", "description": "Create your account..."},
+      {"title": "Find Opportunities", "description": "Browse..."},
+      {"title": "Apply", "description": "Submit..."},
+      {"title": "Track Progress", "description": "Monitor..."},
+    ]
+
+Optional outer params:
+    title: section heading (defaults to "How It Works")
+{% endcomment %}
+{% if steps %}
+<section class="landing-section alt">
+  <div class="container">
+    <h2 class="text-center">{{ title|default:"How It Works" }}</h2>
+    <div class="row g-4 text-center">
+      {% for step in steps %}
+      <div class="col-md-6 col-lg-3">
+        <div class="step-icon">{{ forloop.counter }}</div>
+        <h5 class="fw-bold">{{ step.title }}</h5>
+        <p class="text-muted">{{ step.description }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}

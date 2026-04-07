@@ -1,0 +1,49 @@
+{% comment %}
+Reusable features grid for landing pages.
+
+Usage:
+    {% include "keel/landing/_features.html" with features=my_features title="What We Do" %}
+
+Where my_features is a list of dicts:
+    [
+      {"icon": "bi-building", "title": "Company Management",
+       "description": "Centralized records...", "color": "blue"},
+      {"icon": "bi-shield-check", "title": "FOIA Compliance",
+       "description": "...", "color": "yellow"},
+      ...
+    ]
+
+Each item supports:
+    icon: bootstrap icon class (without 'bi' prefix)
+    title: heading
+    description: paragraph text
+    color: blue (default) | teal | yellow
+
+Optional outer params:
+    title: section heading (defaults to "Features")
+    intro: subtitle paragraph under heading
+    section_class: CSS class for the section (defaults to "landing-section")
+{% endcomment %}
+{% if features %}
+<section class="{{ section_class|default:'landing-section' }}">
+  <div class="container">
+    <h2 class="text-center">{{ title|default:"Features" }}</h2>
+    {% if intro %}
+    <p class="section-intro">{{ intro }}</p>
+    {% endif %}
+    <div class="row g-4 justify-content-center">
+      {% for feature in features %}
+      <div class="col-md-6 col-lg-4">
+        <div class="feature-card">
+          <div class="feature-icon{% if feature.color %} {{ feature.color }}{% endif %}">
+            <i class="bi {{ feature.icon }}"></i>
+          </div>
+          <h5>{{ feature.title }}</h5>
+          <p>{{ feature.description }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}

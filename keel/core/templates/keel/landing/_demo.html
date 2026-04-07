@@ -1,0 +1,52 @@
+{% comment %}
+Reusable demo / sizzle reel section for landing pages.
+
+Usage:
+    {% include "keel/landing/_demo.html" with demo_image="img/harbor-sizzle-reel.gif" demo_title="See It In Action" %}
+
+If demo_image is not provided, renders a styled placeholder card with the
+product icon and a "Coming soon" message.
+
+Params:
+    demo_image: static path to GIF/image (optional)
+    demo_alt:   alt text for the image
+    demo_title: heading text (defaults to "See It In Action")
+    demo_intro: subtitle paragraph
+    demo_cta_text: optional CTA button text
+    demo_cta_url: optional CTA button URL
+{% endcomment %}
+{% load static %}
+<section class="landing-section">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2>{{ demo_title|default:"See It In Action" }}</h2>
+      {% if demo_intro %}
+      <p class="section-intro">{{ demo_intro }}</p>
+      {% endif %}
+    </div>
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="demo-frame">
+          {% if demo_image %}
+          <img src="{% static demo_image %}"
+               alt="{{ demo_alt|default:demo_title }}"
+               class="img-fluid w-100"
+               loading="lazy">
+          {% else %}
+          <div class="demo-placeholder">
+            <i class="bi {{ PRODUCT_ICON|default:'bi-play-btn' }}"></i>
+            <p class="lead mb-0">Product walkthrough coming soon</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% if demo_cta_text and demo_cta_url %}
+    <div class="text-center mt-4">
+      <a href="{{ demo_cta_url }}" class="btn btn-primary btn-lg px-4">
+        <i class="bi bi-box-arrow-in-right me-2"></i>{{ demo_cta_text }}
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</section>

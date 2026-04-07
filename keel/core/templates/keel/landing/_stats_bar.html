@@ -1,0 +1,39 @@
+{% comment %}
+Reusable stats bar for landing pages.
+
+Usage:
+    {% include "keel/landing/_stats_bar.html" with stats=my_stats %}
+
+Where my_stats is a list of dicts:
+    [
+      {"value": "12", "label": "Active Programs"},
+      {"value": "$5M", "label": "Funding Available", "url": "/opportunities/"},
+      ...
+    ]
+
+Each item supports:
+    value: required — the big number/text
+    label: required — the small caption
+    url:   optional — wraps the value in a link
+{% endcomment %}
+{% if stats %}
+<section class="stats-bar">
+  <div class="container">
+    <div class="row text-center">
+      {% for stat in stats %}
+      <div class="col-md-3 col-6 mb-3 mb-md-0">
+        {% if stat.url %}
+        <a href="{{ stat.url }}" class="text-decoration-none">
+          <div class="stat-value">{{ stat.value }}</div>
+          <div class="stat-label">{{ stat.label }}</div>
+        </a>
+        {% else %}
+        <div class="stat-value">{{ stat.value }}</div>
+        <div class="stat-label">{{ stat.label }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}

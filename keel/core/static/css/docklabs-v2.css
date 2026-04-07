@@ -1279,3 +1279,192 @@ th.sortable:hover { color: var(--ct-blue); }
 }
 .dl-footer a { color: var(--text-secondary); text-decoration: none; }
 .dl-footer a:hover { color: var(--ct-blue); }
+
+/* =============================================
+   Landing Page Components (shared across all products)
+   ============================================= */
+
+/* Hero section — gradient with white text */
+.hero-section {
+    background: linear-gradient(135deg, var(--ct-blue) 0%, var(--ct-blue-hover) 100%);
+    color: #fff;
+    padding: 5rem 0;
+    position: relative;
+    overflow: hidden;
+}
+.hero-section .hero-icon {
+    font-size: 3.5rem;
+    opacity: 0.95;
+    margin-bottom: 1rem;
+    display: inline-block;
+}
+.hero-section h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 2.75rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.75rem;
+}
+.hero-section .hero-subtitle {
+    font-size: 1.25rem;
+    opacity: 0.92;
+    font-weight: 500;
+    margin-bottom: 1rem;
+}
+.hero-section .lead {
+    font-size: 1.1rem;
+    opacity: 0.85;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.hero-section .btn-light {
+    font-weight: 600;
+    color: var(--ct-blue);
+    border-radius: var(--radius-sm);
+    padding: 0.625rem 1.5rem;
+}
+.hero-section .btn-outline-light {
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    padding: 0.625rem 1.5rem;
+    border-width: 2px;
+}
+
+/* Stats bar (under hero) */
+.stats-bar {
+    background-color: var(--bg-warm);
+    border-bottom: 1px solid var(--border-light);
+    padding: 2rem 0;
+}
+.stats-bar .stat-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--ct-blue);
+    font-family: 'Poppins', sans-serif;
+    line-height: 1.1;
+}
+.stats-bar .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    margin-top: 0.25rem;
+}
+
+/* Step icon for "How It Works" sections */
+.step-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--ct-blue) 0%, var(--ct-blue-hover) 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    margin: 0 auto 1rem auto;
+    box-shadow: 0 4px 12px rgba(26, 58, 107, 0.25);
+}
+
+/* Feature card (used in features grid) */
+.feature-card {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 2rem 1.5rem;
+    background: var(--bg-card);
+    height: 100%;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    text-align: center;
+}
+.feature-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+.feature-card .feature-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--ct-blue-light);
+    color: var(--ct-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    margin: 0 auto 1rem auto;
+}
+.feature-card .feature-icon.teal {
+    background: var(--accent-teal-light);
+    color: var(--accent-teal);
+}
+.feature-card .feature-icon.yellow {
+    background: var(--accent-yellow-light);
+    color: var(--warning);
+}
+.feature-card h5 {
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+.feature-card p {
+    color: var(--text-secondary);
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+/* Generic "opp-card" used by Harbor & Bounty for content cards */
+.opp-card {
+    border-radius: var(--radius-lg);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border: 1px solid var(--border-light);
+}
+.opp-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+/* Demo / sizzle reel container */
+.demo-frame {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-lg);
+    background: var(--bg-warm);
+}
+.demo-placeholder {
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: var(--text-tertiary);
+    background: linear-gradient(135deg, var(--bg-warm) 0%, var(--bg-hover) 100%);
+}
+.demo-placeholder i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Section spacing helpers */
+.landing-section {
+    padding: 4rem 0;
+}
+.landing-section.alt {
+    background: var(--bg-warm);
+}
+.landing-section h2 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2.5rem;
+}
+.landing-section .section-intro {
+    color: var(--text-secondary);
+    text-align: center;
+    max-width: 640px;
+    margin: -1.5rem auto 2.5rem auto;
+}

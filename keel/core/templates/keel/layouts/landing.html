@@ -1,0 +1,71 @@
+{% extends "keel/layouts/public.html" %}
+{% load static %}
+{# DockLabs Shared Landing Layout — extends keel/layouts/public.html.
+   Each product extends this template and overrides:
+     landing_hero_description, landing_stats, landing_features,
+     landing_how_it_works, landing_extra, landing_demo, landing_cta
+   All branding flows from KEEL_PRODUCT_* settings via site_context. #}
+
+{% block title %}{{ SITE_NAME|default:"DockLabs" }} | {% block landing_page_title %}{{ PRODUCT_SUBTITLE|default:"" }}{% endblock %}{% endblock %}
+
+{% block sidebar_brand_icon %}{{ PRODUCT_ICON|default:"bi-gear" }}{% endblock %}
+{% block sidebar_brand_name %}{{ SITE_NAME|default:"DockLabs" }}{% endblock %}
+
+{% block content %}
+{# ============ HERO ============ #}
+{% block landing_hero %}
+<section class="hero-section">
+  <div class="container text-center">
+    {% block landing_hero_icon %}
+    <div class="hero-icon">
+      <i class="bi {{ PRODUCT_ICON|default:'bi-gear' }}"></i>
+    </div>
+    {% endblock %}
+    <h1>{% block landing_hero_title %}{{ SITE_NAME|default:"DockLabs" }}{% endblock %}</h1>
+    {% block landing_hero_subtitle %}
+    {% if PRODUCT_SUBTITLE %}
+    <p class="hero-subtitle">{{ PRODUCT_SUBTITLE }}</p>
+    {% endif %}
+    {% endblock %}
+    <p class="lead mb-4">
+      {% block landing_hero_description %}
+      Part of the DockLabs suite — purpose-built tools for state government workflows.
+      {% endblock %}
+    </p>
+    <div class="d-flex justify-content-center gap-3 flex-wrap">
+      {% block landing_hero_actions %}
+      {% if user.is_authenticated %}
+      <a href="{% block dashboard_url %}/dashboard/{% endblock %}" class="btn btn-light btn-lg px-4">
+        <i class="bi bi-speedometer2 me-2"></i>Go to Dashboard
+      </a>
+      {% else %}
+      <a href="{% block login_url %}{% url 'account_login' %}{% endblock %}" class="btn btn-light btn-lg px-4">
+        <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+      </a>
+      {% endif %}
+      {% endblock %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{# ============ STATS BAR ============ #}
+{% block landing_stats %}{% endblock %}
+
+{# ============ DEMO / SIZZLE REEL (unauthenticated only) ============ #}
+{% if not user.is_authenticated %}
+{% block landing_demo %}{% endblock %}
+{% endif %}
+
+{# ============ FEATURES ============ #}
+{% block landing_features %}{% endblock %}
+
+{# ============ HOW IT WORKS ============ #}
+{% block landing_how_it_works %}{% endblock %}
+
+{# ============ PRODUCT-SPECIFIC EXTRA SECTIONS ============ #}
+{% block landing_extra %}{% endblock %}
+
+{# ============ BOTTOM CTA ============ #}
+{% block landing_cta %}{% endblock %}
+{% endblock %}
