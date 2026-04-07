@@ -45,10 +45,13 @@ class KeelAccountAdapter(DefaultAccountAdapter):
     signup_redirect_url = '/dashboard/'
 
     def get_login_redirect_url(self, request):
-        return self.login_redirect_url
+        # Prefer the product's LOGIN_REDIRECT_URL setting (e.g. Helm uses
+        # '/helm/', Harbor uses '/harbor/dashboard/'). Fall back to the
+        # class default for products that don't set it.
+        return getattr(settings, 'LOGIN_REDIRECT_URL', None) or self.login_redirect_url
 
     def get_signup_redirect_url(self, request):
-        return self.signup_redirect_url
+        return getattr(settings, 'LOGIN_REDIRECT_URL', None) or self.signup_redirect_url
 
     def send_confirmation_mail(self, request, emailconfirmation, signup):
         # Skip the confirmation mail for users coming from Keel OIDC.
