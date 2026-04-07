@@ -52,14 +52,18 @@ def _keel_oidc_login_url(request):
     provider via ``KEEL_OIDC_CLIENT_ID`` / ``SOCIALACCOUNT_PROVIDERS``.
     Phase 2b: this is the canonical suite-mode entry point; the Microsoft
     button should be suppressed when this one is active.
+
+    allauth's openid_connect provider mounts URLs at
+    ``/accounts/oidc/<provider_id>/login/`` (the prefix is configurable
+    via ``SOCIALACCOUNT_OPENID_CONNECT_URL_PREFIX``). We construct the
+    URL via reverse() rather than the provider registry because the
+    registry lookup is finicky for dynamically-configured OIDC apps.
     """
     if not getattr(settings, 'KEEL_OIDC_CLIENT_ID', ''):
         return None
     try:
-        from allauth.socialaccount.providers import registry
-        provider = registry.by_id('keel', request)
-        return provider.get_login_url(request, process='login')
-    except Exception:
+        return reverse('openid_connect_login', kwargs={'provider_id': 'keel'})
+    except NoReverseMatch:
         return None
 
 
