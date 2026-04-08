@@ -86,9 +86,9 @@ Products extend this and override blocks:
         </div>
         <ul class="dropdown-menu" aria-labelledby="sidebar-user-menu">
           {% block sidebar_user_menu_default %}
-          {% url 'keel_notifications:preferences' as _notif_prefs_url %}
-          {% if _notif_prefs_url %}
-          <li><a class="dropdown-item" href="{{ _notif_prefs_url }}"><i class="bi bi-bell me-2"></i>Notification Preferences</a></li>
+          {% url 'keel_notifications:preferences' as notif_prefs_url %}
+          {% if notif_prefs_url %}
+          <li><a class="dropdown-item" href="{{ notif_prefs_url }}"><i class="bi bi-bell me-2"></i>Notification Preferences</a></li>
           <li><hr class="dropdown-divider"></li>
           {% endif %}
           {% endblock %}
