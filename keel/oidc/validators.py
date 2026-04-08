@@ -38,6 +38,22 @@ def _build_validator_class():
     class KeelOIDCValidator(OAuth2Validator):
         """Adds DockLabs claims to every ID token Keel issues."""
 
+        # django-oauth-toolkit filters OIDC claims by this dict inside
+        # ``get_oidc_claims``: a claim is only included in the ID token if
+        # the scope it maps to is present in ``request.scopes``. Without
+        # extending this mapping, our custom ``product_access`` claim gets
+        # silently dropped on the server side even when the client
+        # requests the ``product_access`` scope — which is exactly how we
+        # spent a couple of hours staring at 403s wondering where the
+        # claim went. Merge our DockLabs-specific claims into the base
+        # mapping so they pass the scope filter.
+        oidc_claim_scope = {
+            **OAuth2Validator.oidc_claim_scope,
+            'product_access': 'product_access',
+            'is_state_user': 'product_access',
+            'agency_abbr': 'product_access',
+        }
+
         def get_additional_claims(self, request):
             """Build the DockLabs claims dict for the requesting user.
 
