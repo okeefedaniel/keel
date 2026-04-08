@@ -31,7 +31,15 @@ urlpatterns = [
         template_name='login.html',
         authentication_form=LoginForm,
     ), name='login'),
-    path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
+    # Accept both GET and POST — Django 5's LogoutView defaults to
+    # POST-only (CSRF safety against <img>-tag logouts), but suite
+    # users need to be able to sign out from a stale session with a
+    # plain link click.
+    path(
+        'accounts/logout/',
+        auth_views.LogoutView.as_view(http_method_names=['get', 'post', 'options']),
+        name='logout',
+    ),
 
     # Suite-wide logout — products chain their own logout through here
     # so the Keel IdP session is cleared at the same time. See

@@ -171,6 +171,12 @@ class SuiteLogoutView(LogoutView):
     based on the ``Host`` header, so the same view works for both
     ecosystems without per-environment configuration.
 
+    Accepts GET as well as POST — Django 5's LogoutView requires POST by
+    default (to prevent CSRF-triggered logouts from ``<img>`` tags), but
+    the DockLabs suite needs users to be able to break out of a stale
+    session with a plain link click. Sign-out is not a destructive
+    action, so relaxing this is fine.
+
     Usage in a product's urls.py::
 
         from keel.core.views import SuiteLogoutView
@@ -180,6 +186,11 @@ class SuiteLogoutView(LogoutView):
             ...
         ]
     """
+
+    http_method_names = ['get', 'post', 'options']
+
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
 
     def get_next_page(self):
         # The parent LogoutView still runs auth.logout() before this is
