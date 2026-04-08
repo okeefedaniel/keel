@@ -233,17 +233,33 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                     'sub': claims.get('sub') or '',
                 }
             email = claims.get('email', '')
-            if email and not sociallogin.is_existing:
+            preferred = (claims.get('preferred_username') or '').strip()
+            if not sociallogin.is_existing:
                 User = get_user_model()
-                try:
-                    user = User.objects.get(email__iexact=email)
-                    sociallogin.connect(request, user)
+                linked = None
+                # 1. Prefer an exact username match against the JWT's
+                #    preferred_username — Keel's canonical identity —
+                #    because email can legitimately change over time
+                #    (e.g. the dokadmin → dok@docklabs.ai email migration).
+                if preferred:
+                    try:
+                        linked = User.objects.get(username__iexact=preferred)
+                    except User.DoesNotExist:
+                        pass
+                # 2. Fall back to email match for products whose local
+                #    user was created with a different username but the
+                #    same email.
+                if linked is None and email:
+                    try:
+                        linked = User.objects.get(email__iexact=email)
+                    except (User.DoesNotExist, User.MultipleObjectsReturned):
+                        pass
+                if linked is not None:
+                    sociallogin.connect(request, linked)
                     logger.info(
                         'SSO: Linked Keel OIDC account to existing user %s',
-                        user.username,
+                        linked.username,
                     )
-                except User.DoesNotExist:
-                    pass
             # Keep ProductAccess in sync with the latest claim on every login
             # (save_user only fires on first sign-in, so returning users would
             # otherwise keep stale access rows if Keel admin changed their role).
@@ -294,16 +310,19 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
             user.email = email
             user.first_name = claims.get('given_name') or data.get('first_name') or ''
             user.last_name = claims.get('family_name') or data.get('last_name') or ''
-            # Use preferred_username from claim if present; else derive from email
-            preferred = claims.get('preferred_username') or ''
-            if not user.username:
-                base = (preferred or (email.split('@')[0] if email else '')).lower().replace('.', '_')
-                username = base
-                counter = 1
-                while username and User.objects.filter(username=username).exists():
-                    username = f'{base}_{counter}'
-                    counter += 1
-                user.username = username or base
+            # Always use preferred_username from the Keel JWT as the
+            # canonical username. Allauth's default populate_user derives
+            # a username from given_name+family_name ("Dan OKeefe" → "dan"),
+            # which collides with existing users on repeated sign-ins and
+            # spawns dan/dan1/dan2/dan3 zombies as the collision resolver
+            # deconflicts. We override that here so every product agrees
+            # with Keel on who the user is.
+            preferred = (claims.get('preferred_username') or '').strip()
+            if preferred:
+                user.username = preferred
+            elif not user.username:
+                base = (email.split('@')[0] if email else 'user').lower().replace('.', '_')
+                user.username = base
             if hasattr(user, 'is_state_user'):
                 user.is_state_user = bool(claims.get('is_state_user'))
             # Resolve role for the current product from the product_access claim
