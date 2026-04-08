@@ -18,6 +18,7 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
+from django.urls import NoReverseMatch, reverse
 
 logger = logging.getLogger(__name__)
 
@@ -142,9 +143,19 @@ class AutoOIDCLoginMiddleware:
         ):
             user = getattr(request, 'user', None)
             if user is None or not user.is_authenticated:
+                # Resolve the OIDC login URL via reverse() so we pick up
+                # whatever prefix the product mounts allauth under — most
+                # products use /accounts/, but yeoman uses /auth/, and any
+                # future product may differ. Hardcoding /accounts/ gave
+                # yeoman a 404 loop on every @login_required bounce.
+                try:
+                    login_path = reverse(
+                        'openid_connect_login',
+                        kwargs={'provider_id': 'keel'},
+                    )
+                except NoReverseMatch:
+                    return self.get_response(request)
                 next_url = request.GET.get('next') or '/dashboard/'
                 params = urlencode({'process': 'login', 'next': next_url})
-                return HttpResponseRedirect(
-                    f'/accounts/oidc/keel/login/?{params}'
-                )
+                return HttpResponseRedirect(f'{login_path}?{params}')
         return self.get_response(request)

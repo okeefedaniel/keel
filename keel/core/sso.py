@@ -73,6 +73,37 @@ class KeelAccountAdapter(DefaultAccountAdapter):
             logger.exception('Failed to send mail %s to %s', template_prefix, email)
             return None
 
+    #: Allauth message templates we suppress suite-wide. SSO is meant to
+    #: be "sign once and stay on", so telling the user "Successfully
+    #: signed in as <X>" on every product they visit is noise — worse,
+    #: stale login messages accumulate in the session and render in
+    #: batches the next time a template iterates ``messages``, which is
+    #: how users end up seeing two "signed in as" toasts at once.
+    SUPPRESSED_MESSAGE_TEMPLATES = frozenset({
+        'account/messages/logged_in.txt',
+        'account/messages/logged_out.txt',
+    })
+
+    def add_message(
+        self,
+        request,
+        level,
+        message_template=None,
+        message_context=None,
+        extra_tags='',
+        message=None,
+    ):
+        if message_template in self.SUPPRESSED_MESSAGE_TEMPLATES:
+            return
+        return super().add_message(
+            request,
+            level,
+            message_template=message_template,
+            message_context=message_context,
+            extra_tags=extra_tags,
+            message=message,
+        )
+
 
 #: Provider slug used for the Keel OIDC provider (matches provider_id in
 #: SOCIALACCOUNT_PROVIDERS['openid_connect'] config on each product).
