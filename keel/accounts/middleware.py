@@ -140,6 +140,11 @@ class AutoOIDCLoginMiddleware:
             and request.method in ('GET', 'HEAD')
             and request.path in _LOGIN_PATHS
             and 'next' in request.GET
+            # Demo instances deliberately don't auto-bounce through OIDC.
+            # They're supposed to have only the one-click demo role users;
+            # if we auto-started SSO here a real DockLabs identity would
+            # get a lingering user row in the demo DB.
+            and not getattr(settings, 'DEMO_MODE', False)
         ):
             user = getattr(request, 'user', None)
             if user is None or not user.is_authenticated:

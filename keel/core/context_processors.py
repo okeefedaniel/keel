@@ -108,12 +108,20 @@ def site_context(request):
     # "Sign in with Microsoft" remains the direct Microsoft Entra path
     # for users who prefer the standalone flow or whose browser already
     # has a Microsoft session.
-    keel_url = _keel_oidc_login_url(request)
-    if keel_url:
-        context['keel_login_url'] = keel_url
-    ms_url = _microsoft_login_url(request)
-    if ms_url:
-        context['microsoft_login_url'] = ms_url
+    #
+    # Demo instances deliberately hide both SSO buttons. Demo sites are
+    # supposed to have only the one-click demo role users — letting a
+    # real DockLabs identity sign in would create a parallel
+    # "persistent" account that lingers after the OIDC flow and
+    # clutters the demo DB. Hiding the buttons here is a belt-and-
+    # suspenders measure alongside middleware checks.
+    if not context['DEMO_MODE']:
+        keel_url = _keel_oidc_login_url(request)
+        if keel_url:
+            context['keel_login_url'] = keel_url
+        ms_url = _microsoft_login_url(request)
+        if ms_url:
+            context['microsoft_login_url'] = ms_url
 
     if hasattr(request, 'user') and request.user.is_authenticated:
         # Try to resolve the notification count via the configured model

@@ -79,9 +79,16 @@ class KeelAccountAdapter(DefaultAccountAdapter):
     #: stale login messages accumulate in the session and render in
     #: batches the next time a template iterates ``messages``, which is
     #: how users end up seeing two "signed in as" toasts at once.
+    #:
+    #: ``email_confirmation_sent.txt`` is also silenced: OIDC logins
+    #: are authoritative (Keel has already verified the address), so
+    #: the confirmation email is never actually sent and the toast
+    #: would be a lie. Signup via the local form is rare enough that
+    #: product staff can tell users to check their inbox out-of-band.
     SUPPRESSED_MESSAGE_TEMPLATES = frozenset({
         'account/messages/logged_in.txt',
         'account/messages/logged_out.txt',
+        'account/messages/email_confirmation_sent.txt',
     })
 
     def add_message(
