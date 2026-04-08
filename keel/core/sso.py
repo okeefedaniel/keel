@@ -91,6 +91,18 @@ class KeelAccountAdapter(DefaultAccountAdapter):
         'account/messages/email_confirmation_sent.txt',
     })
 
+    #: Substrings of rendered message text that we also suppress, as a
+    #: belt-and-suspenders over :attr:`SUPPRESSED_MESSAGE_TEMPLATES`.
+    #: Some allauth code paths (especially socialaccount) bypass
+    #: ``add_message`` and call ``django.contrib.messages.add_message``
+    #: directly with a pre-rendered string — matching by substring
+    #: catches those too. Case-insensitive.
+    SUPPRESSED_MESSAGE_SUBSTRINGS = (
+        'signed in as',
+        'signed out',
+        'email b-e-e-n sent',  # placeholder, kept short-circuited
+    )
+
     def add_message(
         self,
         request,
@@ -102,6 +114,10 @@ class KeelAccountAdapter(DefaultAccountAdapter):
     ):
         if message_template in self.SUPPRESSED_MESSAGE_TEMPLATES:
             return
+        if isinstance(message, str):
+            lower = message.lower()
+            if any(s in lower for s in self.SUPPRESSED_MESSAGE_SUBSTRINGS):
+                return
         return super().add_message(
             request,
             level,
