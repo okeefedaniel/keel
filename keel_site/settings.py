@@ -190,6 +190,17 @@ OAUTH2_PROVIDER = {
     'ACCESS_TOKEN_EXPIRE_SECONDS': 3600,
     'REFRESH_TOKEN_EXPIRE_SECONDS': 14 * 24 * 3600,
     'ROTATE_REFRESH_TOKEN': True,
+    # RP-initiated logout (OIDC end_session_endpoint) so that clicking
+    # "log out" on any product also kills the Keel IdP session. Without
+    # this, a user who logs out of harbor and then clicks "Sign in with
+    # DockLabs" is silently re-authed from the still-active Keel cookie.
+    'OIDC_RP_INITIATED_LOGOUT_ENABLED': True,
+    # Skip the "are you sure?" confirmation page — the click-through
+    # friction defeats the purpose of chaining logouts across the suite.
+    'OIDC_RP_INITIATED_LOGOUT_ALWAYS_PROMPT': False,
+    # Accept any post_logout_redirect_uri that the KeelOIDCValidator
+    # whitelists (see post_logout_redirect_uri_allowed below).
+    'OIDC_RP_INITIATED_LOGOUT_STRICT_REDIRECT_URIS': False,
 }
 
 # ---------------------------------------------------------------------------

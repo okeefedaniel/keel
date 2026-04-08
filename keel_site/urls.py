@@ -5,6 +5,7 @@ from django.shortcuts import redirect
 from django.urls import include, path
 
 from keel.accounts.forms import LoginForm
+from keel.core.views import suite_logout_endpoint
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
 
@@ -31,6 +32,11 @@ urlpatterns = [
         authentication_form=LoginForm,
     ), name='login'),
     path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
+
+    # Suite-wide logout — products chain their own logout through here
+    # so the Keel IdP session is cleared at the same time. See
+    # keel.core.views.SuiteLogoutView for the product-side half.
+    path('suite/logout/', suite_logout_endpoint, name='suite_logout'),
     path('accounts/password/', auth_views.PasswordChangeView.as_view(
         template_name='password_change.html',
         success_url='/accounts/password/done/',
