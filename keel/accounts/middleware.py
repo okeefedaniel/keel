@@ -4,6 +4,7 @@ Usage in product settings.py:
 
     MIDDLEWARE = [
         ...
+        'keel.accounts.middleware.AutoOIDCLoginMiddleware',  # before auth
         'keel.accounts.middleware.ProductAccessMiddleware',
         ...
     ]
@@ -11,9 +12,11 @@ Usage in product settings.py:
     KEEL_PRODUCT_NAME = 'harbor'  # must match ProductAccess.product value
 """
 import logging
+from urllib.parse import quote, urlencode
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 
 logger = logging.getLogger(__name__)
@@ -90,3 +93,58 @@ class ProductAccessMiddleware:
 
     def _is_exempt(self, path):
         return any(path.startswith(prefix) for prefix in self.exempt_paths)
+
+
+# Login URL paths used by various products. We auto-OIDC on these only.
+_LOGIN_PATHS = ('/accounts/login/', '/auth/login/')
+
+
+class AutoOIDCLoginMiddleware:
+    """Auto-start the Keel OIDC flow when a user lands on the local login
+    page after being bounced by ``@login_required``.
+
+    This is the bridge between Django's ``LOGIN_URL`` redirect contract
+    and the Keel suite SSO flow. Without it, clicking a product in the
+    fleet switcher (e.g. Harbor) takes the user to that product's
+    login page, where they have to click "Sign in with DockLabs"
+    *manually* even though Keel already has an active session for them.
+
+    With it, the flow becomes:
+
+        click Harbor in fleet switcher
+        → harbor.docklabs.ai/dashboard/
+        → @login_required → 302 /accounts/login/?next=/dashboard/
+        → AutoOIDCLoginMiddleware sees ?next= and KEEL_OIDC_CLIENT_ID set
+        → 302 /accounts/oidc/keel/login/?process=login&next=/dashboard/
+        → Keel sees its own session → immediately issues code
+        → harbor receives code → local session created
+        → harbor/dashboard/ ✓
+
+    Direct visits to ``/accounts/login/`` (no ``?next=``) still render
+    the form so users can sign in via the local form, the Microsoft
+    button, or the DockLabs button if they prefer.
+
+    Configuration: install in ``MIDDLEWARE`` somewhere after
+    ``AuthenticationMiddleware`` and before ``ProductAccessMiddleware``.
+    Active only when ``KEEL_OIDC_CLIENT_ID`` is set.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.client_id = getattr(settings, 'KEEL_OIDC_CLIENT_ID', '')
+
+    def __call__(self, request):
+        if (
+            self.client_id
+            and request.method == 'GET'
+            and request.path in _LOGIN_PATHS
+            and 'next' in request.GET
+        ):
+            user = getattr(request, 'user', None)
+            if user is None or not user.is_authenticated:
+                next_url = request.GET.get('next') or '/dashboard/'
+                params = urlencode({'process': 'login', 'next': next_url})
+                return HttpResponseRedirect(
+                    f'/accounts/oidc/keel/login/?{params}'
+                )
+        return self.get_response(request)
