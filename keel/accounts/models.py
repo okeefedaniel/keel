@@ -94,8 +94,9 @@ PRODUCT_ROLES = {
         ('external_submitter', 'External Submitter'),
     ],
     'helm': [
-        ('admin', 'Admin'),
-        ('viewer', 'Viewer'),
+        ('helm_admin', 'Admin'),
+        ('helm_director', 'Director'),
+        ('helm_viewer', 'Viewer'),
     ],
     'yeoman': [
         ('yeoman_admin', 'Administrator'),
