@@ -140,18 +140,24 @@ class Command(BaseCommand):
             self.stdout.write(f'  Would create: {username} → {product} ({role})')
             return
 
+        # All demo users get is_staff=True so they can reach staff-gated
+        # views (e.g. manifest's AgencyStaffRequiredMixin falls back to a
+        # plain is_staff check in standalone mode). is_superuser is still
+        # reserved for admin-role accounts.
         user, created = KeelUser.objects.get_or_create(
             username=username,
             defaults={
                 'email': f'{username}@docklabs.ai',
                 'first_name': 'Demo',
                 'last_name': display_name,
-                'is_staff': is_superuser,
+                'is_staff': True,
                 'is_superuser': is_superuser,
                 'is_state_user': True,
                 'accepted_terms': True,
             },
         )
+        # Ensure is_staff stays True on re-seeds of existing users.
+        user.is_staff = True
         user.set_password(DEMO_PASSWORD)
         user.save()
 
