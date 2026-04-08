@@ -136,7 +136,7 @@ class AutoOIDCLoginMiddleware:
     def __call__(self, request):
         if (
             self.client_id
-            and request.method == 'GET'
+            and request.method in ('GET', 'HEAD')
             and request.path in _LOGIN_PATHS
             and 'next' in request.GET
         ):
