@@ -13,6 +13,8 @@ Usage in settings.py:
     # Required setting:
     KEEL_PRODUCT_NAME = 'Beacon'  # or 'Harbor', 'Lookout', etc.
 """
+import re
+
 from django.conf import settings
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -142,12 +144,25 @@ def site_context(request):
     return context
 
 
+_FLEET_URL_REWRITE_RE = re.compile(r'^(https?://)(?!demo-)([a-z0-9-]+\.docklabs\.ai)', re.IGNORECASE)
+
+
 def fleet_context(request):
     """Inject fleet-switching template variables.
 
     Provides:
         FLEET_PRODUCTS — list of dicts with name, label, code, url keys
         CURRENT_PRODUCT — code of the current product (e.g., 'harbor')
+
+    Demo-aware URL rewriting: products configure a single canonical
+    ``KEEL_FLEET_PRODUCTS`` list pointing at the production hostnames
+    (``https://harbor.docklabs.ai/dashboard/`` etc.). When a request
+    arrives on a ``demo-*.docklabs.ai`` hostname, every fleet URL is
+    rewritten on the fly to its ``demo-<product>.docklabs.ai``
+    equivalent so clicks in the fleet switcher keep the user inside
+    the demo ecosystem instead of jumping to production. This lets
+    every product ship the same fleet list without branching on
+    environment.
 
     Usage in settings.py:
         TEMPLATES = [{
@@ -161,13 +176,25 @@ def fleet_context(request):
 
         KEEL_PRODUCT_CODE = 'harbor'
         KEEL_FLEET_PRODUCTS = [
-            {'name': 'Helm', 'label': 'Helm', 'code': 'helm', 'url': 'https://helm.docklabs.ai'},
-            {'name': 'Beacon', 'label': 'Beacon', 'code': 'beacon', 'url': 'https://beacon.docklabs.ai'},
+            {'name': 'Helm', 'label': 'Helm', 'code': 'helm', 'url': 'https://helm.docklabs.ai/dashboard/'},
+            {'name': 'Beacon', 'label': 'Beacon', 'code': 'beacon', 'url': 'https://beacon.docklabs.ai/dashboard/'},
             ...
         ]
     """
+    products = getattr(settings, 'KEEL_FLEET_PRODUCTS', [])
+
+    # Rewrite fleet URLs when serving a demo hostname so users stay
+    # within the demo ecosystem. Production hosts are left alone.
+    if request is not None:
+        host = request.get_host().split(':', 1)[0]
+        if host.startswith('demo-'):
+            products = [
+                {**p, 'url': _FLEET_URL_REWRITE_RE.sub(r'\1demo-\2', p.get('url', ''))}
+                for p in products
+            ]
+
     return {
-        'FLEET_PRODUCTS': getattr(settings, 'KEEL_FLEET_PRODUCTS', []),
+        'FLEET_PRODUCTS': products,
         'CURRENT_PRODUCT': getattr(settings, 'KEEL_PRODUCT_CODE', ''),
     }
 
