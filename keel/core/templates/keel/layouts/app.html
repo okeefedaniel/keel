@@ -80,7 +80,7 @@ Products extend this and override blocks:
           <div class="sidebar-avatar">{{ user.first_name|make_list|first|default:"?" }}{{ user.last_name|make_list|first|default:"" }}</div>
           <div class="sidebar-user-info">
             <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
-            <div class="sidebar-user-role">{% block sidebar_user_role %}{{ user.role|default:"User" }}{% endblock %}</div>
+            <div class="sidebar-user-role">{% block sidebar_user_role %}{{ user.get_role_display }}{% endblock %}</div>
           </div>
           <span class="sb-item-action" style="opacity:1; color:var(--text-tertiary)">&ctdot;</span>
         </div>

@@ -205,6 +205,26 @@ class KeelUser(AbstractUser):
             .values_list('product', flat=True)
         )
 
+    # Human-friendly labels for product roles. Add new roles here as
+    # products define them; unknown roles get title-cased automatically.
+    ROLE_LABELS = {
+        'system_admin': 'System Admin',
+        'admin': 'Administrator',
+        'analyst': 'Analyst',
+        'relationship_manager': 'Relationship Manager',
+        'program_officer': 'Program Officer',
+        'fiscal_officer': 'Fiscal Officer',
+        'federal_coordinator': 'Federal Coordinator',
+        'applicant': 'Applicant',
+        'auditor': 'Auditor',
+        'viewer': 'Viewer',
+        'coordinator': 'Coordinator',
+        'foia_officer': 'FOIA Officer',
+        'foia_attorney': 'FOIA Attorney',
+        'scheduler': 'Scheduler',
+        'delegate': 'Delegate',
+    }
+
     @property
     def role(self):
         """Return the role for the current product (set by middleware).
@@ -221,6 +241,19 @@ class KeelUser(AbstractUser):
         if product:
             return self.get_product_role(product)
         return None
+
+    def get_role_display(self):
+        """Human-friendly label for the current product role.
+
+        Returns e.g. "System Admin" instead of "system_admin". Falls
+        back to title-casing the raw role string so unknown roles
+        still look presentable. Returns "User" when no role is
+        assigned (matches the old sidebar default).
+        """
+        raw = self.role
+        if not raw:
+            return 'User'
+        return self.ROLE_LABELS.get(raw, raw.replace('_', ' ').title())
 
     def accept_terms(self):
         """Record terms acceptance with timestamp."""
