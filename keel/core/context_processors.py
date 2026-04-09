@@ -83,12 +83,19 @@ def site_context(request):
         reset_password_url — allauth password-reset page
         microsoft_login_url — Microsoft Entra ID SSO entry-point
     """
+    demo_mode = getattr(settings, 'DEMO_MODE', False)
+    product_name = getattr(settings, 'KEEL_PRODUCT_NAME', 'DockLabs')
+    # In demo mode, append "Demo" to the product name so the top-left
+    # sidebar brand reads "Harbor Demo", "Beacon Demo", etc. — a clear
+    # visual cue that this is a demo instance, not production.
+    site_name = f'{product_name} Demo' if demo_mode else product_name
+
     context = {
-        'SITE_NAME': getattr(settings, 'KEEL_PRODUCT_NAME', 'DockLabs'),
+        'SITE_NAME': site_name,
         'PRODUCT_ICON': getattr(settings, 'KEEL_PRODUCT_ICON', 'bi-gear'),
         'PRODUCT_SUBTITLE': getattr(settings, 'KEEL_PRODUCT_SUBTITLE', ''),
         'CURRENT_YEAR': timezone.now().year,
-        'DEMO_MODE': getattr(settings, 'DEMO_MODE', False),
+        'DEMO_MODE': demo_mode,
     }
 
     # ── Auth URLs for the shared login card ──────────────────────────

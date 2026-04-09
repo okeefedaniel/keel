@@ -249,11 +249,18 @@ class KeelUser(AbstractUser):
         back to title-casing the raw role string so unknown roles
         still look presentable. Returns "User" when no role is
         assigned (matches the old sidebar default).
+
+        In ``DEMO_MODE``, the label is prefixed with "Demo" so every
+        role reads "Demo System Admin", "Demo Analyst", etc. — a
+        consistent visual cue that you're on a demo instance.
         """
         raw = self.role
         if not raw:
             return 'User'
-        return self.ROLE_LABELS.get(raw, raw.replace('_', ' ').title())
+        label = self.ROLE_LABELS.get(raw, raw.replace('_', ' ').title())
+        if getattr(settings, 'DEMO_MODE', False):
+            return f'Demo {label}'
+        return label
 
     def accept_terms(self):
         """Record terms acceptance with timestamp."""
