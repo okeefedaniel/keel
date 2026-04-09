@@ -46,7 +46,13 @@ These principles ensure consistency across the DockLabs suite (Admiralty, Beacon
 - **Session claim handoff.** `KeelSocialAccountAdapter.pre_social_login` stashes the claims into `request.session['keel_oidc_claims']` so `ProductAccessMiddleware` reads the per-product role from the claim instead of hitting the DB. `save_user` / returning-user branches also mirror the full `product_access` dict into `ProductAccess` rows so Keel-admin role changes propagate to products on the next login.
 - **Extracting OIDC claims.** allauth nests them under `extra_data['userinfo']` and `extra_data['id_token']` (NOT the top level). Use `keel.core.sso._extract_keel_claims()` which prefers userinfo, falls back to id_token, and merges `product_access` from the signed token when userinfo is missing it.
 - **Login card buttons.** Every product's shared `keel/login_card.html` shows **both** "Sign in with DockLabs" (Keel OIDC) and "Sign in with Microsoft" (direct Entra) when configured. The context processor `keel.core.context_processors.site_context` injects `keel_login_url` via `reverse('openid_connect_login', {'provider_id': 'keel'})` — do NOT use the provider registry, it's unreliable for dynamic OIDC apps in allauth 65.
-- **`dokadmin`** on Keel is the canonical superuser with `system_admin` `ProductAccess` for all 10 products. Email must be `dok@docklabs.ai` and must match the email of each product's local superuser, or the cross-product SocialAccount linking will attach the Keel identity to the wrong local user.
+- **`oidc_claim_scope` mapping is REQUIRED for custom claims.** django-oauth-toolkit's `OAuth2Validator.get_oidc_claims` filters every claim through `oidc_claim_scope`: a claim is only included in the issued ID token when the scope it maps to is present in the client's requested scopes. The base mapping only covers standard OIDC profile/email/address/phone claims. `KeelOIDCValidator` extends it to register `product_access`, `is_state_user`, and `agency_abbr` under the `product_access` scope. **If you add a new custom claim, you MUST add it to `oidc_claim_scope` on the validator class, or it will be silently stripped from every token.**
+- **Products MUST request the `product_access` scope.** Each product's openid_connect APP settings must include `'scope': ['openid', 'email', 'profile', 'product_access']`. Without this, Keel scrubs the claim even though the validator returns it.
+- **`dokadmin`** on Keel is the canonical superuser with `system_admin` `ProductAccess` for all 10 products. Email is `dok@dok.net`. Keel uses Django's native auth (username/password), not allauth — there's no Microsoft SSO on Keel itself. Products link to the local `dokadmin` user via `preferred_username` from the JWT (see adapter notes below), not by email.
+- **User linking uses `preferred_username` first, email second.** `KeelSocialAccountAdapter.pre_social_login` matches the JWT's `preferred_username` claim against the local DB's `username` field FIRST, then falls back to email. This prevents the "zombie dan/dan2/dan3" pattern where allauth creates a new user from `given_name`+`family_name` when email doesn't match a legacy account. `populate_user` also unconditionally sets `user.username = preferred_username` from the JWT, overriding allauth's default name-derived username.
+- **`AutoOIDCLoginMiddleware`** intercepts unauthenticated GET/HEAD requests to `/accounts/login/` (or `/auth/login/`) carrying a `?next=` query param and 302s them into the Keel OIDC flow. This makes fleet-switcher navigation seamless: clicking Harbor from Helm bounces through Keel's `/oauth/authorize/` (which already has a session) and lands on Harbor's dashboard without showing a login form. Direct visits to `/accounts/login/` without `?next=` still render the form. Active only when `KEEL_OIDC_CLIENT_ID` is set; respects `DEMO_MODE` (demo instances skip auto-OIDC).
+- **`SuiteLogoutView`** chains product logout through Keel's `/suite/logout/` endpoint so the IdP session is also cleared. Accepts both GET and POST (Django 5's LogoutView requires POST by default, but users need a way to break out of stale sessions via link click). Demo instances chain through `demo-keel.docklabs.ai` automatically based on the Host header.
+- **Message suppression.** `KeelAccountAdapter.add_message` suppresses "Successfully signed in as X" and "Signed out" toasts suite-wide — SSO users don't need to see these on every product switch. Suppression works by both template path (`SUPPRESSED_MESSAGE_TEMPLATES`) and rendered text substring (`SUPPRESSED_MESSAGE_SUBSTRINGS`). If allauth changes its message path in a future version, the substring filter catches it.
 
 ### Core identity rules (apply in all modes)
 
@@ -54,9 +60,19 @@ These principles ensure consistency across the DockLabs suite (Admiralty, Beacon
 - **SSO adapter:** Use `keel.core.sso.KeelAccountAdapter` and `keel.core.sso.KeelSocialAccountAdapter`. Do not create product-specific SSO adapters. `KeelAccountAdapter.get_login_redirect_url` resolves from `settings.LOGIN_REDIRECT_URL` (which MUST be `/dashboard/` — see Canonical URLs below). `KeelAccountAdapter.send_confirmation_mail` short-circuits when `keel_oidc_claims` is in the session so OIDC logins don't try to send a verification email.
 - **Shared login form:** `keel.accounts.forms.LoginForm` provides a styled `AuthenticationForm` with "Username or email" / "Password" fields carrying `class="form-control"`. Every product's login URL wires this into the `authentication_form` kwarg so input fields render with Bootstrap styling. Do not fall back to Django's bare `AuthenticationForm` — the inputs render unstyled.
 - **Shared auth templates:** Keel provides all auth templates in `keel/core/templates/account/` (login, signup, logout, password reset, email confirm, etc.). Products inherit these automatically via `APP_DIRS`. Product branding (icon, name, subtitle, demo mode) is driven entirely by `KEEL_PRODUCT_NAME`, `KEEL_PRODUCT_ICON`, `KEEL_PRODUCT_SUBTITLE` settings — do not create product-specific login pages.
-- **Roles:** Define product-specific roles in `keel.accounts.ProductAccess`, not on the User model.
+- **Roles:** Define product-specific roles in `keel.accounts.ProductAccess`, not on the User model. `KeelUser.get_role_display()` humanizes the raw role string (e.g. `system_admin` → `System Admin`) using `ROLE_LABELS` with auto-title-case fallback. In `DEMO_MODE`, it prepends "Demo" (→ "Demo System Admin"). The shared sidebar calls `{{ user.get_role_display }}` — do not use `{{ user.role }}` directly in templates.
 
 **Why:** Split identity prevents cross-product SSO, complicates Helm's executive dashboard, and creates maintenance burden with N copies of auth logic. OIDC also eliminates the cookie-domain fragility that kept invalidating dokadmin sessions on every `SECRET_KEY` rotation.
+
+## Demo Mode
+
+- **`DEMO_MODE=True`** activates demo branding and seed data across the suite.
+- **Product name:** `site_context` appends " Demo" to `SITE_NAME` so the sidebar brand reads "Harbor Demo", "Beacon Demo", etc.
+- **Role display:** `get_role_display()` prepends "Demo" to every role label (→ "Demo System Admin", "Demo Analyst").
+- **Seed data:** `keel.core.startup.run_startup()` auto-seeds demo users and domain data when `DEMO_MODE=True` and the DB is empty. Demo sites (`demo-*.docklabs.ai`) use this; production sites (`*.docklabs.ai`) do NOT.
+- **AutoOIDCLoginMiddleware** skips auto-OIDC redirect in `DEMO_MODE` so demo users can log in via the local form with demo credentials.
+- **`SuiteLogoutView`** chains through `demo-keel.docklabs.ai` (not `keel.docklabs.ai`) on demo instances, auto-detected from the Host header.
+- **Dashboard greeting:** Only Helm shows a "Welcome back" greeting (auto-fades after 4s, once per session). Other products show just "Dashboard" as the page header — no per-product greeting in suite mode.
 
 ## Canonical URLs
 
@@ -244,23 +260,19 @@ Every DockLabs product MUST include:
 
 ```python
 # keel/__init__.py
-__version__ = '0.10.1'
+__version__ = '0.10.9'
 
 # pyproject.toml
-version = "0.10.1"
+version = "0.10.9"
 ```
 
 Bump both files in the same commit as the code change, then bump pins in all product `requirements.txt` files referencing the new git commit.
 
 ### Railway deployment notes
 
-- **Purser and Manifest have broken Railway↔GitHub auto-deploy integration.** Git pushes do not trigger builds on those two services. Use `railway up --service <name> --detach` to upload source directly. Needs investigation in the Railway project settings.
-- **Purser's `start.sh` runs a runtime `pip install --upgrade --force-reinstall --no-deps keel` step** as a belt-and-suspenders workaround for the pip cache issue above. This can be removed once every product is consistently bumping keel versions and Railway's build cache is behaving.
 - **`SECURE_SSL_REDIRECT` MUST be `False`** on Railway — the healthcheck sends plain HTTP and a `True` setting makes it 301-redirect, failing the check and blocking deploys. Preventive: Keel's settings sets it to `False`; product settings should not override.
-- **Shared Harbor Postgres.** Bounty and Manifest currently point `DATABASE_URL` at Harbor's `switchback.proxy.rlwy.net:54349` Postgres as a legacy side-effect of the cookie-SSO shared-session design. Each project has its own Postgres service (Bounty: `ballast`, Manifest: `shinkansen`) that is NOT currently in use. Phase 2b.5 cleanup will switch them over. Until then, migrations on those two products can fail with "table/index already exists" conflicts from overlapping app migrations in the shared DB — the recovery pattern is:
-  1. Drop orphaned tables/indexes (`DROP INDEX IF EXISTS ... CASCADE`)
-  2. Run `manage.py migrate --fake-initial --noinput` to mark existing tables as migrated
-  3. Retry `manage.py migrate --noinput` for any remaining migrations
+- **Manifest may need `railway up --service manifest --detach`** if its GitHub auto-deploy integration is still broken. Most other products auto-deploy on push. Verify by checking `railway service status --all` after a push — if the deploy ID doesn't change, use `railway up`.
+- **Bounty has a legacy `core_user` table** alongside the current `keel_user`. Some old FK constraints may reference `core_user`. If migrations fail with "FK violation on core_user", the recovery pattern is: (1) drop the offending FK constraint, (2) copy missing users from `core_user` to `keel_user` if needed, (3) re-add the FK pointing at `keel_user`.
 
 ## Data Patterns
 
@@ -273,27 +285,29 @@ Bump both files in the same commit as the code change, then bump pins in all pro
 
 ## Known Deviations
 
-- **Beacon** is missing `keel.notifications` in `INSTALLED_APPS` — needs to be added. The sidebar user dropdown guards the Notification Preferences link with `{% url 'keel_notifications:preferences' as notif_prefs_url %}` so Beacon doesn't crash, but it also doesn't surface the link.
-- **Manifest + Bounty share Harbor's Postgres** via a hard-coded `DATABASE_URL`. Phase 2b.5 cleanup will give each product its own database.
-- **Purser + Manifest Railway↔GitHub auto-deploy is broken.** Pushes don't trigger builds; both require `railway up` for every release.
 - **KEEL_FOIA_EXPORT_MODEL** is not yet defined in any product's settings — FOIA export pipeline integration is pending.
 - **keel.core.foia_urls** is only included in Harbor, Manifest, and Admiralty — other products need it added as they adopt FOIA export.
-- **`/search/` endpoint is not implemented on any product.** The shared ⌘K modal submits there but every product will 404 until a product-specific `keel.search`-backed view is wired up. Tracked as a follow-up.
-- **`KEEL_SUITE_DOMAIN` cookie SSO blocks** are still present in product settings as a fallback for the OIDC flow. They should be removed in Phase 2b.5 once every product is verified on the OIDC path.
-- **Bounty + Harbor shared-DB migration remnants.** Migrations occasionally leave orphan tables and indexes in the shared DB after partial deploys. Recovery pattern documented in "Railway deployment notes" above.
+- **`/search/` endpoint is not implemented on any product.** The shared ⌘K modal submits there but every product will 404 until a product-specific `keel.search`-backed view is wired up.
+- **Bounty has a legacy `core_user` table** with orphan FK constraints. Most were dropped during the Phase 2b cleanup, but some product-specific tables may still reference it. See Railway deployment notes for the recovery pattern.
+- **Helm is not yet wired to live product feeds.** The `ProductFeed` contract (`dashboard/feed_contract.py`) and `CachedFeedSnapshot` caching model exist, but no product exposes the `/api/v1/helm-feed/` endpoint and no fetch mechanism pulls data from products into Helm's cache. Helm's dashboard is blank on production until this is built. The feed pipeline is the next major feature build.
 
 ---
 
-## Phase 2b.5 — Pending cleanup
+## Completed cleanup (Phase 2b.5)
 
-These items close out the OIDC migration and can be done in one deployment cycle:
+These items were completed during the Phase 2b OIDC rollout session:
 
-1. **Decommission `KEEL_SUITE_DOMAIN` cookie SSO.** Remove the `SESSION_COOKIE_DOMAIN=.docklabs.ai` blocks from all 9 product settings — OIDC makes them redundant.
-2. **Move Bounty and Manifest to their own Postgres.** Flip `DATABASE_URL` from Harbor's shared DB to each project's own Postgres service. Copy over the user/session/signatures data if needed.
-3. **Fix Purser + Manifest Railway↔GitHub auto-deploy.** Reconnect the repo or recreate the service so pushes trigger builds automatically.
-4. **Remove Purser's runtime `pip --upgrade --force-reinstall keel` workaround from `start.sh`** once every product is consistently version-bumping.
-5. **Add a `keel.search`-backed `/search/` endpoint** to at least one product (recommended: Helm, since it's the executive dashboard) so the ⌘K modal does something useful.
+1. ✅ **Cookie SSO decommissioned.** `KEEL_SUITE_DOMAIN` / `SESSION_COOKIE_DOMAIN` blocks removed from all 9 products.
+2. ✅ **Bounty and Manifest on their own Postgres.** `DATABASE_URL` flipped from Harbor's shared DB to each project's own Postgres service (`ballast` for Bounty, `shinkansen` for Manifest).
+3. ✅ **Purser auto-deploy fixed** and runtime `pip --force-reinstall` workaround removed from `start.sh`.
+4. ✅ **Beacon has `keel.notifications`** in INSTALLED_APPS and URLs wired.
+5. ✅ **User state consolidated.** All 10 DBs paved to a single `dokadmin` user; zombie `dan/dan2/dan3/...` users cleaned up. Adapter fixed to prevent recurrence (preferred_username linking + unconditional username assignment).
+6. ✅ **`AutoOIDCLoginMiddleware`** deployed to all 9 products for seamless fleet switching.
+7. ✅ **`SuiteLogoutView`** + Keel `suite_logout_endpoint` for cross-product logout chain.
+8. ✅ **Message suppression** for "signed in as" and "signed out" toasts.
+9. ✅ **Demo branding** — "Demo" prefix on roles and product name in `DEMO_MODE`.
+10. ✅ **Dashboard greeting** only on Helm (auto-fades, once per session).
 
 ---
 
-*Last updated: 2026-04-08.*
+*Last updated: 2026-04-09.*
