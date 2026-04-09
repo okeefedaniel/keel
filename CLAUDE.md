@@ -268,6 +268,18 @@ version = "0.10.9"
 
 Bump both files in the same commit as the code change, then bump pins in all product `requirements.txt` files referencing the new git commit.
 
+### Railway CLI access
+
+- **The Railway CLI is installed and authenticated** (`railway` command, logged in as `inbox@okeefeweb.com`). Use it for managing env vars, checking deploy status, and triggering deployments across all 10 DockLabs services.
+- **Project structure:** Each product is its own Railway project with `<product>` (production) and `<product>-demo` services in the same project, sharing a single Postgres service.
+- **Useful commands:**
+  - `railway link -p <project> -e production` — link to a project
+  - `railway service status --all` — check all services in the linked project
+  - `railway variable set KEY=VALUE --service <service> --skip-deploys` — set env vars without triggering a deploy
+  - `railway variable list --service <service> --kv` — list env vars
+  - `railway up --service <service> --detach` — manual deploy (for services without auto-deploy)
+- **Auto-deploy:** Most services auto-deploy on `git push` to `main`. Manifest sometimes needs `railway up --service manifest --detach` if its GitHub integration is broken.
+
 ### Railway deployment notes
 
 - **`SECURE_SSL_REDIRECT` MUST be `False`** on Railway — the healthcheck sends plain HTTP and a `True` setting makes it 301-redirect, failing the check and blocking deploys. Preventive: Keel's settings sets it to `False`; product settings should not override.
