@@ -214,6 +214,48 @@ def fleet_context(request):
     }
 
 
+def _resolve_namespace_url(namespace):
+    """Try several naming conventions to find a clickable URL for a namespace.
+
+    Products use different patterns:
+      - Harbor: ``name='list'`` (bare)
+      - Beacon: ``name='interaction_list'`` (prefixed with singular model name)
+
+    We try: list, index, dashboard, {singular}_list, {namespace}_list.
+    """
+    # Derive singular form: "interactions" → "interaction", "companies" → "company"
+    ns = namespace.lower()
+    if ns.endswith('ies'):
+        singular = ns[:-3] + 'y'
+    elif ns.endswith('ses') or ns.endswith('xes'):
+        singular = ns[:-2]
+    elif ns.endswith('s') and not ns.endswith('ss'):
+        singular = ns[:-1]
+    else:
+        singular = ns
+
+    # Also try common model names that differ from namespace
+    # e.g. pipeline → opportunity_list, cadences → reminder_list
+    alt_models = {
+        'pipeline': 'opportunity',
+        'cadences': 'reminder',
+    }
+    alt = alt_models.get(ns, '')
+
+    candidates = [
+        'list', 'index', 'dashboard',
+        f'{singular}_list',   # interaction_list, company_list
+        f'{ns}_list',         # interactions_list (rare but possible)
+    ]
+    if alt:
+        candidates.append(f'{alt}_list')  # opportunity_list, reminder_list
+    for suffix in candidates:
+        url = _safe_reverse(f'{namespace}:{suffix}')
+        if url:
+            return url
+    return None
+
+
 def breadcrumb_context(request):
     """Auto-generate breadcrumbs from the current URL resolver match.
 
@@ -221,22 +263,33 @@ def breadcrumb_context(request):
         auto_breadcrumbs — list of {'label': str, 'url': str|None} dicts.
 
     The last item has url=None (current page, not a link).
-    Products can override the breadcrumb_items block in app.html to
-    use these, or provide their own breadcrumbs entirely.
+
+    Views can override breadcrumbs by setting ``breadcrumbs`` on the
+    view class (list of dicts) or by overriding the ``breadcrumb_items``
+    block in the template.
     """
+    # If the view explicitly provides breadcrumbs, use those
+    view = getattr(request, 'resolver_match', None)
+    if view:
+        view_func = getattr(view, 'func', None)
+        view_cls = getattr(view_func, 'view_class', None)
+        custom = getattr(view_cls, 'breadcrumbs', None)
+        if custom is not None:
+            return {'auto_breadcrumbs': custom}
+
     product_name = getattr(settings, 'KEEL_PRODUCT_NAME', 'DockLabs')
     crumbs = [{'label': product_name, 'url': '/'}]
 
     # Namespaces to skip (internal implementation detail, not user-facing)
     skip_namespaces = {'admin', 'core', 'portal', 'keel_notifications',
-                       'keel_accounts', 'keel_requests'}
+                       'keel_accounts', 'keel_requests', 'beacon_core'}
 
     match = getattr(request, 'resolver_match', None)
     if match:
         url_name = match.url_name or ''
         namespace = match.namespace or ''
 
-        # Convert url_name like 'program-list' to 'Program List'
+        # Convert url_name like 'program_list' to 'Program List'
         label = url_name.replace('-', ' ').replace('_', ' ').title()
 
         # Clean up common suffixes to get the section name
@@ -247,7 +300,6 @@ def breadcrumb_context(request):
 
         # Also strip "List" when it IS the entire label (url_name='list')
         if label == 'List':
-            # Use namespace as the label instead
             if namespace:
                 label = namespace.replace('_', ' ').replace('-', ' ').title()
             else:
@@ -262,17 +314,24 @@ def breadcrumb_context(request):
             'User': 'Users', 'Invitation': 'Invitations',
             'Notification': 'Notifications', 'Request': 'Requests',
             'Reporting': 'Reports', 'Financial': 'Financial',
-            'Closeout': 'Closeouts', 'Keel Notifications': 'Notifications',
-            'Applications': 'Applications', 'Awards': 'Awards',
+            'Keel Notifications': 'Notifications',
+            'Task': 'Tasks', 'Interaction': 'Interactions',
+            'Company': 'Companies', 'Contact': 'Contacts',
+            'Note': 'Notes', 'Reminder': 'Reminders',
+            'Foia': 'FOIA', 'Interaction Create': 'Log Interaction',
+            'Interaction Edit': 'Edit Interaction',
         }
         label = plurals.get(label, label)
 
         # Add namespace as middle crumb if it's user-facing and distinct
         if namespace and namespace.lower() not in skip_namespaces:
             ns_label = namespace.replace('_', ' ').replace('-', ' ').title()
+            ns_label = plurals.get(ns_label, ns_label)
+            # Special case: FOIA is an acronym, not title-case
+            if ns_label == 'Foia':
+                ns_label = 'FOIA'
             # Skip if namespace is same as product, same as label, or
-            # label is a plural/variant of namespace (e.g. Reporting/Reports)
-            # Normalize for comparison: strip trailing s/ing
+            # label is a plural/variant of namespace
             ns_lower = ns_label.lower().rstrip('s')
             label_lower = label.lower().rstrip('s')
             if ns_lower.endswith('ing'):
@@ -280,12 +339,7 @@ def breadcrumb_context(request):
             if (ns_label.lower() != product_name.lower()
                     and ns_label.lower() != label.lower()
                     and ns_lower != label_lower):
-                # Try to resolve a list/index URL for this namespace
-                ns_url = None
-                for suffix in ('list', 'index', 'dashboard'):
-                    ns_url = _safe_reverse(f'{namespace}:{suffix}')
-                    if ns_url:
-                        break
+                ns_url = _resolve_namespace_url(namespace)
                 crumbs.append({'label': ns_label, 'url': ns_url})
 
         if label and label.lower() not in ('home', 'dashboard', product_name.lower()):
