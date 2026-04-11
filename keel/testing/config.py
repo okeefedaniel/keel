@@ -160,6 +160,7 @@ _LOOKOUT_STAFF = [
 _BOUNTY_PUBLIC = [
     '/',
     '/opportunities/',
+    '/support/',
 ]
 
 _BOUNTY_COMMON = [
@@ -177,6 +178,7 @@ _BOUNTY_STAFF = [
 _YEOMAN_PUBLIC = [
     '/invite/',
     '/invite/success/',
+    '/support/',
 ]
 
 _YEOMAN_COMMON = [
@@ -235,7 +237,7 @@ PRODUCTS = {
             'admin', 'agency_admin', 'relationship_manager',
             'foia_officer', 'foia_attorney', 'analyst', 'executive',
         ],
-        public_urls=['/login/'],
+        public_urls=['/login/', '/support/'],
         auth_urls={
             'admin': _BEACON_COMMON + _BEACON_STAFF + _BEACON_FOIA,
             'agency_admin': _BEACON_COMMON + _BEACON_STAFF,
@@ -262,7 +264,7 @@ PRODUCTS = {
         settings_module='admiralty.settings',
         live_url='https://admiralty.docklabs.ai',
         demo_roles=['admin', 'foia_officer', 'foia_attorney'],
-        public_urls=['/', '/accounts/login/'],
+        public_urls=['/', '/accounts/login/', '/support/'],
         auth_urls={
             'admin': _ADMIRALTY_ALL + _ADMIRALTY_STAFF,
             'foia_officer': _ADMIRALTY_ALL + ['/foia/review/'],
@@ -320,7 +322,7 @@ PRODUCTS = {
         settings_module='manifest.settings',
         live_url='https://manifest.docklabs.ai',
         demo_roles=['admin', 'staff', 'signer'],
-        public_urls=['/accounts/login/'],
+        public_urls=['/accounts/login/', '/support/'],
         auth_urls={
             'admin': [
                 '/packets/',
@@ -386,7 +388,7 @@ PRODUCTS = {
         settings_module='purser_site.settings',
         live_url='https://purser.docklabs.ai',
         demo_roles=['purser_admin', 'purser_submitter', 'purser_reviewer', 'purser_compliance_officer'],
-        public_urls=['/accounts/login/'],
+        public_urls=['/accounts/login/', '/support/'],
         auth_urls={
             'purser_admin': _PURSER_COMMON + _PURSER_STAFF + _PURSER_ADMIN,
             'purser_submitter': _PURSER_COMMON,
