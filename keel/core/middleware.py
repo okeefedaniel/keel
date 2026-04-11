@@ -49,13 +49,34 @@ def _handle_user_logged_in(sender, request, user, **kwargs):
 
 
 class AuditMiddleware:
-    """Captures per-request audit metadata and logs login events."""
+    """Captures per-request audit metadata, logs login events, and
+    populates thread-local context for signal-based auto-audit.
+
+    After this middleware runs:
+    - ``request.audit_ip`` is set to the client IP
+    - ``keel.core.audit_signals.get_audit_context()`` returns the
+      current user and IP for post_save/post_delete signal handlers
+    """
 
     def __init__(self, get_response):
         self.get_response = get_response
         user_logged_in.connect(_handle_user_logged_in)
 
     def __call__(self, request):
+        from keel.core.audit_signals import set_audit_context
+
         request.audit_ip = _get_client_ip(request)
+
+        # Set thread-local context for signal-based audit logging
+        user = getattr(request, 'user', None)
+        if user and getattr(user, 'is_authenticated', False):
+            set_audit_context(user=user, ip_address=request.audit_ip)
+        else:
+            set_audit_context(user=None, ip_address=request.audit_ip)
+
         response = self.get_response(request)
+
+        # Clean up after request
+        set_audit_context(user=None, ip_address=None)
+
         return response
