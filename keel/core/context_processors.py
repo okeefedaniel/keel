@@ -256,95 +256,154 @@ def _resolve_namespace_url(namespace):
     return None
 
 
+def _singularize(word):
+    """Best-effort singular: 'interactions' → 'interaction'."""
+    w = word.lower()
+    if w.endswith('ies'):
+        return w[:-3] + 'y'
+    if w.endswith('ses') or w.endswith('xes'):
+        return w[:-2]
+    if w.endswith('s') and not w.endswith('ss'):
+        return w[:-1]
+    return w
+
+
+# Label overrides: raw title-cased name → display label
+_LABEL_MAP = {
+    # Plurals
+    'Program': 'Programs', 'Application': 'Applications',
+    'Award': 'Awards', 'Report': 'Reports', 'Packet': 'Packets',
+    'Flow': 'Flows', 'Closeout': 'Closeouts', 'Drawdown': 'Cash Requests',
+    'Opportunity': 'Opportunities', 'Bill': 'Bills',
+    'User': 'Users', 'Invitation': 'Invitations',
+    'Notification': 'Notifications', 'Request': 'Requests',
+    'Reporting': 'Reports', 'Financial': 'Financial',
+    'Keel Notifications': 'Notifications',
+    'Task': 'Tasks', 'Interaction': 'Interactions',
+    'Company': 'Companies', 'Contact': 'Contacts',
+    'Note': 'Notes', 'Reminder': 'Reminders',
+    # Acronyms
+    'Foia': 'FOIA',
+    # Full url_name label overrides
+    'Interaction Create': 'Log Interaction',
+    'Interaction Edit': 'Edit Interaction',
+    'Opportunity Transition': 'Change Stage',
+}
+
+# Action label overrides: 'create' → 'Create', etc.
+_ACTION_LABELS = {
+    'create': 'Create', 'edit': 'Edit', 'update': 'Edit',
+    'delete': 'Delete', 'detail': '', 'list': '',
+    'complete': 'Complete', 'status': 'Status',
+}
+
+
 def breadcrumb_context(request):
     """Auto-generate breadcrumbs from the current URL resolver match.
 
-    Provides:
-        auto_breadcrumbs — list of {'label': str, 'url': str|None} dicts.
+    Provides ``auto_breadcrumbs`` — a list of ``{'label', 'url'}`` dicts.
+    The last item has ``url=None`` (current page, not a link).
 
-    The last item has url=None (current page, not a link).
+    Handles nested sections automatically: if ``url_name`` has a prefix
+    that differs from the namespace (e.g. ``task_create`` inside the
+    ``interactions`` namespace), the prefix becomes an intermediate crumb
+    linked to ``{namespace}:{prefix}_list``.
 
-    Views can override breadcrumbs by setting ``breadcrumbs`` on the
-    view class (list of dicts) or by overriding the ``breadcrumb_items``
-    block in the template.
+    Trail structure::
+
+        Product  ›  Namespace  [›  Sub-section]  ›  Page
+        Beacon   ›  Interactions  ›  Tasks  ›  Create
     """
-    # If the view explicitly provides breadcrumbs, use those
-    view = getattr(request, 'resolver_match', None)
-    if view:
-        view_func = getattr(view, 'func', None)
-        view_cls = getattr(view_func, 'view_class', None)
-        custom = getattr(view_cls, 'breadcrumbs', None)
-        if custom is not None:
-            return {'auto_breadcrumbs': custom}
-
     product_name = getattr(settings, 'KEEL_PRODUCT_NAME', 'DockLabs')
     crumbs = [{'label': product_name, 'url': '/'}]
 
-    # Namespaces to skip (internal implementation detail, not user-facing)
     skip_namespaces = {'admin', 'core', 'portal', 'keel_notifications',
                        'keel_accounts', 'keel_requests', 'beacon_core'}
 
     match = getattr(request, 'resolver_match', None)
-    if match:
-        url_name = match.url_name or ''
-        namespace = match.namespace or ''
+    if not match:
+        return {'auto_breadcrumbs': crumbs}
 
-        # Convert url_name like 'program_list' to 'Program List'
-        label = url_name.replace('-', ' ').replace('_', ' ').title()
+    url_name = match.url_name or ''
+    namespace = match.namespace or ''
+    ns_singular = _singularize(namespace) if namespace else ''
 
-        # Clean up common suffixes to get the section name
-        for suffix in (' List', ' Index', ' Home'):
-            if label.endswith(suffix) and len(label) > len(suffix):
-                label = label[:-len(suffix)].strip()
-                break
+    # ── Parse url_name into (prefix, action) ────────────────────
+    # e.g. 'task_create' → ('task', 'create')
+    #      'interaction_list' → ('interaction', 'list')
+    #      'list' → ('', 'list')
+    #      'dashboard' → ('', 'dashboard')
+    parts = url_name.rsplit('_', 1) if '_' in url_name else ['', url_name]
+    prefix = parts[0] if len(parts) == 2 else ''
+    action = parts[-1]
 
-        # Also strip "List" when it IS the entire label (url_name='list')
-        if label == 'List':
-            if namespace:
-                label = namespace.replace('_', ' ').replace('-', ' ').title()
-            else:
-                label = ''
+    # Detect sub-section: prefix differs from namespace singular
+    # e.g. prefix='task' inside namespace='interactions' (singular='interaction')
+    is_subsection = (
+        prefix
+        and prefix != ns_singular
+        and prefix != namespace.lower()
+        and action not in ('', )
+    )
 
-        # Pluralize / rename common section names
-        plurals = {
-            'Program': 'Programs', 'Application': 'Applications',
-            'Award': 'Awards', 'Report': 'Reports', 'Packet': 'Packets',
-            'Flow': 'Flows', 'Closeout': 'Closeouts', 'Drawdown': 'Cash Requests',
-            'Opportunity': 'Opportunities', 'Bill': 'Bills',
-            'User': 'Users', 'Invitation': 'Invitations',
-            'Notification': 'Notifications', 'Request': 'Requests',
-            'Reporting': 'Reports', 'Financial': 'Financial',
-            'Keel Notifications': 'Notifications',
-            'Task': 'Tasks', 'Interaction': 'Interactions',
-            'Company': 'Companies', 'Contact': 'Contacts',
-            'Note': 'Notes', 'Reminder': 'Reminders',
-            'Foia': 'FOIA', 'Interaction Create': 'Log Interaction',
-            'Interaction Edit': 'Edit Interaction',
-        }
-        label = plurals.get(label, label)
+    # ── Namespace crumb ─────────────────────────────────────────
+    if namespace and namespace.lower() not in skip_namespaces:
+        ns_label = namespace.replace('_', ' ').replace('-', ' ').title()
+        ns_label = _LABEL_MAP.get(ns_label, ns_label)
 
-        # Add namespace as middle crumb if it's user-facing and distinct
-        if namespace and namespace.lower() not in skip_namespaces:
-            ns_label = namespace.replace('_', ' ').replace('-', ' ').title()
-            ns_label = plurals.get(ns_label, ns_label)
-            # Special case: FOIA is an acronym, not title-case
-            if ns_label == 'Foia':
-                ns_label = 'FOIA'
-            # Skip if namespace is same as product, same as label, or
-            # label is a plural/variant of namespace
-            ns_lower = ns_label.lower().rstrip('s')
-            label_lower = label.lower().rstrip('s')
-            if ns_lower.endswith('ing'):
-                ns_lower = ns_lower[:-3]
-            if (ns_label.lower() != product_name.lower()
-                    and ns_label.lower() != label.lower()
-                    and ns_lower != label_lower):
-                ns_url = _resolve_namespace_url(namespace)
-                crumbs.append({'label': ns_label, 'url': ns_url})
+        # Skip if namespace label matches product name
+        if ns_label.lower() != product_name.lower():
+            ns_url = _resolve_namespace_url(namespace)
 
-        if label and label.lower() not in ('home', 'dashboard', product_name.lower()):
-            crumbs.append({'label': label, 'url': None})
-        elif label.lower() == 'dashboard':
-            crumbs.append({'label': 'Dashboard', 'url': None})
+            # For the namespace's own list page, this IS the current page
+            if url_name in ('list', f'{ns_singular}_list'):
+                crumbs.append({'label': ns_label, 'url': None})
+                return {'auto_breadcrumbs': crumbs}
+
+            crumbs.append({'label': ns_label, 'url': ns_url})
+
+    # ── Sub-section crumb (e.g. "Tasks" inside interactions) ────
+    if is_subsection:
+        sub_label = prefix.replace('-', ' ').title()
+        sub_label = _LABEL_MAP.get(sub_label, sub_label)
+
+        # For the sub-section's own list page, this IS the current page
+        if action == 'list':
+            crumbs.append({'label': sub_label, 'url': None})
+            return {'auto_breadcrumbs': crumbs}
+
+        # Link to the sub-section list
+        sub_url = _safe_reverse(f'{namespace}:{prefix}_list')
+        crumbs.append({'label': sub_label, 'url': sub_url})
+
+        # Final crumb = action label
+        action_label = _ACTION_LABELS.get(action, action.replace('-', ' ').title())
+        if action_label:
+            crumbs.append({'label': action_label, 'url': None})
+
+        return {'auto_breadcrumbs': crumbs}
+
+    # ── Standard final crumb (non-subsection) ───────────────────
+    # Build a readable label from the full url_name
+    label = url_name.replace('-', ' ').replace('_', ' ').title()
+
+    # Strip common suffixes
+    for suffix in (' List', ' Index', ' Home'):
+        if label.endswith(suffix) and len(label) > len(suffix):
+            label = label[:-len(suffix)].strip()
+            break
+
+    if label == 'List':
+        if namespace:
+            label = namespace.replace('_', ' ').replace('-', ' ').title()
+        else:
+            label = ''
+
+    label = _LABEL_MAP.get(label, label)
+
+    if label and label.lower() not in ('home', 'dashboard', product_name.lower()):
+        crumbs.append({'label': label, 'url': None})
+    elif label.lower() == 'dashboard':
+        crumbs.append({'label': 'Dashboard', 'url': None})
 
     return {'auto_breadcrumbs': crumbs}
