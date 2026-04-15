@@ -2,6 +2,23 @@
 
 These principles ensure consistency across the DockLabs suite (Admiralty, Beacon, Bounty, Harbor, Helm, Lookout, Manifest, Purser, Yeoman). When working on any product, verify compliance and flag deviations.
 
+## Session & Machine Context
+
+### How Claude accesses this codebase
+- **Claude Code** (run from Mac mini or laptop): Has full filesystem access to `/Users/dok/Code/CT/`. Use this for all code reading, editing, and terminal commands.
+- **claude.ai chat interface**: The `bash_tool` runs in a remote sandboxed container — it has NO access to the local filesystem regardless of which physical machine Dan is using. SSH from that container to the Mac mini is blocked by egress restrictions.
+
+### Machine setup
+- **Mac mini (dispatch)**: M4 Pro, Tailscale IP `100.122.119.51`, SSH alias `macmini`, user `dok`. Primary dev machine. All DockLabs repos at `/Users/dok/Code/CT/`.
+- **Laptop**: Also has the repos, synced via GitHub. Either machine may be the source of a claude.ai message.
+- **Code is synced via GitHub** — the canonical source is always the same. There is no meaningful difference between "macmini code" and "laptop code" as long as both are up to date.
+
+### What Claude should do at the start of each session
+1. **Do not assume bash_tool works on the local machine** — it never does in claude.ai.
+2. **Ask Dan to confirm the session type** if it's ambiguous whether he's in Claude Code or claude.ai chat, since capabilities differ significantly.
+3. **When in Claude Code**: read `keel/CLAUDE.md` and relevant app `CLAUDE.md` files before responding to code questions.
+4. **When in claude.ai chat**: work from memory/context; ask Dan to paste files or use `git show` output if code review is needed.
+
 ## Authentication & Identity
 
 ### Suite SSO — Keel as the OIDC Identity Provider (Phase 2b)
@@ -236,6 +253,30 @@ Every DockLabs product MUST include:
 
 **Why:** DockLabs products operate in a government transparency context. FOIA staff must be able to one-click export any agency-submitted record to Admiralty without developer intervention. Incomplete FOIA coverage is a legal liability.
 
+## Groups & Tags on People/Entity Records
+
+Products that maintain people-style records (contacts, stakeholders, applicants) should follow a getdex-style split between **Tags** and **Groups**:
+
+- **Tag** = a categorical label controlled by the platform/admin (industry, region, program). Often enumerated (`TagType` choices). Shared across many entity types.
+- **ContactGroup** (or analogous) = a user-defined collection of records the user curates ("Inbound", "VIPs", "Board Candidates", "Reporters"). Has a `slug`, a human-readable `name`, and an `is_system` flag for platform-managed groups that users cannot rename or delete.
+- Both are M2M on the entity — a contact can carry any number of tags AND any number of groups. Neither implies an org/parent affiliation — that is the job of a `Company` / `Organization` FK.
+- **Parent FK (e.g. `Contact.company`) MUST be nullable.** A contact the user knows personally, or one that arrived via external intake without an organization, belongs to no company but still lives in Beacon — typically surfaced via the "Inbound" system group. Do not invent a sentinel "Inbound" company to satisfy a NOT NULL constraint; groups are the right primitive for that.
+- **System groups are seeded lazily by the code that needs them** (e.g. intake API calls `get_or_create(slug='inbound', defaults={'is_system': True, ...})`), not via migrations. This keeps the pattern portable across products and avoids data migrations every time a new intake source appears.
+- Detail templates / list pages must tolerate `entity.company is None` and render a reasonable fallback ("No company", link to the contact's group instead of the company). URL schemes that embed a company slug in a contact URL (`/<company>/contacts/<id>/`) need a parallel orphan URL (`/contacts/orphan/<id>/`) and `get_absolute_url()` should branch on `company_id`.
+
+**Why:** Real-world CRM-style data includes lots of people who don't neatly belong to an organization — inbound leads, journalists, personal contacts, event attendees. Forcing every contact to attach to a company creates sentinel-company pollution ("Inbound", "Unknown", "Individual") that corrupts reporting and duplicates the job groups already do well. The getdex model — contacts have many groups, many tags, and optionally an org — is a better fit.
+
+## Cross-Product Linkage (Provenance)
+
+When one DockLabs product creates a record in another (e.g., Yeoman creates a Contact in Beacon from a speaking-engagement request), the receiving product **MUST** capture a link back to the originating record so a user inspecting the new record can navigate to whatever drove its creation.
+
+- **Receiving product accepts provenance fields** on its intake API (typically `source_product`, `source_url`, `source_label`). Persist these on the created record AND drop a row in the receiving product's activity stream / interaction log that surfaces the link to users browsing that record's history.
+- **Sending product passes the provenance** when calling the intake API, but treats the call as best-effort — a 4xx/5xx from the other product MUST NOT block the originating workflow. Wrap the cross-product call in a try/except and log on failure; the user's primary action (submitting a speaking request) succeeds regardless.
+- **Standalone deployment must still work.** Provenance fields are always optional. A product deployed alone (with no peers calling it) functions identically; the fields stay blank. Likewise the sending product gracefully no-ops when its peer's URL/API key isn't configured (`if not BEACON_INTAKE_URL: return`).
+- **No hard FKs across product DBs.** Provenance is a string slug + URL, never a database foreign key. Products may live in separate Postgres instances, and the linked record may be deleted or moved without breaking the receiver. Treat the URL like an external link.
+- **Suite-mode enrichment is additive.** When products are deployed together, the activity-stream entry can render the source URL as a clickable link with the product's icon/label. When deployed alone, the same entry still reads correctly as plain text.
+- **Why:** Users navigating from a Beacon contact need to answer "where did this come from?" without leaving Beacon. Without a link back, cross-product creation produces orphan records that look manually entered, which erodes trust in the data and makes audit/FOIA review harder.
+
 ## Security
 
 - **CSP:** Configure `KEEL_CSP_POLICY` in settings. `SecurityHeadersMiddleware` adds Content-Security-Policy, Permissions-Policy, X-Content-Type-Options, and Cross-Origin-Opener-Policy headers automatically.
@@ -278,6 +319,7 @@ Bump both files in the same commit as the code change, then bump pins in all pro
   - `railway variable set KEY=VALUE --service <service> --skip-deploys` — set env vars without triggering a deploy
   - `railway variable list --service <service> --kv` — list env vars
   - `railway up --service <service> --detach` — manual deploy (for services without auto-deploy)
+  - `railway ssh --service <service> -- <command>` — run a command on the remote service (e.g., `railway ssh --service admiralty-demo -- python manage.py seed_keel_users`). Use this for management commands that need to hit the live database. **Do not confuse with `railway run`**, which executes locally with remote env vars injected — it won't find `manage.py` unless you're in the right local directory.
 - **Auto-deploy:** Most services auto-deploy on `git push` to `main`. Manifest sometimes needs `railway up --service manifest --detach` if its GitHub integration is broken.
 
 ### Railway deployment notes
