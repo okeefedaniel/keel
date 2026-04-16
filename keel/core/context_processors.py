@@ -214,45 +214,91 @@ def fleet_context(request):
     }
 
 
+def _resolve_list_url(namespace, model):
+    """Try several URL-name patterns to find a list URL for a model.
+
+    Handles both underscore and hyphen separator conventions so that
+    Harbor-style (``packet-list``) and Beacon-style (``packet_list``)
+    url_names both resolve. Also tries the bare model name as a fallback
+    (e.g. ``yeoman:reports`` when there is no ``reports_list``). When
+    *namespace* is empty, the url_name is looked up without a namespace
+    prefix (for products like Lookout that do not set ``app_name``).
+    """
+    ns_prefix = f'{namespace}:' if namespace else ''
+
+    # Build model-name variants covering both separator styles.
+    variants = [model]
+    if '_' in model:
+        variants.append(model.replace('_', '-'))
+    if '-' in model:
+        variants.append(model.replace('-', '_'))
+
+    for m in variants:
+        for suffix in ('_list', '-list', '_queue', '-queue',
+                       '_dashboard', '-dashboard', ''):
+            name = f'{m}{suffix}' if suffix else m
+            url = _safe_reverse(f'{ns_prefix}{name}')
+            if url:
+                return url
+    return None
+
+
 def _resolve_namespace_url(namespace):
     """Try several naming conventions to find a clickable URL for a namespace.
 
     Products use different patterns:
       - Harbor: ``name='list'`` (bare)
       - Beacon: ``name='interaction_list'`` (prefixed with singular model name)
+      - Manifest / Harbor financial: ``name='packet-list'`` (hyphen-separated)
 
-    We try: list, index, dashboard, {singular}_list, {namespace}_list.
+    We try: list, index, dashboard; then {singular}_list/-list,
+    {namespace}_list/-list, and any known alt-model list URLs. As a last
+    resort we scan every URL registered in the namespace for one ending
+    in ``_list`` or ``-list``.
     """
-    # Derive singular form: "interactions" → "interaction", "companies" → "company"
     ns = namespace.lower()
-    if ns.endswith('ies'):
-        singular = ns[:-3] + 'y'
-    elif ns.endswith('ses') or ns.endswith('xes'):
-        singular = ns[:-2]
-    elif ns.endswith('s') and not ns.endswith('ss'):
-        singular = ns[:-1]
-    else:
-        singular = ns
+    singular = _singularize(ns)
 
-    # Also try common model names that differ from namespace
-    # e.g. pipeline → opportunity_list, cadences → reminder_list
+    # Bare section-landing candidates
+    for name in ('list', 'index', 'dashboard'):
+        url = _safe_reverse(f'{namespace}:{name}')
+        if url:
+            return url
+
+    # Namespaces whose primary model name differs from the namespace.
+    # e.g. ``pipeline`` → opportunity, ``grants`` → program (Harbor).
     alt_models = {
         'pipeline': 'opportunity',
         'cadences': 'reminder',
+        'grants': 'program',
+        'financial': 'drawdown',
     }
-    alt = alt_models.get(ns, '')
 
-    candidates = [
-        'list', 'index', 'dashboard',
-        f'{singular}_list',   # interaction_list, company_list
-        f'{ns}_list',         # interactions_list (rare but possible)
-    ]
+    models = [singular, ns]
+    alt = alt_models.get(ns)
     if alt:
-        candidates.append(f'{alt}_list')  # opportunity_list, reminder_list
-    for suffix in candidates:
-        url = _safe_reverse(f'{namespace}:{suffix}')
+        models.append(alt)
+
+    for model in models:
+        url = _resolve_list_url(namespace, model)
         if url:
             return url
+
+    # Last resort: scan every url_name registered in this namespace
+    # for one ending in ``_list`` or ``-list``.
+    try:
+        from django.urls import get_resolver
+        ns_data = get_resolver().namespace_dict.get(namespace)
+        if ns_data:
+            _, ns_resolver = ns_data
+            for name in ns_resolver.reverse_dict:
+                if isinstance(name, str) and (name.endswith('_list') or name.endswith('-list')):
+                    url = _safe_reverse(f'{namespace}:{name}')
+                    if url:
+                        return url
+    except Exception:
+        pass
+
     return None
 
 
@@ -266,6 +312,28 @@ def _singularize(word):
     if w.endswith('s') and not w.endswith('ss'):
         return w[:-1]
     return w
+
+
+def _pluralize_display(word):
+    """Best-effort display pluralization; no-op on words already plural.
+
+    Only pluralizes the LAST word so multi-word labels like 'User Signature'
+    become 'User Signatures' rather than 'Users Signature'.
+    """
+    words = word.split(' ') if word else []
+    if not words or not words[-1]:
+        return word
+    last = words[-1]
+    lower = last.lower()
+    if lower.endswith('s'):
+        return word
+    if lower.endswith('y') and len(last) > 1 and last[-2].lower() not in 'aeiou':
+        words[-1] = last[:-1] + 'ies'
+    elif lower.endswith(('x', 'ch', 'sh')):
+        words[-1] = last + 'es'
+    else:
+        words[-1] = last + 's'
+    return ' '.join(words)
 
 
 # Label overrides: raw title-cased name → display label
@@ -282,6 +350,16 @@ _LABEL_MAP = {
     'Task': 'Tasks', 'Interaction': 'Interactions',
     'Company': 'Companies', 'Contact': 'Contacts',
     'Note': 'Notes', 'Reminder': 'Reminders',
+    'Role': 'Roles', 'Step': 'Steps', 'Document': 'Documents',
+    'Stakeholder': 'Stakeholders', 'Committee': 'Committees',
+    'Archive': 'Archives', 'Group': 'Groups', 'Envelope': 'Envelopes',
+    'Budget': 'Budgets', 'Transaction': 'Transactions',
+    'Amendment': 'Amendments', 'Exemption': 'Exemptions',
+    'Appeal': 'Appeals', 'Submission': 'Submissions',
+    'Profile': 'Profiles', 'Testimony': 'Testimony',
+    'Tracked': 'Tracked',  # Lookout + Harbor — already reads as plural
+    'Compliance': 'Compliance',  # mass noun
+    'Review': 'Reviews',
     # Acronyms
     'Foia': 'FOIA',
     # Full url_name label overrides
@@ -329,21 +407,30 @@ def breadcrumb_context(request):
     ns_singular = _singularize(namespace) if namespace else ''
 
     # ── Parse url_name into (prefix, action) ────────────────────
-    # e.g. 'task_create' → ('task', 'create')
-    #      'interaction_list' → ('interaction', 'list')
-    #      'list' → ('', 'list')
-    #      'dashboard' → ('', 'dashboard')
-    parts = url_name.rsplit('_', 1) if '_' in url_name else ['', url_name]
-    prefix = parts[0] if len(parts) == 2 else ''
-    action = parts[-1]
+    # Split on the LAST separator (either ``_`` or ``-``) so both
+    # Harbor-style (``packet-detail``) and Beacon-style
+    # (``task_create``) url_names produce the same shape.
+    #   'task_create' → ('task', 'create')
+    #   'packet-detail' → ('packet', 'detail')
+    #   'detail' → ('', 'detail')
+    m = re.search(r'^(.+)[_-]([^_-]+)$', url_name)
+    if m:
+        prefix = m.group(1)
+        action = m.group(2)
+    else:
+        prefix = ''
+        action = url_name
+
+    # Normalize prefix display (hyphens and underscores → spaces) for labels.
+    prefix_label = prefix.replace('-', ' ').replace('_', ' ').title() if prefix else ''
 
     # Detect sub-section: prefix differs from namespace singular
     # e.g. prefix='task' inside namespace='interactions' (singular='interaction')
-    is_subsection = (
+    is_subsection = bool(
         prefix
-        and prefix != ns_singular
-        and prefix != namespace.lower()
-        and action not in ('', )
+        and prefix.lower() != ns_singular
+        and prefix.lower() != namespace.lower()
+        and action
     )
 
     # ── Namespace crumb ─────────────────────────────────────────
@@ -355,8 +442,10 @@ def breadcrumb_context(request):
         if ns_label.lower() != product_name.lower():
             ns_url = _resolve_namespace_url(namespace)
 
-            # For the namespace's own list page, this IS the current page
-            if url_name in ('list', f'{ns_singular}_list'):
+            # For the namespace's own landing page (list/index/dashboard),
+            # this IS the current page.
+            if url_name in ('list', 'index', 'dashboard',
+                            f'{ns_singular}_list', f'{ns_singular}-list'):
                 crumbs.append({'label': ns_label, 'url': None})
                 return {'auto_breadcrumbs': crumbs}
 
@@ -364,24 +453,44 @@ def breadcrumb_context(request):
 
     # ── Sub-section crumb (e.g. "Tasks" inside interactions) ────
     if is_subsection:
-        sub_label = prefix.replace('-', ' ').title()
-        sub_label = _LABEL_MAP.get(sub_label, sub_label)
+        sub_singular = prefix_label
+        sub_label = _LABEL_MAP.get(sub_singular) or _pluralize_display(sub_singular)
 
         # For the sub-section's own list page, this IS the current page
         if action == 'list':
             crumbs.append({'label': sub_label, 'url': None})
             return {'auto_breadcrumbs': crumbs}
 
-        # Link to the sub-section list
-        sub_url = _safe_reverse(f'{namespace}:{prefix}_list')
-        crumbs.append({'label': sub_label, 'url': sub_url})
+        # Link to the sub-section list (try several URL-name conventions).
+        # If we can't find a list URL, the url_name probably isn't really
+        # a subsection — fall through to the standard branch so the crumb
+        # reads "Principal Settings" instead of a dead "Principal" link
+        # followed by "Settings".
+        sub_url = _resolve_list_url(namespace, prefix)
+        if sub_url is None:
+            is_subsection = False
+        else:
+            crumbs.append({'label': sub_label, 'url': sub_url})
 
-        # Final crumb = action label
-        action_label = _ACTION_LABELS.get(action, action.replace('-', ' ').title())
-        if action_label:
-            crumbs.append({'label': action_label, 'url': None})
+            # Final crumb = action label. Detail pages get "{Singular} Detail"
+            # so the list crumb above stays clickable and the current page is
+            # clearly identified. Full url_name overrides (e.g. 'Interaction
+            # Create' → 'Log Interaction') take precedence.
+            full_title = f'{sub_singular} {action.replace("-", " ").replace("_", " ").title()}'
+            override = _LABEL_MAP.get(full_title)
+            if override:
+                action_label = override
+            elif action == 'detail':
+                action_label = f'{sub_singular} Detail'
+            else:
+                action_label = _ACTION_LABELS.get(
+                    action, action.replace('-', ' ').replace('_', ' ').title()
+                )
 
-        return {'auto_breadcrumbs': crumbs}
+            if action_label:
+                crumbs.append({'label': action_label, 'url': None})
+
+            return {'auto_breadcrumbs': crumbs}
 
     # ── Standard final crumb (non-subsection) ───────────────────
     # Build a readable label from the full url_name
