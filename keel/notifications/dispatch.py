@@ -134,7 +134,19 @@ def _resolve_recipients(ntype, context):
     qs = User.objects.filter(is_active=True)
 
     if 'all' not in ntype.default_roles:
-        qs = qs.filter(role__in=ntype.default_roles)
+        # `role` on KeelUser is a per-request property, not a DB column —
+        # it's stored on ProductAccess and resolved against the current
+        # product. Filter through the relation, scoped to this product,
+        # and dedupe with .distinct() since the join can fan out rows.
+        from django.conf import settings
+        product = (getattr(settings, 'KEEL_PRODUCT_CODE', '') or '').lower()
+        qs = qs.filter(
+            product_access__role__in=ntype.default_roles,
+            product_access__is_active=True,
+        )
+        if product:
+            qs = qs.filter(product_access__product=product)
+        qs = qs.distinct()
 
     # Agency scoping
     if ntype.agency_scoped and ntype.agency_field:
