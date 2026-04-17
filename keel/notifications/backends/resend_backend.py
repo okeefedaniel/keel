@@ -54,6 +54,21 @@ class ResendEmailBackend(BaseEmailBackend):
                 if message.reply_to:
                     params['reply_to'] = message.reply_to[0]
 
+                if message.attachments:
+                    params['attachments'] = []
+                    for attachment in message.attachments:
+                        if isinstance(attachment, tuple) and len(attachment) >= 2:
+                            filename, content = attachment[0], attachment[1]
+                            mimetype = attachment[2] if len(attachment) > 2 else None
+                            att = {'filename': filename}
+                            if isinstance(content, bytes):
+                                att['content'] = list(content)
+                            else:
+                                att['content'] = content
+                            if mimetype:
+                                att['content_type'] = mimetype
+                            params['attachments'].append(att)
+
                 result = resend.Emails.send(params)
                 sent += 1
                 logger.debug('Resend email sent to %s (id: %s)', message.to, result)
