@@ -194,7 +194,12 @@ class WorkflowEngine:
         if not required_roles or 'any' in required_roles:
             return True
 
+        if getattr(user, 'is_superuser', False):
+            return True
+
         role = getattr(user, 'role', '')
+        if role == 'system_admin':
+            return True
 
         for r in required_roles:
             # Check role keyword -> property mapping
