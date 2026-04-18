@@ -38,6 +38,18 @@ def _build_validator_class():
     class KeelOIDCValidator(OAuth2Validator):
         """Adds DockLabs claims to every ID token Keel issues."""
 
+        # Canonical set of DockLabs-specific claims this validator is
+        # contracted to emit. Every entry MUST also appear as a key in
+        # ``oidc_claim_scope`` below, or django-oauth-toolkit will
+        # silently strip it from every issued ID token. Adding a claim
+        # here without wiring the scope mapping is the failure mode
+        # ``validate_claim_scope`` exists to catch.
+        DOCKLABS_CUSTOM_CLAIMS = frozenset({
+            'product_access',
+            'is_state_user',
+            'agency_abbr',
+        })
+
         # django-oauth-toolkit filters OIDC claims by this dict inside
         # ``get_oidc_claims``: a claim is only included in the ID token if
         # the scope it maps to is present in ``request.scopes``. Without
@@ -53,6 +65,39 @@ def _build_validator_class():
             'is_state_user': 'product_access',
             'agency_abbr': 'product_access',
         }
+
+        @classmethod
+        def validate_claim_scope(cls):
+            """Fail loudly if any DockLabs custom claim isn't scoped.
+
+            django-oauth-toolkit's ``get_oidc_claims`` only emits a claim
+            whose scope (from ``oidc_claim_scope``) is present in the
+            client's requested scopes. A claim that's emitted by
+            ``get_additional_claims`` but has no ``oidc_claim_scope``
+            entry is silently stripped from every token — a bug that
+            only surfaces downstream when a product reads a role the
+            IdP never sent.
+
+            Call this at app boot (see ``keel.oidc.apps.ready``) so
+            drift is caught at startup rather than at token-issue time.
+            Raises ``ImproperlyConfigured`` naming every unscoped claim.
+            """
+            from django.core.exceptions import ImproperlyConfigured
+
+            missing = sorted(
+                claim for claim in cls.DOCKLABS_CUSTOM_CLAIMS
+                if claim not in cls.oidc_claim_scope
+            )
+            if missing:
+                raise ImproperlyConfigured(
+                    "KeelOIDCValidator claim drift: the following "
+                    "DockLabs custom claims are declared in "
+                    "DOCKLABS_CUSTOM_CLAIMS but missing from "
+                    f"oidc_claim_scope and will be silently stripped "
+                    f"from every issued ID token: {missing}. Add each "
+                    "claim to oidc_claim_scope with the gating scope "
+                    "(typically 'product_access')."
+                )
 
         def get_additional_claims(self, request):
             """Build the DockLabs claims dict for the requesting user.
