@@ -54,10 +54,15 @@ a:hover { color: var(--ct-bold-blue); }
 
 /* =============================================
    3. Button Base (DockLabs standard)
+   Canonical button radius is 6px (matches
+   --radius-sm in docklabs-v2.css). Do not
+   override per-product; round pills / icon
+   circles should use dedicated utility classes
+   (e.g. .rounded-circle) instead.
    ============================================= */
 .btn {
     font-weight: 500;
-    border-radius: 0.5rem;
+    border-radius: 6px;
     font-size: 0.9rem;
     transition: all 0.15s ease;
     position: relative;
@@ -618,12 +623,12 @@ footer hr {
 .hero-section .btn-light {
     font-weight: 600;
     color: var(--ct-dark-blue);
-    border-radius: 0.5rem;
+    border-radius: 6px;
     padding: 0.625rem 1.5rem;
 }
 .hero-section .btn-outline-light {
     font-weight: 600;
-    border-radius: 0.5rem;
+    border-radius: 6px;
     padding: 0.625rem 1.5rem;
     border-width: 2px;
 }

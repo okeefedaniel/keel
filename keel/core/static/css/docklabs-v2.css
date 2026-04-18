@@ -111,6 +111,10 @@ h6, .h6 { font-size: 12px; }
 
 /* =============================================
    4. Buttons
+   Canonical button radius is --radius-sm (6px).
+   Do not override per-product; round pills /
+   icon circles should use dedicated utility
+   classes (e.g. .rounded-circle) instead.
    ============================================= */
 .btn {
     font-family: 'Poppins', sans-serif;
