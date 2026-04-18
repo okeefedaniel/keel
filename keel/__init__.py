@@ -1,2 +1,2 @@
 """Keel — shared platform layer for DockLabs products."""
-__version__ = '0.11.6'
+__version__ = '0.11.7'
