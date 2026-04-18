@@ -46,7 +46,7 @@ Products extend this and override blocks:
     <!-- ============================================
          SIDEBAR — inlined for block inheritance
          ============================================ -->
-    <aside class="dl-sidebar" id="dl-sidebar">
+    <aside class="dl-sidebar" id="dl-sidebar" aria-label="Primary navigation">
       <div class="sidebar-header">
         <a class="sidebar-brand" href="{% block sidebar_brand_href %}/{% endblock %}">
           <div class="sidebar-brand-icon">
@@ -64,13 +64,13 @@ Products extend this and override blocks:
         {% block sidebar_quick_new %}{% endblock %}
       </div>
 
-      <div class="sidebar-body">
+      <nav class="sidebar-body" aria-label="Sections">
         {% block sidebar_favorites %}{% endblock %}
         {% block sidebar_tree %}{% endblock %}
         {% block sidebar_recent %}{% endblock %}
         {% block sidebar_extra_sections %}{% endblock %}
         {% block sidebar_admin %}{% endblock %}
-      </div>
+      </nav>
 
       <div class="sidebar-footer">
         {% include "keel/components/fleet_switcher.html" %}
@@ -105,25 +105,25 @@ Products extend this and override blocks:
       <!-- ============================================
            TOPBAR — inlined for block inheritance
            ============================================ -->
-      <div class="dl-topbar">
+      <header class="dl-topbar" role="banner">
         <button class="topbar-expand" onclick="dlToggleSidebar()" title="Open sidebar">&#9776;</button>
 
-        <div class="dl-breadcrumb">
+        <nav class="dl-breadcrumb" aria-label="Breadcrumb">
           {% block breadcrumb_items %}
           {% for crumb in auto_breadcrumbs %}
             {% if not forloop.last %}
               {% if crumb.url %}<a href="{{ crumb.url }}">{{ crumb.label }}</a>{% else %}<span>{{ crumb.label }}</span>{% endif %}
               <span class="breadcrumb-sep">&rsaquo;</span>
             {% else %}
-              <span class="breadcrumb-current">{{ crumb.label }}</span>
+              <span class="breadcrumb-current" aria-current="page">{{ crumb.label }}</span>
             {% endif %}
           {% empty %}
             <a href="/">{{ SITE_NAME|default:"DockLabs" }}</a>
             <span class="breadcrumb-sep">&rsaquo;</span>
-            <span class="breadcrumb-current">Dashboard</span>
+            <span class="breadcrumb-current" aria-current="page">Dashboard</span>
           {% endfor %}
           {% endblock %}
-        </div>
+        </nav>
 
         <div class="topbar-actions">
           <button type="button" class="search-trigger" title="Search (⌘K)"
@@ -151,7 +151,7 @@ Products extend this and override blocks:
 
           {% block topbar_primary_action %}{% endblock %}
         </div>
-      </div>
+      </header>
 
       <!-- Page tabs (optional) -->
       {% block page_tabs %}{% endblock %}
@@ -159,7 +159,7 @@ Products extend this and override blocks:
 
       <!-- Messages -->
       {% if messages %}
-      <div class="px-4 pt-3">
+      <div class="px-4 pt-3" role="status" aria-live="polite">
         {% for message in messages %}
         <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -170,9 +170,9 @@ Products extend this and override blocks:
       {% endif %}
 
       <!-- Page content -->
-      <div class="dl-content" id="main-content">
+      <main class="dl-content" id="main-content" role="main">
         {% block content %}{% endblock %}
-      </div>
+      </main>
     </div>
   </div>
 
@@ -214,12 +214,20 @@ Products extend this and override blocks:
   <!-- ⌘K / Ctrl+K → open the search modal -->
   <script>
     (function () {
+      var modal = document.getElementById('keelSearchModal');
+      if (!modal) return;
+
+      // Focus the search input when the modal finishes opening
+      modal.addEventListener('shown.bs.modal', function () {
+        var input = modal.querySelector('input[name="q"]');
+        if (input) input.focus();
+      });
+
       document.addEventListener('keydown', function (e) {
         if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
           e.preventDefault();
-          var el = document.getElementById('keelSearchModal');
-          if (el && window.bootstrap) {
-            bootstrap.Modal.getOrCreateInstance(el).show();
+          if (window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modal).show();
           }
         }
       });
