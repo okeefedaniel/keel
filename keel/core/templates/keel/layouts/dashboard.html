@@ -30,12 +30,12 @@ Usage:
 {% endcomment %}
 
 {% block dashboard_content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2 class="fw-bold mb-0">{% block page_title %}Dashboard{% endblock %}</h2>
+        <h1 class="page-title mb-0">{% block page_title %}Dashboard{% endblock %}</h1>
         {% block page_subtitle_block %}
         {% with subtitle=page_subtitle %}
-        {% if subtitle %}<p class="text-muted mb-0">{{ subtitle }}</p>{% endif %}
+        {% if subtitle %}<p class="page-subtitle mb-0">{{ subtitle }}</p>{% endif %}
         {% endwith %}
         {% endblock %}
     </div>

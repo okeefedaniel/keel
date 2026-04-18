@@ -110,6 +110,24 @@ h4, .h4 { font-size: 1.25rem; }
 h5, .h5 { font-size: 1.125rem; }
 h6, .h6 { font-size: 1rem; }
 
+/* Canonical page heading — matches docklabs-v2.css so products on either
+   stylesheet render page titles at the same size/weight. */
+.page-title,
+.page-header h1 {
+    font-size: 1.625rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 3px;
+    color: var(--ct-dark-blue);
+    font-family: 'Poppins', Arial, sans-serif;
+}
+.page-subtitle,
+.page-header p {
+    font-size: 0.875rem;
+    color: var(--ct-dark-gray);
+    font-weight: 400;
+}
+
 /* =============================================
    6. Navbar
    ============================================= */

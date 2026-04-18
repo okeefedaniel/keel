@@ -673,14 +673,20 @@ h6, .h6 { font-size: 12px; }
     background: var(--accent-teal);
 }
 
+/* Canonical page heading. Use on the top-level <h1> of every page so titles
+   share one size/weight across products. Also applied automatically to
+   <h1> inside .page-header so existing markup keeps working. */
+.page-title,
 .page-header h1 {
     font-size: 26px;
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.02em;
     margin-bottom: 3px;
+    font-family: 'Poppins', -apple-system, sans-serif;
 }
-.page-header p {
+.page-header p,
+.page-subtitle {
     font-size: 14px;
     color: var(--text-secondary);
     font-weight: 400;
