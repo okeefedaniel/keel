@@ -34,9 +34,13 @@ def _verify_webhook(request):
 
     Postmark doesn't sign payloads, so we use a secret token
     passed as a query parameter or Authorization header.
+
+    Fails closed: if COMMS_POSTMARK_WEBHOOK_TOKEN is unset, all webhook
+    requests are rejected. Set the env var (even in dev) to receive inbound.
     """
     if not COMMS_POSTMARK_WEBHOOK_TOKEN:
-        return True  # No token configured — allow (dev mode)
+        logger.error('Comms: COMMS_POSTMARK_WEBHOOK_TOKEN not configured — rejecting webhook')
+        return False
 
     # Check Authorization header first
     auth = request.headers.get('Authorization', '')
