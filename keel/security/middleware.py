@@ -162,10 +162,28 @@ class FailedLoginMonitor:
 class AdminIPAllowlistMiddleware:
     """Restricts /admin/ access to a list of allowed IP addresses/networks.
 
+    Wiring (required — this middleware is NOT enabled by default):
+        Add to MIDDLEWARE in each product's settings.py, AFTER
+        SecurityHeadersMiddleware and BEFORE AuthenticationMiddleware so the
+        403 is returned before any auth work happens:
+
+            MIDDLEWARE = [
+                ...
+                'keel.security.middleware.SecurityHeadersMiddleware',
+                'keel.security.middleware.AdminIPAllowlistMiddleware',
+                ...
+                'django.contrib.auth.middleware.AuthenticationMiddleware',
+                ...
+            ]
+
     Configure in settings:
         KEEL_ADMIN_ALLOWED_IPS = ['10.0.0.0/8', '192.168.0.0/16', '1.2.3.4']
+        KEEL_ADMIN_URL_PREFIX = '/admin/'  # optional, defaults to '/admin/'
 
-    If KEEL_ADMIN_ALLOWED_IPS is not set or empty, all IPs are allowed.
+    Behavior: if KEEL_ADMIN_ALLOWED_IPS is unset or empty, the middleware is
+    a no-op (all IPs allowed). This keeps local dev working without extra
+    config but means production MUST populate the list to get protection.
+    Pull the client IP from a trusted proxy header — see _get_client_ip.
     """
 
     def __init__(self, get_response):
