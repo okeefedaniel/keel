@@ -366,6 +366,8 @@ _LABEL_MAP = {
     'Interaction Create': 'Log Interaction',
     'Interaction Edit': 'Edit Interaction',
     'Opportunity Transition': 'Change Stage',
+    # Canonical /dashboard/ alias used by Helm, Admiralty, Purser, etc.
+    'Dashboard Alias': 'Dashboard',
 }
 
 # Action label overrides: 'create' → 'Create', etc.
