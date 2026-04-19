@@ -712,11 +712,12 @@ h6, .h6 { font-size: 12px; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 13px 18px;
+    padding: 16px 18px;
     border-bottom: 1px solid var(--border-light);
     background: transparent;
     font-weight: 600;
     font-family: 'Poppins', sans-serif;
+    line-height: 1.4;
 }
 
 .card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
