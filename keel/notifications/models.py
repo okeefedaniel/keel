@@ -49,6 +49,10 @@ class AbstractNotificationPreference(models.Model):
         default=False,
         verbose_name=_('SMS notifications'),
     )
+    channel_boswell = models.BooleanField(
+        default=False,
+        verbose_name=_('OpenClaw notifications'),
+    )
 
     # Full mute (overrides all channels)
     is_muted = models.BooleanField(
@@ -73,6 +77,8 @@ class AbstractNotificationPreference(models.Model):
             channels.append('email')
         if self.channel_sms:
             channels.append('sms')
+        if self.channel_boswell:
+            channels.append('boswell')
         return f'{self.user} | {self.notification_type} | {status} [{",".join(channels)}]'
 
 

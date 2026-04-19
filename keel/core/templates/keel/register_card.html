@@ -1,0 +1,133 @@
+{% comment %}
+DockLabs shared registration card — included by each product's register/signup template.
+
+Mirrors keel/login_card.html so the suite presents a single, consistent
+sign-up experience across products.
+
+Expects these context variables (provided by keel.core.context_processors.site_context):
+  SITE_NAME        — product name (e.g., "Beacon")
+  PRODUCT_ICON     — Bootstrap icon class (e.g., "bi-broadcast")
+  PRODUCT_SUBTITLE — tagline
+
+Expects from the view:
+  form             — a registration form (allauth SignupForm OR a product
+                     UserCreationForm subclass — both render via crispy)
+
+Optional context:
+  keel_login_url      — URL for "Sign in with DockLabs" (Keel OIDC). When
+                        set, surfaced as the primary path because the suite
+                        flow is product → Keel → Microsoft and account
+                        creation should happen at the IdP, not the product.
+  microsoft_login_url — URL for direct Microsoft SSO (standalone mode only)
+  login_url           — URL for the "Already have an account? Sign in" link
+                        (defaults to {% url 'account_login' %} if unset)
+  form_action         — Optional explicit form action; defaults to current URL
+  intro_alert         — Optional info-alert text rendered above the form
+                        (e.g. "New accounts require administrator approval")
+  outro_alert         — Optional info-alert text rendered below the form
+                        (e.g. "After creating your account, set up your org profile")
+  submit_label        — Optional submit button label (defaults to "Create Account")
+{% endcomment %}
+{% load crispy_forms_tags %}
+
+<style>
+    .register-card { max-width: 480px; margin: 0 auto; }
+</style>
+
+<div class="register-card">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-md-5">
+            {# ── Header ── #}
+            <div class="text-center mb-4">
+                <div class="mb-3">
+                    <i class="bi {{ PRODUCT_ICON }} display-4 text-primary"></i>
+                </div>
+                <h2 class="fw-bold">Create your account</h2>
+                {% if SITE_NAME %}
+                <p class="text-muted mb-0">Join {{ SITE_NAME }}{% if PRODUCT_SUBTITLE %} — {{ PRODUCT_SUBTITLE }}{% endif %}</p>
+                {% endif %}
+            </div>
+
+            {# ── Single sign-on (preferred path) ── #}
+            {% if keel_login_url or microsoft_login_url %}
+            {% if keel_login_url %}
+            <div class="d-grid mb-2">
+                <a href="{{ keel_login_url }}"
+                   class="btn btn-outline-primary btn-lg d-flex align-items-center justify-content-center">
+                    <i class="bi bi-shield-lock-fill me-2"></i>
+                    Sign up with DockLabs
+                </a>
+            </div>
+            {% endif %}
+
+            {% if microsoft_login_url %}
+            <div class="d-grid mb-2">
+                <a href="{{ microsoft_login_url }}"
+                   class="btn btn-outline-dark btn-lg d-flex align-items-center justify-content-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 21 21" class="me-2">
+                        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                    </svg>
+                    Sign up with Microsoft
+                </a>
+            </div>
+            {% endif %}
+
+            <p class="text-center text-muted small mt-2 mb-0">
+                {% if keel_login_url %}One account for the entire DockLabs suite{% else %}State employees: use your DOK.gov account{% endif %}
+            </p>
+
+            <div class="d-flex align-items-center my-4">
+                <hr class="flex-grow-1">
+                <span class="px-3 text-muted small">OR CREATE A LOCAL ACCOUNT</span>
+                <hr class="flex-grow-1">
+            </div>
+            {% endif %}
+
+            {# ── Local registration form ── #}
+            {% if intro_alert %}
+            <div class="alert alert-info small" role="alert">
+                <i class="bi bi-info-circle me-1"></i>{{ intro_alert }}
+            </div>
+            {% endif %}
+
+            <form method="post"{% if form_action %} action="{{ form_action }}"{% endif %}>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {{ form|crispy }}
+
+                {% if redirect_field_value %}
+                <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+                {% endif %}
+
+                {% if outro_alert %}
+                <div class="alert alert-info mt-3 mb-0" role="alert">
+                    <i class="bi bi-info-circle me-2"></i><small>{{ outro_alert }}</small>
+                </div>
+                {% endif %}
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-person-plus me-2"></i>{% if submit_label %}{{ submit_label }}{% else %}Create Account{% endif %}
+                    </button>
+                </div>
+            </form>
+
+            {# ── Footer link ── #}
+            <p class="text-center small mt-4 mb-0">
+                Already have an account?
+                <a href="{% if login_url %}{{ login_url }}{% else %}{% url 'account_login' %}{% endif %}" class="text-decoration-none fw-semibold">Sign in</a>
+            </p>
+        </div>
+    </div>
+</div>

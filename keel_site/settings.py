@@ -280,7 +280,7 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-SESSION_COOKIE_AGE = 3600  # 1 hour
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days (pre-gov-launch; tighten before go-live)
 SESSION_SAVE_EVERY_REQUEST = True
 
 # Upload limits

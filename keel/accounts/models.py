@@ -506,6 +506,7 @@ class NotificationPreference(models.Model):
     channel_in_app = models.BooleanField(default=True)
     channel_email = models.BooleanField(default=True)
     channel_sms = models.BooleanField(default=False)
+    channel_boswell = models.BooleanField(default=False)
     is_muted = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 

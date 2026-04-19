@@ -159,8 +159,18 @@ def preferences(request):
         'prefs_enabled': True,
         'sms_available': bool(getattr(settings, 'KEEL_SMS_BACKEND', None)),
         'user_has_phone': bool(getattr(request.user, 'phone', None)),
+        'boswell_available': _boswell_available(types_by_category),
     }
     return render(request, 'notifications/preferences.html', context)
+
+
+def _boswell_available(types_by_category):
+    """Check if any notification type in the visible categories uses boswell."""
+    for types in types_by_category.values():
+        for ntype in types:
+            if 'boswell' in ntype.default_channels:
+                return True
+    return False
 
 
 def _save_preferences(request, PrefModel, types_by_category):
@@ -178,6 +188,7 @@ def _save_preferences(request, PrefModel, types_by_category):
                 'channel_in_app': True,
                 'channel_email': 'email' in ntype.default_channels,
                 'channel_sms': False,
+                'channel_boswell': 'boswell' in ntype.default_channels,
             },
         )
 
@@ -185,4 +196,5 @@ def _save_preferences(request, PrefModel, types_by_category):
         pref.channel_in_app = request.POST.get(f'{key}_in_app') == 'on'
         pref.channel_email = request.POST.get(f'{key}_email') == 'on'
         pref.channel_sms = request.POST.get(f'{key}_sms') == 'on'
+        pref.channel_boswell = request.POST.get(f'{key}_boswell') == 'on'
         pref.save()

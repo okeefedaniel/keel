@@ -5,6 +5,7 @@ from django.shortcuts import redirect
 from django.urls import include, path
 
 from keel.accounts.forms import LoginForm
+from keel.core.demo import demo_login_view
 from keel.core.views import suite_logout_endpoint
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
@@ -40,6 +41,10 @@ urlpatterns = [
         auth_views.LogoutView.as_view(http_method_names=['get', 'post', 'options']),
         name='logout',
     ),
+
+    # Demo login — keel's login template renders Quick Demo Login
+    # buttons when DEMO_MODE=True; they POST here.
+    path('demo-login/', demo_login_view, name='demo_login'),
 
     # Suite-wide logout — products chain their own logout through here
     # so the Keel IdP session is cleared at the same time. See

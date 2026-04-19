@@ -1268,6 +1268,21 @@ summary:focus-visible,
     .dl-page-tabs { overflow-x: auto; padding: 0 16px; }
 }
 
+@media (max-width: 767.98px) {
+    .dl-topbar { padding: 8px 12px; gap: 8px; }
+    .dl-breadcrumb { display: none; }
+    .topbar-actions { margin-left: auto; gap: 2px; }
+    .search-trigger { padding: 5px 8px; }
+    .search-trigger .search-kbd { display: none; }
+    .tb-divider { display: none; }
+}
+
+@media (max-width: 479.98px) {
+    .search-trigger { font-size: 0; padding: 5px 8px; gap: 0; }
+    .search-trigger i { font-size: 14px !important; }
+    .topbar-primary-action-label { display: none; }
+}
+
 @media (max-width: 575.98px) {
     .table { font-size: 0.85rem; }
     .progress-tracker { flex-wrap: wrap; gap: 0.5rem; }

@@ -17,11 +17,31 @@ from urllib.parse import urlencode, urlparse
 
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.views import LogoutView
+from django.contrib.staticfiles.storage import staticfiles_storage
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET, require_http_methods
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView, TemplateView
+
+
+@require_GET
+@cache_control(max_age=86400)
+def favicon_view(request):
+    """Redirect `/favicon.ico` to the hashed static favicon.
+
+    Products drop a `favicon.svg` (and optional `favicon.ico`) into
+    `static/img/`; WhiteNoise serves them with content hashes in the URL,
+    so browsers that request `/favicon.ico` directly 404 without this
+    shim. Prefers SVG where available, falls back to ICO.
+    """
+    for candidate in ('img/favicon.svg', 'img/favicon.ico'):
+        try:
+            url = staticfiles_storage.url(candidate)
+        except ValueError:
+            continue
+        return HttpResponseRedirect(url)
+    return HttpResponse(status=404)
 
 
 @require_GET

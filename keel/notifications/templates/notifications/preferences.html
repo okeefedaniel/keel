@@ -49,6 +49,11 @@
                 <i class="bi bi-phone me-1"></i>SMS
               </th>
               {% endif %}
+              {% if boswell_available %}
+              <th class="text-center" style="width: 12%">
+                <i class="bi bi-robot me-1"></i>OpenClaw
+              </th>
+              {% endif %}
               <th class="text-center" style="width: 12%">
                 <i class="bi bi-bell-slash me-1"></i>Mute
               </th>
@@ -86,6 +91,17 @@
                          {% if not user_has_phone %}disabled{% endif %}
                          {% if ntype.key in preferences and preferences|get_pref_attr:ntype.key|get_pref_attr:"channel_sms" %}checked{% endif %}>
                 </div>
+              </td>
+              {% endif %}
+              {% if boswell_available %}
+              <td class="text-center">
+                {% if "boswell" in ntype.default_channels %}
+                <div class="form-check d-flex justify-content-center">
+                  <input class="form-check-input" type="checkbox"
+                         name="{{ ntype.key }}_boswell" id="{{ ntype.key }}_boswell"
+                         {% if ntype.key in preferences and preferences|get_pref_attr:ntype.key|get_pref_attr:"channel_boswell" %}checked{% elif ntype.key not in preferences and "boswell" in ntype.default_channels %}checked{% endif %}>
+                </div>
+                {% endif %}
               </td>
               {% endif %}
               <td class="text-center">
