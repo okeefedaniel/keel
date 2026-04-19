@@ -26,11 +26,24 @@ import os
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login
+from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.views.decorators.http import require_POST
 
 from .utils import rate_limit
+
+
+def _wants_json(request):
+    accept = request.META.get('HTTP_ACCEPT', '')
+    return 'application/json' in accept and 'text/html' not in accept
+
+
+def _error(request, message, status, login_url='/accounts/login/'):
+    if _wants_json(request):
+        return JsonResponse({'error': message}, status=status)
+    messages.error(request, message)
+    return redirect(login_url)
 
 DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo2026!')
 
@@ -131,15 +144,15 @@ def demo_login_view(request):
     name, and ProductAccessMiddleware resolves the role from ProductAccess.
     """
     if not getattr(settings, 'DEMO_MODE', False):
-        return JsonResponse({'error': 'Demo mode is not enabled'}, status=403)
+        return _error(request, 'Demo mode is not enabled', 403)
 
     role = request.POST.get('role', '').strip()
     if not role:
-        return JsonResponse({'error': 'No role specified'}, status=400)
+        return _error(request, 'No role specified', 400)
 
     allowed_roles = get_demo_roles()
     if role not in allowed_roles:
-        return JsonResponse({'error': f'Invalid demo role: {role}'}, status=400)
+        return _error(request, f'Invalid demo role: {role}', 400)
 
     user = authenticate(request, username=role, password=DEMO_PASSWORD)
     if user is not None:
@@ -147,7 +160,9 @@ def demo_login_view(request):
         redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/')
         return redirect(redirect_url)
 
-    return JsonResponse(
-        {'error': f'Demo user "{role}" not found. Run seed_keel_users.'},
-        status=500,
+    return _error(
+        request,
+        f'Demo user "{role}" is not seeded on this instance yet. '
+        'Please try a different role or contact support.',
+        500,
     )

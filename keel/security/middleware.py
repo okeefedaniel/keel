@@ -34,9 +34,28 @@ logger = logging.getLogger('keel.security')
 
 
 def _get_client_ip(request):
-    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if forwarded_for:
-        return forwarded_for.split(',')[0].strip()
+    """Return the real client IP, honoring X-Forwarded-For only when trusted.
+
+    Django sees ``REMOTE_ADDR`` as the last hop — on Railway, that's Railway's
+    own proxy. Clients can forge ``X-Forwarded-For`` on arbitrary requests, so
+    trusting the leftmost hop unconditionally lets any attacker spoof their IP
+    (and evade per-IP rate limits / admin allowlists).
+
+    ``KEEL_TRUSTED_PROXY_COUNT`` declares how many trusted proxies sit in
+    front of Django. For each one, we pop the rightmost hop of the
+    ``X-Forwarded-For`` chain (the hop added by that proxy). Whatever is left
+    at the tail is the real client. Default = 0 → ignore the header entirely
+    and use ``REMOTE_ADDR``.
+    """
+    trusted = int(getattr(settings, 'KEEL_TRUSTED_PROXY_COUNT', 0) or 0)
+    if trusted > 0:
+        forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+        hops = [h.strip() for h in forwarded_for.split(',') if h.strip()]
+        # Pop `trusted` proxies from the right; the next rightmost hop is the
+        # real client (the one *trusted[0]* saw).
+        idx = len(hops) - trusted
+        if idx >= 0 and idx < len(hops):
+            return hops[idx]
     return request.META.get('REMOTE_ADDR', '0.0.0.0')
 
 

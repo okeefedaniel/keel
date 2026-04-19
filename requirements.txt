@@ -9,6 +9,9 @@ psycopg2-binary>=2.9
 twilio>=9.0
 requests>=2.30
 
+# HTML sanitizer for inbound email (parser-based; regex approach was unsafe)
+nh3>=0.2
+
 # Email (Resend HTTP API — Railway blocks outbound SMTP)
 resend>=2.0
 

@@ -19,6 +19,26 @@ import csv
 from django.http import HttpResponse
 
 
+# Characters that Excel / LibreOffice / Google Sheets interpret as the start of
+# a formula. Prefixing with a single quote neutralizes the cell.
+_CSV_FORMULA_CHARS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def csv_safe(value):
+    """Neutralize CSV formula-injection payloads before writing to a spreadsheet.
+
+    Strings that begin with =, +, -, @, tab, or CR can be interpreted as
+    formulas by Excel and trigger remote content / RCE when a staff user
+    opens the exported file. Prefix with a single quote so the cell renders
+    as literal text. Non-string values pass through unchanged.
+    """
+    if not isinstance(value, str):
+        return value
+    if value and value[0] in _CSV_FORMULA_CHARS:
+        return "'" + value
+    return value
+
+
 class CSVExportMixin:
     """Add CSV export to any ListView via ``?export=csv``.
 
@@ -59,6 +79,6 @@ class CSVExportMixin:
                     if callable(value):
                         value = value()
                     row.append(value)
-            writer.writerow(row)
+            writer.writerow([csv_safe(v) for v in row])
 
         return response

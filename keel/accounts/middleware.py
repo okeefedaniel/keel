@@ -161,6 +161,11 @@ class AutoOIDCLoginMiddleware:
                 except NoReverseMatch:
                     return self.get_response(request)
                 next_url = request.GET.get('next') or '/dashboard/'
+                # Guard against reflected open-redirect / phishing pivot:
+                # only accept same-origin paths. Protocol-relative
+                # ("//evil.com/...") and absolute URLs are rejected.
+                if not next_url.startswith('/') or next_url.startswith('//'):
+                    next_url = '/dashboard/'
                 params = urlencode({'process': 'login', 'next': next_url})
                 return HttpResponseRedirect(f'{login_path}?{params}')
         return self.get_response(request)

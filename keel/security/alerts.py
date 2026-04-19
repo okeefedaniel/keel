@@ -23,6 +23,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.db.models import Count
 from django.utils import timezone
 
 logger = logging.getLogger('keel.security')
@@ -54,11 +55,11 @@ def check_failed_logins(audit_log_model, window_minutes=15, threshold=5):
     login_attempts = (
         audit_log_model.objects
         .filter(
-            action='login',
+            action='login_failed',
             timestamp__gte=since,
         )
         .values('ip_address')
-        .annotate(count=__import__('django.db.models', fromlist=['Count']).Count('id'))
+        .annotate(count=Count('id'))
         .filter(count__gte=threshold)
     )
 
@@ -85,7 +86,7 @@ def check_bulk_exports(audit_log_model, window_hours=1, threshold=10):
             timestamp__gte=since,
         )
         .values('user__username', 'user_id')
-        .annotate(count=__import__('django.db.models', fromlist=['Count']).Count('id'))
+        .annotate(count=Count('id'))
         .filter(count__gte=threshold)
     )
 

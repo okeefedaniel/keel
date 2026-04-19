@@ -44,6 +44,17 @@ class KeelAccountAdapter(DefaultAccountAdapter):
     login_redirect_url = '/dashboard/'
     signup_redirect_url = '/dashboard/'
 
+    def is_open_for_signup(self, request):
+        """Close public signup across the suite by default.
+
+        Provisioning happens via Keel OIDC (the ``product_access`` claim
+        creates ``ProductAccess`` rows on first sign-in) or by a Keel admin
+        explicitly seeding a user. Products that want self-service signup
+        can opt in by setting ``KEEL_ALLOW_SIGNUP = True`` in their
+        settings — e.g. a future grantee-self-registration flow on Harbor.
+        """
+        return bool(getattr(settings, 'KEEL_ALLOW_SIGNUP', False))
+
     def get_login_redirect_url(self, request):
         # Prefer the product's LOGIN_REDIRECT_URL setting (e.g. Helm uses
         # '/helm/', Harbor uses '/harbor/dashboard/'). Fall back to the

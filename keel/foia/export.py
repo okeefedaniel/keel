@@ -139,16 +139,23 @@ def _get_export_model():
 def submit_to_foia(source_product: str, record_type: str, record_id: str,
                    title: str, content: str,
                    created_by: str = '', created_at=None, metadata=None,
-                   submitted_by=None, foia_request_id: str = ''):
+                   submitted_by=None, foia_request_id: str = '',
+                   submitter_ip: str = ''):
     """Submit a single record for FOIA review.
 
     Creates a FOIAExportItem in the queue for Admiralty to pick up.
     Returns the created export item.
+
+    ``submitter_ip`` — optional client IP of the user triggering the
+    export. Persisted on the queue item so FOIA review has an audit
+    trail of who initiated the push, not just who authored the record.
+    Pass ``request.audit_ip`` from a view (populated by
+    ``keel.core.middleware.AuditMiddleware``).
     """
     ExportItem = _get_export_model()
     content_hash = _content_hash(content)
 
-    item = ExportItem.objects.create(
+    create_kwargs = dict(
         source_product=source_product,
         record_type=record_type,
         record_id=str(record_id),
@@ -161,6 +168,10 @@ def submit_to_foia(source_product: str, record_type: str, record_id: str,
         submitted_by=submitted_by,
         foia_request_id_ref=foia_request_id,
     )
+    if submitter_ip and hasattr(ExportItem, 'submitter_ip'):
+        create_kwargs['submitter_ip'] = submitter_ip
+
+    item = ExportItem.objects.create(**create_kwargs)
 
     logger.info(
         'FOIA export: %s:%s:%s → item %s (hash: %s...)',

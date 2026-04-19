@@ -1,10 +1,25 @@
 """FOIA Export — one-click audit log + activity export to Admiralty.
 
-Any DockLabs product can include this view to let admins export a
-date-ranged package of all audit log entries and entity snapshots,
-formatted for direct ingestion into Admiralty's FOIA document store.
+**DEPRECATED (2026-04-19):** this module is the audit-log, time-range
+variant of FOIA export. It predates ``keel.foia.export`` which is the
+canonical registry-based pipeline referenced by ``keel/CLAUDE.md``.
 
-Usage in product urls.py:
+Going forward:
+
+* New products should register exportable types with
+  ``keel.foia.export.foia_export_registry`` and include
+  ``keel.foia.urls`` (not ``keel.core.foia_urls``).
+* The audit-log bulk-export view below remains available as an admin
+  convenience until all products have migrated their FOIA buttons to the
+  registry. When the last caller is gone, delete this module AND
+  ``keel.core.foia_urls`` in the same commit.
+
+Current callers (verified 2026-04-19): admiralty, beacon, harbor,
+manifest all ``include('keel.core.foia_urls')`` in their root URLConf;
+none of them use the registry yet, so the audit-log path is still the
+only working export on three of them. Do not delete until that changes.
+
+Legacy usage in product urls.py:
     from keel.core.foia_export import foia_export_view
     path('foia-export/', foia_export_view, name='foia_export'),
 
@@ -18,6 +33,8 @@ import logging
 from datetime import datetime
 
 from django.apps import apps
+
+from keel.core.export import csv_safe
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
@@ -180,7 +197,7 @@ def _export_csv(entries, product_name, date_from, date_to):
 
     for entry in entries:
         data = _serialize_audit_entry(entry)
-        writer.writerow([
+        writer.writerow([csv_safe(v) for v in (
             data['timestamp'],
             data['user'],
             data['user_email'],
@@ -190,7 +207,7 @@ def _export_csv(entries, product_name, date_from, date_to):
             data['description'],
             json.dumps(data['changes']) if data['changes'] else '',
             data['ip_address'],
-        ])
+        )])
 
     response = HttpResponse(output.getvalue(), content_type='text/csv')
     filename = f'foia_export_{product_name}_{date_from}_{date_to}.csv'

@@ -124,12 +124,29 @@ def thread_to_transcript(thread: Thread) -> str:
     return '\n'.join(lines)
 
 
+def _safe_download_header(basename: str) -> str:
+    """Return a Content-Disposition value safe against CRLF/filename tricks.
+
+    Strips control characters and quotes, then urllib-quotes to emit an
+    RFC 5987 ``filename*`` param alongside an ASCII fallback.
+    """
+    from urllib.parse import quote as _urlquote
+
+    cleaned = ''.join(c for c in basename if c.isprintable() and c not in '"\r\n\\')
+    ascii_fallback = ''.join(c if ord(c) < 128 else '_' for c in cleaned) or 'download'
+    encoded = _urlquote(cleaned, safe='')
+    return (
+        f'attachment; filename="{ascii_fallback}"; '
+        f"filename*=UTF-8''{encoded}"
+    )
+
+
 def export_message_eml_response(message: Message) -> HttpResponse:
     """Return an HttpResponse with a single message as .eml download."""
     eml_content = message_to_eml(message)
     response = HttpResponse(eml_content, content_type='message/rfc822')
     safe_subject = message.subject[:50].replace(' ', '_').replace('/', '-')
-    response['Content-Disposition'] = f'attachment; filename="{safe_subject}.eml"'
+    response['Content-Disposition'] = _safe_download_header(f'{safe_subject}.eml')
     return response
 
 
@@ -138,5 +155,7 @@ def export_thread_transcript_response(thread: Thread) -> HttpResponse:
     transcript = thread_to_transcript(thread)
     response = HttpResponse(transcript, content_type='text/plain; charset=utf-8')
     safe_subject = thread.subject[:50].replace(' ', '_').replace('/', '-')
-    response['Content-Disposition'] = f'attachment; filename="{safe_subject}_transcript.txt"'
+    response['Content-Disposition'] = _safe_download_header(
+        f'{safe_subject}_transcript.txt'
+    )
     return response

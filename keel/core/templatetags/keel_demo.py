@@ -22,6 +22,9 @@ def demo_login_buttons(context):
     if not getattr(settings, 'DEMO_MODE', False):
         return ''
 
+    if getattr(settings, 'KEEL_PRODUCT_NAME', '').lower() == 'keel':
+        return ''
+
     request = context.get('request')
     if request and request.user.is_authenticated:
         return ''

@@ -132,15 +132,31 @@ def api_ingest(request):
     This is the primary path for change requests to reach Keel's database.
     The widget in each product uses fetch() to call this endpoint.
     """
-    # Verify API key
-    api_key = getattr(settings, 'KEEL_API_KEY', '') or ''
-    if not api_key:
+    # Verify API key. Accept either a per-product key (preferred) via the
+    # ``KEEL_PRODUCT_API_KEYS`` mapping, or the shared ``KEEL_API_KEY``
+    # (legacy). Per-product keys let an operator rotate one product's key
+    # without forcing a fleet-wide rotation, and limit the blast radius
+    # if any single product container is compromised.
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer '):
+        return JsonResponse({'error': 'Invalid API key.'}, status=401)
+    presented = auth_header[7:].strip()
+    if not presented:
+        return JsonResponse({'error': 'Invalid API key.'}, status=401)
+
+    per_product = getattr(settings, 'KEEL_PRODUCT_API_KEYS', {}) or {}
+    shared_key = getattr(settings, 'KEEL_API_KEY', '') or ''
+    if not per_product and not shared_key:
         return JsonResponse({'error': 'API ingest not configured.'}, status=503)
 
-    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-    if not auth_header.startswith('Bearer ') or not hmac.compare_digest(
-        auth_header[7:].strip(), api_key
-    ):
+    valid = False
+    # Constant-time compare against every configured key. compare_digest
+    # never short-circuits, so iterating doesn't leak which product key
+    # matched via timing.
+    for configured in list(per_product.values()) + ([shared_key] if shared_key else []):
+        if configured and hmac.compare_digest(presented, configured):
+            valid = True
+    if not valid:
         return JsonResponse({'error': 'Invalid API key.'}, status=401)
 
     # Parse JSON body

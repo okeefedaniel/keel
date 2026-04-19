@@ -136,6 +136,32 @@ def check_keel_security():
         'keel',
     ))
 
+    # Enforce canonical ordering: FailedLoginMonitor must appear before
+    # AuditMiddleware, and AuditMiddleware must be the last keel middleware
+    # in the stack. Products bounty/harbor/lookout/yeoman historically had
+    # these inverted, which made the audit log miss the lockout-decision
+    # context on brute-force responses.
+    audit_idx = next(
+        (i for i, m in enumerate(middleware) if 'AuditMiddleware' in m),
+        -1,
+    )
+    flm_idx = next(
+        (i for i, m in enumerate(middleware) if 'FailedLoginMonitor' in m),
+        -1,
+    )
+    if audit_idx >= 0 and flm_idx >= 0:
+        checks.append(_check(
+            'Middleware order (FailedLoginMonitor before AuditMiddleware)',
+            flm_idx < audit_idx,
+            'FailedLoginMonitor is ordered before AuditMiddleware',
+            (
+                'Middleware order is inverted: FailedLoginMonitor must come '
+                'BEFORE AuditMiddleware so lockout decisions are captured '
+                'in the audit log for the current request.'
+            ),
+            'keel',
+        ))
+
     checks.append(_check(
         'File scanning configured',
         getattr(settings, 'KEEL_FILE_SCANNING_ENABLED', None) is not None,

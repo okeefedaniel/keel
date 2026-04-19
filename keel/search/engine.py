@@ -173,30 +173,69 @@ class SearchEngine:
             return SearchQuery(raw.strip('"'), search_type='phrase')
         return SearchQuery(raw, search_type='websearch')
 
+    def _allowed_column_names(self):
+        """Return the set of column names that are safe to interpolate.
+
+        Derived from the model's own field list. A subclass that passes
+        an arbitrary attacker-controlled string into a filter kwarg (for
+        example by forwarding raw request.GET keys) cannot escape this
+        allowlist — unknown columns are rejected before reaching SQL.
+        """
+        try:
+            return {
+                f.column
+                for f in self.model._meta.get_fields()
+                if hasattr(f, 'column') and f.column
+            }
+        except Exception:
+            return set()
+
     def _build_filter_sql(self, filters):
         """Convert filter dict to SQL WHERE clauses.
 
         Override for complex filter logic. Returns (clause_str, params_list).
+        Field names are allowlisted against the model's own columns so a
+        subclass that forwards untrusted keys cannot inject SQL.
         """
         if not filters:
             return '', []
 
+        allowed = self._allowed_column_names()
         clauses = []
         params = []
         filter_kwargs = self.get_filter_kwargs(filters)
         for field, value in filter_kwargs.items():
-            clauses.append(f"AND {field} = %s")
+            if field not in allowed:
+                logger.warning(
+                    "search: dropping filter with disallowed field %r (not a %s column)",
+                    field, self.model.__name__ if self.model else '?',
+                )
+                continue
+            clauses.append(f'AND "{field}" = %s')
             params.append(value)
         return ' '.join(clauses), params
 
     def _instant_select_cols(self):
-        """Build SELECT column list for instant search."""
-        cols = ['id']
+        """Build SELECT column list for instant search.
+
+        Columns are validated against the model's own field list so a
+        misconfigured subclass cannot interpolate arbitrary SQL into the
+        SELECT clause.
+        """
+        allowed = self._allowed_column_names()
+        requested = ['id']
         if self.instant_display_fields:
-            cols.extend(self.instant_display_fields)
+            requested.extend(self.instant_display_fields)
         else:
-            cols.extend(self.search_fields.keys())
-        return ', '.join(cols)
+            requested.extend(self.search_fields.keys())
+        safe = [c for c in requested if c in allowed or c == 'id']
+        dropped = [c for c in requested if c not in safe]
+        if dropped:
+            logger.warning(
+                "search: dropping unknown instant_display columns %r on %s",
+                dropped, self.model.__name__ if self.model else '?',
+            )
+        return ', '.join(f'"{c}"' for c in safe)
 
     def _execute_instant(self, sql, params):
         """Execute instant search SQL and format results."""
@@ -220,13 +259,30 @@ class SearchEngine:
             return 0
 
         table = self.model._meta.db_table
-        sv_field = self.search_vector_field
+        allowed = self._allowed_column_names()
+        if self.search_vector_field not in allowed:
+            raise ValueError(
+                f"search_vector_field={self.search_vector_field!r} is not a "
+                f"column on {self.model.__name__}"
+            )
+        sv_field = f'"{self.search_vector_field}"'
 
-        # Build weighted tsvector expression
+        # Build weighted tsvector expression. Validate every column name
+        # against the model's own fields; refuse to interpolate anything
+        # else so a bad subclass definition can't produce injectable SQL.
+        _ALLOWED_WEIGHTS = {'A', 'B', 'C', 'D'}
         parts = []
         for field, weight in self.search_fields.items():
+            if field not in allowed:
+                raise ValueError(
+                    f"search_fields contains unknown column {field!r} for {self.model.__name__}"
+                )
+            if weight not in _ALLOWED_WEIGHTS:
+                raise ValueError(
+                    f"search_fields[{field!r}] weight must be one of {_ALLOWED_WEIGHTS}, got {weight!r}"
+                )
             parts.append(
-                f"setweight(to_tsvector('english', coalesce({field}, '')), '{weight}')"
+                f"setweight(to_tsvector('english', coalesce(\"{field}\", '')), '{weight}')"
             )
         vector_expr = ' || '.join(parts)
 

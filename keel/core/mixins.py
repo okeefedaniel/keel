@@ -9,6 +9,8 @@ from django.db.models.expressions import BaseExpression
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 
+from keel.core.export import csv_safe
+
 logger = logging.getLogger(__name__)
 
 
@@ -193,7 +195,7 @@ class BulkActionMixin:
                     if callable(value):
                         value = value()
                     row.append(value)
-            writer.writerow(row)
+            writer.writerow([csv_safe(v) for v in row])
 
         return response
 

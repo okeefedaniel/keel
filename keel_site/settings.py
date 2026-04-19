@@ -199,9 +199,13 @@ OAUTH2_PROVIDER = {
     # Skip the "are you sure?" confirmation page — the click-through
     # friction defeats the purpose of chaining logouts across the suite.
     'OIDC_RP_INITIATED_LOGOUT_ALWAYS_PROMPT': False,
-    # Accept any post_logout_redirect_uri that the KeelOIDCValidator
-    # whitelists (see post_logout_redirect_uri_allowed below).
-    'OIDC_RP_INITIATED_LOGOUT_STRICT_REDIRECT_URIS': False,
+    # STRICT validation: django-oauth-toolkit checks the requested
+    # post_logout_redirect_uri against each Application's registered
+    # ``post_logout_redirect_uris`` list. An unregistered URI is rejected
+    # before the logout completes. This closes the open-redirect path
+    # that would otherwise let an attacker bounce an authenticated user
+    # to an arbitrary external URL after logout.
+    'OIDC_RP_INITIATED_LOGOUT_STRICT_REDIRECT_URIS': True,
 }
 
 # ---------------------------------------------------------------------------
@@ -245,7 +249,21 @@ KEEL_GATE_ACCESS = False  # Keel admin console doesn't gate itself
 KEEL_NOTIFICATION_MODEL = 'keel_accounts.Notification'
 KEEL_NOTIFICATION_PREFERENCE_MODEL = 'keel_accounts.NotificationPreference'
 KEEL_NOTIFICATION_LOG_MODEL = 'keel_accounts.NotificationLog'
-KEEL_API_KEY = os.environ.get('KEEL_API_KEY', '')  # Shared key for product → Keel API
+KEEL_API_KEY = os.environ.get('KEEL_API_KEY', '')  # Shared key for product → Keel API (legacy)
+
+# Per-product API keys — preferred over ``KEEL_API_KEY``. Each product is
+# provisioned its own key so a compromised product container can only
+# forge requests attributed to itself, not to the whole fleet. Format:
+# ``KEEL_API_KEY_<PRODUCT>`` env vars map into this dict. Unset entries
+# simply do not create an accepted credential for that product.
+KEEL_PRODUCT_API_KEYS = {
+    code: os.environ.get(f'KEEL_API_KEY_{code.upper()}', '')
+    for code in (
+        'helm', 'harbor', 'beacon', 'lookout', 'bounty',
+        'admiralty', 'purser', 'manifest', 'yeoman',
+    )
+}
+KEEL_PRODUCT_API_KEYS = {k: v for k, v in KEEL_PRODUCT_API_KEYS.items() if v}
 DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
 DEMO_ROLES = ['admin', 'system_admin']
 KEEL_AUDIT_LOG_MODEL = 'keel_accounts.AuditLog'

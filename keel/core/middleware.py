@@ -74,9 +74,12 @@ class AuditMiddleware:
         else:
             set_audit_context(user=None, ip_address=request.audit_ip)
 
-        response = self.get_response(request)
-
-        # Clean up after request
-        set_audit_context(user=None, ip_address=None)
+        try:
+            response = self.get_response(request)
+        finally:
+            # Always clear thread-local context. Without try/finally, an
+            # exception in view/downstream middleware would leak identity
+            # to the next request served on the same thread.
+            set_audit_context(user=None, ip_address=None)
 
         return response

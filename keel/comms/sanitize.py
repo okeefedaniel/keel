@@ -5,14 +5,14 @@ External email HTML can contain arbitrary CSS, JavaScript, tracking pixels,
 and other hostile content. This module strips it down to safe, renderable
 HTML before it's displayed in the comms panel.
 
-Uses a lightweight regex-based approach with no external dependencies.
-For production deployments handling high-risk content, install nh3 or
-bleach for more robust parsing.
+Backed by ``nh3`` (Rust-backed ammonia) — a parser-based sanitizer that is
+resilient to mutation-XSS and attribute-splitting tricks that the prior
+regex-based pass could be fooled by.
 """
-import re
+import nh3
 
 # Tags allowed in rendered email content
-ALLOWED_TAGS = frozenset({
+ALLOWED_TAGS = {
     'p', 'br', 'div', 'span',
     'strong', 'b', 'em', 'i', 'u', 's',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -21,83 +21,45 @@ ALLOWED_TAGS = frozenset({
     'a', 'img',
     'blockquote', 'pre', 'code',
     'hr',
-})
+}
 
 # Attributes allowed per tag (all others stripped)
 ALLOWED_ATTRS = {
-    'a': {'href', 'title'},
+    'a': {'href', 'title', 'target', 'rel'},
     'img': {'src', 'alt', 'width', 'height'},
     'td': {'colspan', 'rowspan'},
     'th': {'colspan', 'rowspan'},
 }
 
-# Patterns for stripping dangerous content
-SCRIPT_RE = re.compile(r'<script[^>]*>.*?</script>', re.DOTALL | re.IGNORECASE)
-STYLE_RE = re.compile(r'<style[^>]*>.*?</style>', re.DOTALL | re.IGNORECASE)
-COMMENT_RE = re.compile(r'<!--.*?-->', re.DOTALL)
-EVENT_ATTR_RE = re.compile(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', re.IGNORECASE)
-STYLE_ATTR_RE = re.compile(r'\s+style\s*=\s*["\'][^"\']*["\']', re.IGNORECASE)
-TAG_RE = re.compile(r'<(/?)(\w+)([^>]*)(/?)>', re.IGNORECASE)
-ATTR_RE = re.compile(r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|(\S+))')
-JAVASCRIPT_URI_RE = re.compile(r'^\s*javascript:', re.IGNORECASE)
-DATA_URI_RE = re.compile(r'^\s*data:', re.IGNORECASE)
+_ALLOWED_URL_SCHEMES = {'http', 'https', 'mailto', 'tel'}
 
 
 def sanitize_html(html: str) -> str:
     """Strip dangerous HTML from inbound email content.
 
-    Removes scripts, styles, event handlers, and non-allowlisted tags.
-    Links with javascript: URIs are defanged. Returns safe HTML suitable
-    for rendering inside the comms panel.
+    Uses nh3 with a conservative tag + attribute allowlist. Scripts, styles,
+    event handlers, and non-allowlisted tags are removed. Links are limited
+    to safe URL schemes.
     """
     if not html:
         return ''
 
-    # Strip scripts, styles, and comments entirely
-    html = SCRIPT_RE.sub('', html)
-    html = STYLE_RE.sub('', html)
-    html = COMMENT_RE.sub('', html)
+    return nh3.clean(
+        html,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRS,
+        url_schemes=_ALLOWED_URL_SCHEMES,
+        link_rel='noopener noreferrer',
+        strip_comments=True,
+    )
 
-    # Strip event handler attributes (onclick, onload, etc.)
-    html = EVENT_ATTR_RE.sub('', html)
 
-    # Strip inline styles (can leak data via url(), expression(), etc.)
-    html = STYLE_ATTR_RE.sub('', html)
+def strip_all_html(html: str) -> str:
+    """Aggressively strip every tag — return plain text only.
 
-    def replace_tag(match):
-        closing = match.group(1)
-        tag_name = match.group(2).lower()
-        attrs_str = match.group(3)
-        self_closing = match.group(4)
-
-        if tag_name not in ALLOWED_TAGS:
-            return ''
-
-        # Filter attributes
-        allowed = ALLOWED_ATTRS.get(tag_name, set())
-        clean_attrs = []
-        if attrs_str and allowed:
-            for attr_match in ATTR_RE.finditer(attrs_str):
-                attr_name = attr_match.group(1).lower()
-                attr_value = attr_match.group(2) or attr_match.group(3) or attr_match.group(4) or ''
-
-                if attr_name not in allowed:
-                    continue
-
-                # Block javascript: and data: URIs in href/src
-                if attr_name in ('href', 'src'):
-                    if JAVASCRIPT_URI_RE.match(attr_value) or DATA_URI_RE.match(attr_value):
-                        continue
-
-                clean_attrs.append(f'{attr_name}="{attr_value}"')
-
-        # Add target="_blank" and rel="noopener" to links
-        if tag_name == 'a' and not closing:
-            clean_attrs.extend(['target="_blank"', 'rel="noopener noreferrer"'])
-
-        attrs_part = (' ' + ' '.join(clean_attrs)) if clean_attrs else ''
-        slash = '/' if self_closing else ''
-
-        return f'<{closing}{tag_name}{attrs_part}{slash}>'
-
-    return TAG_RE.sub(replace_tag, html)
+    Use for any content that will be rendered inside templates that already
+    mark it |safe (e.g. Claude-generated summaries).
+    """
+    if not html:
+        return ''
+    return nh3.clean(html, tags=set(), attributes={})

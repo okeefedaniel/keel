@@ -289,6 +289,12 @@ When one DockLabs product creates a record in another (e.g., Yeoman creates a Co
 
 **Why:** Government-facing products require defense in depth. Centralizing security policy prevents products from shipping with missing headers or inconsistent protections.
 
+## Testing
+
+- **Test runner:** pytest with `keel_site.settings` as the default DJANGO_SETTINGS_MODULE. The baseline keel test suite lives at `keel/tests/` and covers `keel.comms.sanitize`, `keel.search.engine` (column-name allowlist), `keel.security.alerts` (failed-login filter), `keel.oidc.validators` (claim-scope mapping), `keel.core.middleware.AuditMiddleware` (try/finally isolation), and `keel.core.workflow.WorkflowEngine`. Run with `pytest keel/tests/` from the keel repo root. New keel features must ship tests or explain in the PR why they can't.
+- **Products with zero tests at 2026-04-19:** Beacon, Bounty, Yeoman, Helm, Lookout, dokeefect-django. Government procurement questionnaires ask about coverage — these are the gaps.
+- **FOIA compliance:** `python manage.py foia_audit --fail-on-error` gates CI for any product that registers with `keel.foia.export`.
+
 ## Deployment & Configuration
 
 - **Startup:** Use `keel.core.startup.run_startup()` in Railway Procfile. It runs migrate, collectstatic, configures Site objects, and optionally seeds demo users (`DEMO_MODE=true`). Pass `extra_commands` for product-specific post-startup tasks.
@@ -340,10 +346,12 @@ Bump both files in the same commit as the code change, then bump pins in all pro
 
 ## Known Deviations
 
-- **KEEL_FOIA_EXPORT_MODEL** is not yet defined in any product's settings — FOIA export pipeline integration is pending.
-- **keel.core.foia_urls** is only included in Harbor, Manifest, and Admiralty — other products need it added as they adopt FOIA export.
-- **`/search/` endpoint is not implemented on any product.** The shared ⌘K modal submits there but every product will 404 until a product-specific `keel.search`-backed view is wired up.
+- **KEEL_FOIA_EXPORT_MODEL** is currently set on Beacon only (`foia.FOIAExportItem`). Harbor, Manifest, and Admiralty wire `keel.core.foia_urls` (the audit-log time-range export) but do not register records with the `keel.foia.export` registry; they rely on the legacy audit-log pipeline. The two pipelines will be collapsed in a future Keel release — see the deprecation banner at the top of `keel/core/foia_export.py`.
+- **keel.core.foia_urls** is included in Admiralty, Beacon, Harbor, and Manifest.
+- **`keel.requests` mount-path drift:** admiralty/beacon/harbor/helm/manifest mount at `/keel/requests/`; bounty/lookout mount at `/feedback/`; purser and yeoman don't include the module. Unify in a follow-up so the feedback widget always has a stable endpoint.
+- **`/search/` endpoint is registered on all 8 products** with product-specific `keel.search`-backed views. The shared ⌘K modal resolves correctly on every product.
 - **Bounty has a legacy `core_user` table** with orphan FK constraints. Most were dropped during the Phase 2b cleanup, but some product-specific tables may still reference it. See Railway deployment notes for the recovery pattern.
+- **Signing workflow deduplication pending.** Harbor and Manifest both ship `signatures/` with byte-identical `services.py` and 12-line-diff `views.py`. The extraction plan is scaffolded at `keel/keel/signatures/__init__.py` but the move is blocked on a migration strategy (both products' `signatures` app label carries live migration history).
 - **Helm feed pipeline is wired for all 8 products.** `keel.feed` provides the shared framework (`helm_feed_view` decorator + `fetch_product_feed` client). All 8 products expose `/api/v1/helm-feed/` with real-time metrics from live data. Helm's `fetch_feeds` management command pulls data into `CachedFeedSnapshot`. **Deployment:** set `HELM_FEED_API_KEY` as a shared env var on all 9 Railway services (8 products + Helm). In `DEMO_MODE`, auth is bypassed and `seed_helm` provides static demo data as a fallback. Feed endpoint files: `harbor/api/helm_feed.py` (reference), `bounty/api/helm_feed.py`, `beacon/api/helm_feed.py`, `admiralty/foia/helm_feed.py`, `manifest/signatures/helm_feed.py`, `lookout/api/helm_feed.py`, `purser/purser/helm_feed.py`, `yeoman/yeoman/helm_feed.py`.
 
 ---
