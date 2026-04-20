@@ -237,11 +237,15 @@ KEEL_PRODUCT_CODE = 'keel'
 KEEL_PRODUCT_ICON = 'bi-gear-wide-connected'
 KEEL_PRODUCT_SUBTITLE = 'DockLabs Admin Console'
 KEEL_FLEET_PRODUCTS = [
-    {'name': 'Helm', 'label': 'Helm', 'code': 'helm', 'url': '/'},
-    {'name': 'Beacon', 'label': 'Beacon', 'code': 'beacon', 'url': '/'},
-    {'name': 'Harbor', 'label': 'Harbor', 'code': 'harbor', 'url': '/'},
-    {'name': 'Bounty', 'label': 'Bounty', 'code': 'bounty', 'url': '/'},
-    {'name': 'Lookout', 'label': 'Lookout', 'code': 'lookout', 'url': '/'},
+    {'name': 'Helm', 'label': 'Helm', 'code': 'helm', 'url': 'https://helm.docklabs.ai/dashboard/', 'icon': 'bi-compass'},
+    {'name': 'Harbor', 'label': 'Harbor', 'code': 'harbor', 'url': 'https://harbor.docklabs.ai/dashboard/', 'icon': 'bi-bank2'},
+    {'name': 'Beacon', 'label': 'Beacon', 'code': 'beacon', 'url': 'https://beacon.docklabs.ai/dashboard/', 'icon': 'bi-broadcast'},
+    {'name': 'Bounty', 'label': 'Bounty', 'code': 'bounty', 'url': 'https://bounty.docklabs.ai/dashboard/', 'icon': 'bi-globe'},
+    {'name': 'Lookout', 'label': 'Lookout', 'code': 'lookout', 'url': 'https://lookout.docklabs.ai/dashboard/', 'icon': 'bi-binoculars'},
+    {'name': 'Admiralty', 'label': 'Admiralty', 'code': 'admiralty', 'url': 'https://admiralty.docklabs.ai/dashboard/', 'icon': 'bi-shield-check'},
+    {'name': 'Manifest', 'label': 'Manifest', 'code': 'manifest', 'url': 'https://manifest.docklabs.ai/dashboard/', 'icon': 'bi-pen'},
+    {'name': 'Purser', 'label': 'Purser', 'code': 'purser', 'url': 'https://purser.docklabs.ai/dashboard/', 'icon': 'bi-safe2'},
+    {'name': 'Yeoman', 'label': 'Yeoman', 'code': 'yeoman', 'url': 'https://yeoman.docklabs.ai/dashboard/', 'icon': 'bi-calendar-event'},
 ]
 KEEL_GATE_ACCESS = False  # Keel admin console doesn't gate itself
 
