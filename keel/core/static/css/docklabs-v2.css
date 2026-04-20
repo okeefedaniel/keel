@@ -92,7 +92,6 @@ body {
     background: var(--bg-page);
     color: var(--text-primary);
     line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, h5, h6,
@@ -700,6 +699,11 @@ h6, .h6 { font-size: 12px; }
 /* =============================================
    11. Cards
    ============================================= */
+/* Clickable table rows: add .table-clickable to <table> and
+   data-href="..." to each <tr>. JS in docklabs-v2.js handles click. */
+.table-clickable tbody tr[data-href] { cursor: pointer; }
+.table-clickable tbody tr[data-href]:hover td { background: var(--bg-page, #f8f9fa); }
+
 .card {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -1224,10 +1228,9 @@ summary:focus-visible,
    is never 0) — the animation only handles the transform. The old
    "both" fill mode with opacity:0 left elements permanently invisible
    when animations didn't fire (backgrounded tab, render race). */
-.dl-content > * {
-    animation: fadeUp 0.25s ease-out;
-}
-
+/* Entrance animation disabled: translateY on every child promotes elements
+   to compositor layers, which Chrome renders with grayscale AA — causing
+   soft/blurry text (esp. h1 headings). Keeping keyframes for opt-in use. */
 @keyframes fadeUp {
     from { transform: translateY(4px); }
     to { transform: translateY(0); }
