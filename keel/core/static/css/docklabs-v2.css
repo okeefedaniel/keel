@@ -703,7 +703,6 @@ h6, .h6 { font-size: 12px; }
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    overflow: hidden;
     transition: box-shadow 0.2s ease;
 }
 .card:hover { box-shadow: var(--shadow-md); }
