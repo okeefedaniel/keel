@@ -74,11 +74,23 @@
 
   // =========================================================================
   // 5. Bootstrap tooltip activation
+  //
+  // Activates tooltips for:
+  //   (a) any element with data-bs-toggle="tooltip" (explicit opt-in)
+  //   (b) any .btn[title] (implicit — covers icon-only header buttons)
+  //
+  // Case (b) means header action rows like
+  //   <a class="btn btn-sm btn-outline-primary" title="Add Contact">
+  //     <i class="bi bi-person-plus"></i>
+  //   </a>
+  // get a styled Bootstrap tooltip instead of the slow native browser one,
+  // without each template having to add data-bs-toggle="tooltip" by hand.
   // =========================================================================
   document.addEventListener('DOMContentLoaded', function () {
-    var els = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    els.forEach(function (el) {
-      new bootstrap.Tooltip(el);
+    if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
+    var selector = '[data-bs-toggle="tooltip"], .btn[title]:not([data-bs-toggle="dropdown"])';
+    document.querySelectorAll(selector).forEach(function (el) {
+      bootstrap.Tooltip.getOrCreateInstance(el);
     });
   });
 
