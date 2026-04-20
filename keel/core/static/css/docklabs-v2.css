@@ -152,9 +152,8 @@ h6, .h6 { font-size: 12px; }
 }
 
 .dl-main {
-    flex: 1 1 0%;
+    flex: 1 1 auto;
     min-width: 0;
-    width: 0;
     overflow-y: auto;
     background: var(--bg-page);
     display: flex;
