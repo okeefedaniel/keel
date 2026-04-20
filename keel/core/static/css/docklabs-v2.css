@@ -1220,17 +1220,17 @@ summary:focus-visible,
 /* =============================================
    31. Page Entrance Animation
    ============================================= */
+/* Page entrance: subtle slide-up. Elements are always visible (opacity
+   is never 0) — the animation only handles the transform. The old
+   "both" fill mode with opacity:0 left elements permanently invisible
+   when animations didn't fire (backgrounded tab, render race). */
 .dl-content > * {
-    animation: fadeUp 0.3s ease both;
+    animation: fadeUp 0.25s ease-out;
 }
-.dl-content > *:nth-child(1) { animation-delay: 0s; }
-.dl-content > *:nth-child(2) { animation-delay: 0.04s; }
-.dl-content > *:nth-child(3) { animation-delay: 0.08s; }
-.dl-content > *:nth-child(4) { animation-delay: 0.12s; }
 
 @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { transform: translateY(4px); }
+    to { transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
