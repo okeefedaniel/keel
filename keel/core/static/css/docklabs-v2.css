@@ -1131,29 +1131,33 @@ code, kbd, samp, pre,
 }
 
 /* Semantic badge colors */
-.badge-active, .badge-open, .badge-approved, .badge-accepted, .badge-awarded {
+.badge-active, .badge-open, .badge-approved, .badge-accepted, .badge-awarded,
+.badge-committed, .badge-closed_won, .badge-closed-won, .badge-retained {
     background: var(--success-bg);
     color: var(--success);
 }
 .badge-review, .badge-pending, .badge-under-review, .badge-under_review,
-.badge-on-hold, .badge-forecasted, .badge-preparing {
+.badge-on-hold, .badge-forecasted, .badge-preparing,
+.badge-proposal, .badge-negotiation, .badge-qualified {
     background: var(--brass-soft);
     color: var(--brass-text);
     border-color: #e3c98a;
 }
-.badge-draft, .badge-inactive, .badge-archived {
-    background: #f3f3f3;
-    color: #888;
+.badge-draft, .badge-inactive, .badge-archived, .badge-lead {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border-color: var(--border-strong);
 }
 .badge-closed, .badge-completed, .badge-submitted, .badge-posted, .badge-applied {
     background: var(--ct-blue-light);
     color: var(--ct-blue);
 }
-.badge-error, .badge-denied, .badge-cancelled, .badge-declined, .badge-rejected {
+.badge-error, .badge-denied, .badge-cancelled, .badge-declined, .badge-rejected,
+.badge-closed_lost, .badge-closed-lost {
     background: var(--error-bg);
     color: var(--error);
 }
-.badge-watching { background: #f3f3f3; color: #888; }
+.badge-watching { background: var(--bg-hover); color: var(--text-secondary); }
 
 /* Grant type badge */
 .badge-grant-type {

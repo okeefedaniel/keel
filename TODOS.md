@@ -2,23 +2,23 @@
 
 Cross-product or suite-wide engineering work that's been identified but not yet scheduled. Product-specific TODOs live in each product's own repo.
 
-## Reconcile cross-product template overrides
+## ~~Reconcile cross-product template overrides~~ — DONE 2026-04-21
 
-**What:** Three products ship copies of other products' base templates that still load v1 CSS (`docklabs.css`) instead of the shared v2:
-- `beacon/templates/admiralty/base.html:22`
-- `harbor/templates/manifest/base.html:16`
-- `lookout/templates/account/base.html:12`
+Resolved during v3 polish. Each of the three overrides is actively rendered (beacon serves FOIA through a compat layer mapped in `beacon/foia/compat.py:106`; harbor's signatures app renders through `manifest/base.html` via `harbor/signatures/context_processors.py:19`; lookout's allauth picks up `account/base.html` by template lookup). All three were bumped from `docklabs.css` (v1) to `docklabs-v2.css` (v3).
 
-**Why:** These override bundles shadow peer products' templates when the containing product is deployed. They likely predate proper template extraction — the same pattern as the `signatures/` duplication flagged in `keel/CLAUDE.md` Known Deviations. After v3 ships, any request that hits one of these routes will render in v1 aesthetic while the rest of the suite renders in v3. Low user-visibility unless those specific routes are exercised, but unprincipled.
+Deeper action item (fold product-specific bits into documented mixins) intentionally not done — the templates work as full copies. The right time to refactor is when the underlying apps extract (see signatures extraction below).
 
-**Context:** Identified during the design-v3 migration plan's fork reconciliation step (April 2026). Investigation didn't happen inline because it's not blocking v3 — this can ship before OR after v3.
+## Extract duplicated `signatures/` app from Harbor + Manifest
+
+**What:** Harbor and Manifest both ship their own `signatures/` Django app with byte-identical `services.py` and a ~12-line diff in `views.py`. The extraction plan is scaffolded at `keel/keel/signatures/__init__.py` but the move is blocked on a migration strategy — both products' `signatures` app label carries live migration history.
+
+**Why:** Every change to signing behavior has to be made twice. The duplicated templates + context processors that loaded the wrong CSS until today are a symptom of the same root cause.
+
+**Context:** Flagged in `keel/CLAUDE.md` Known Deviations since v2 era. Not blocked on v3.
 
 **Action items:**
-1. Determine *why* each override exists (intentional divergence vs. stale copy-paste).
-2. If stale: delete the override and rely on the peer product's canonical template (via `keel.core` or the peer's own app).
-3. If intentional: fold the product-specific bits into a documented mixin or block override, not a full template copy.
-4. Bump the `css/docklabs.css` references to `css/docklabs-v2.css` regardless.
+1. Propose a migration strategy that unifies both products' `signatures_*` tables under the shared `keel.signatures` app label without data loss.
+2. Move the identical service code into `keel/keel/signatures/`.
+3. Deprecate the per-product signatures apps in a coordinated release.
 
-**Depends on / blocked by:** Nothing. Can be done independently. Worth bundling with the pending `signatures/` extraction work since the root cause is similar.
-
-**Effort:** ~1-2 hours CC-assisted across 3 repos.
+**Effort:** ~1-2 days of engineering work (migration planning is the hard part).
