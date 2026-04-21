@@ -395,12 +395,11 @@ Bump both files in the same commit as the code change, then bump pins in all pro
   - `railway variable list --service <service> --kv` — list env vars
   - `railway up --service <service> --detach` — manual deploy (for services without auto-deploy)
   - `railway ssh --service <service> -- <command>` — run a command on the remote service (e.g., `railway ssh --service admiralty-demo -- python manage.py seed_keel_users`). Use this for management commands that need to hit the live database. **Do not confuse with `railway run`**, which executes locally with remote env vars injected — it won't find `manage.py` unless you're in the right local directory.
-- **Auto-deploy:** Most services auto-deploy on `git push` to `main`. Manifest sometimes needs `railway up --service manifest --detach` if its GitHub integration is broken.
+- **Auto-deploy:** Services auto-deploy on `git push` to `main`.
 
 ### Railway deployment notes
 
 - **`SECURE_SSL_REDIRECT` MUST be `False`** on Railway — the healthcheck sends plain HTTP and a `True` setting makes it 301-redirect, failing the check and blocking deploys. Preventive: Keel's settings sets it to `False`; product settings should not override.
-- **Manifest may need `railway up --service manifest --detach`** if its GitHub auto-deploy integration is still broken. Most other products auto-deploy on push. Verify by checking `railway service status --all` after a push — if the deploy ID doesn't change, use `railway up`.
 - **Bounty has a legacy `core_user` table** alongside the current `keel_user`. Some old FK constraints may reference `core_user`. If migrations fail with "FK violation on core_user", the recovery pattern is: (1) drop the offending FK constraint, (2) copy missing users from `core_user` to `keel_user` if needed, (3) re-add the FK pointing at `keel_user`.
 
 ## Data Patterns
