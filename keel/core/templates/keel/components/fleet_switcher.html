@@ -52,10 +52,11 @@ if the logo SVG fails to load.
     {% endfor %}
   </div>
 
-  <!-- Collapsed row: one logo chip per product -->
+  <!-- Collapsed grid: 8 icons (current product excluded) -->
   <div class="fleet-collapsed">
     {% for product in FLEET_PRODUCTS %}
-    <a class="fleet-logo-chip{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
+    {% if product.code != CURRENT_PRODUCT %}
+    <a class="fleet-logo-chip"
        href="{{ product.url }}"
        title="{{ product.name }}"
        aria-label="{{ product.name }}"
@@ -64,6 +65,7 @@ if the logo SVG fails to load.
            alt="" width="24" height="24"
            onerror="this.outerHTML='<i class=&quot;bi {{ product.icon|default:'bi-app' }}&quot;></i>'">
     </a>
+    {% endif %}
     {% endfor %}
   </div>
 </div>

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'keel.reporting',
     'keel.compliance',
     'keel.calendar',
+    'keel.signatures',
     'keel.oidc.apps.KeelOIDCConfig',  # Phase 2b: OIDC validator + claims
 ]
 

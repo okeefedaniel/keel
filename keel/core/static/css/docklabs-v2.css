@@ -569,12 +569,20 @@ code, kbd, samp, pre,
     padding: 4px 2px 2px;
 }
 
-/* Collapsed state: single row of 22x22 icon chips */
+/* Collapsed grid: 8 icons (current product excluded).
+   Responsive: 4 columns when sidebar is wide, 2 columns when
+   collapsed/narrow. Grid ensures even rows automatically. */
 .fleet-collapsed {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 2px;
-    flex-wrap: wrap;
+    justify-items: center;
+}
+@media (max-width: 991.98px) {
+    .fleet-collapsed { grid-template-columns: repeat(4, 1fr); }
+}
+.dl-sidebar.collapsed .fleet-collapsed {
+    grid-template-columns: repeat(2, 1fr);
 }
 
 /* Logo chip — displays the product's favicon.svg.
@@ -614,21 +622,7 @@ code, kbd, samp, pre,
     opacity: 1;
     transform: scale(1.08);
 }
-.fleet-logo-chip.active img,
-.fleet-logo-chip.active > i {
-    opacity: 1;
-}
-.fleet-logo-chip.active::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: -3px;
-    width: 16px;
-    height: 2px;
-    background: var(--ct-blue);
-    border-radius: 1px;
-    transform: translateX(-50%);
-}
+/* Active chip styles retained for the expanded list only */
 .fleet-logo-chip:focus-visible {
     outline: 2px solid var(--ct-blue);
     outline-offset: 2px;
