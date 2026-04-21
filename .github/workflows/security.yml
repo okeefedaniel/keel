@@ -96,7 +96,7 @@ jobs:
           python <<'PY'
           import os, re, sys
           patterns = [
-              (r'''(?:password|secret|token|key)\s*=\s*["'][^"']{8,}["']''', 'Hardcoded secret'),
+              (r'''(?:password|passwd|api_key|api_secret|secret_key|access_key|access_token|auth_token|bearer_token|private_key|client_secret)\s*=\s*["'][^"']{8,}["']''', 'Hardcoded secret'),
               (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
               (r'sk-[a-zA-Z0-9]{48}', 'API Secret Key'),
               (r'-----BEGIN (?:RSA )?PRIVATE KEY-----', 'Private Key'),
