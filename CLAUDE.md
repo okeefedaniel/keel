@@ -240,6 +240,101 @@ Every DockLabs product MUST include:
 
 **Why:** Ad-hoc status management in views bypasses role checks, skips audit logging, and makes the transition rules invisible. Harbor's 4 declarative workflows are the reference implementation.
 
+## Project Lifecycle Standard
+
+Every workflow-carrying DockLabs product (beacon, bounty, lookout, harbor, purser — and any future product that shepherds "a thing" through stages) MUST follow the same high-level lifecycle so that a user moving between products encounters a familiar motion. The shape:
+
+> **claim** → **invite collaborators** → **diligence (notes + attachments)** → **stage progression** → **handoff to Manifest for signing (optional)** → **signed-doc roundtrip: mark approved on source + file signed PDF back** → **downstream export (optional, product-specific)**
+
+### Lifecycle diagram
+
+```mermaid
+flowchart LR
+    subgraph Source["Source product (beacon / bounty / lookout / harbor / purser)"]
+        direction TB
+        POOL["Unowned pool"] -->|claim| CLAIMED
+        CLAIMED["Claimed<br/>(principal driver assigned)"] -->|invite| COLLAB
+        COLLAB["Collaborators<br/>LEAD / CONTRIBUTOR / REVIEWER / OBSERVER"] --> DILIGENCE
+        DILIGENCE["Diligence<br/>notes + attachments"] --> STAGES
+        STAGES["Stage progression<br/>(product-specific WorkflowEngine)"] --> READY{"Needs<br/>signature?"}
+        READY -- no --> DONE["Closed / Archived"]
+    end
+
+    READY -- yes --> MANIFEST
+    subgraph ManifestSvc["Manifest (optional — standalone fallback if absent)"]
+        MANIFEST["SigningPacket<br/>ordered signers"]
+    end
+    MANIFEST -- completion webhook --> ROUNDTRIP
+
+    subgraph SourceAgain["Back to source product"]
+        ROUNDTRIP["on_manifest_approved():<br/>• status → approved<br/>• file signed PDF as Attachment<br/>• register for FOIA export<br/>• notify owner + collaborators"] --> DOWNSTREAM{"Downstream<br/>export?"}
+        DOWNSTREAM -- bounty win --> HARBOR["Harbor: create state grant program"]
+        DOWNSTREAM -- beacon incentive --> FILED["Filed on Opportunity"]
+        DOWNSTREAM -- lookout testimony --> SUBMITTED["TrackedBill → TESTIMONY_SUBMITTED"]
+        DOWNSTREAM -- none --> DONE2["Closed / Archived"]
+    end
+```
+
+### Required primitives (all from keel — do not re-invent)
+
+| Lifecycle piece | Keel primitive | Import |
+|---|---|---|
+| Claim / assignment | `AbstractAssignment` | `from keel.core.models import AbstractAssignment` |
+| Collaborator invite | `AbstractCollaborator` | `from keel.core.models import AbstractCollaborator` |
+| Notes (internal / external) | `AbstractInternalNote` | `from keel.core.models import AbstractInternalNote` |
+| Typed document attachments | `AbstractAttachment` | `from keel.core.models import AbstractAttachment` |
+| Stage progression | `WorkflowEngine` + `WorkflowModelMixin` + `AbstractStatusHistory` | `from keel.core.workflow import WorkflowEngine, Transition`; `from keel.core.models import WorkflowModelMixin, AbstractStatusHistory` |
+| Manifest signing handoff | `keel.signatures.client.send_to_manifest` (pending — see `keel/signatures/__init__.py`) | `from keel.signatures.client import send_to_manifest` |
+
+Product-level models are concrete subclasses with the owning-entity ForeignKey added. Example for bounty:
+
+```python
+from keel.core.models import (
+    AbstractAssignment, AbstractCollaborator, AbstractAttachment,
+    AbstractInternalNote,
+)
+
+class OpportunityAssignment(AbstractAssignment):
+    opportunity = models.ForeignKey(TrackedOpportunity, on_delete=models.CASCADE,
+                                    related_name='assignments')
+
+class OpportunityCollaborator(AbstractCollaborator):
+    opportunity = models.ForeignKey(TrackedOpportunity, on_delete=models.CASCADE,
+                                    related_name='collaborators')
+    class Meta(AbstractCollaborator.Meta):
+        unique_together = [('opportunity', 'user'), ('opportunity', 'email')]
+
+class OpportunityAttachment(AbstractAttachment):
+    opportunity = models.ForeignKey(TrackedOpportunity, on_delete=models.CASCADE,
+                                    related_name='attachments')
+
+class OpportunityNote(AbstractInternalNote):
+    opportunity = models.ForeignKey(TrackedOpportunity, on_delete=models.CASCADE,
+                                    related_name='notes')
+```
+
+### Canonical role vocabulary (Collaborator.Role)
+
+**LEAD / CONTRIBUTOR / REVIEWER / OBSERVER.** These are the ONLY acceptable collaborator roles. Products MUST NOT introduce product-specific role names (e.g. "Sponsor", "Champion"). If a product needs finer-grained roles, model them as tags on the collaborator, not as new role enum values.
+
+### Manifest handoff rules
+
+1. **Standalone deployability is non-negotiable.** A product deployed without Manifest MUST still work end-to-end. Gate every "Send to Manifest" control behind an `is_available()` helper that checks for `MANIFEST_URL` + API key. When unavailable, hide the control and offer a local "Mark approved + upload signed PDF" affordance that writes to the same `Attachment` collection and advances the same workflow status. Do not render controls that silently no-op.
+2. **No cross-product foreign keys.** The link from a source product to a Manifest packet is a string reference (`manifest_packet_uuid` on the attachment; a `ManifestHandoff` back-pointer row on the source side). Products and Manifest may live in separate Postgres instances. Treat the link like an external URL.
+3. **Best-effort outbound calls.** If Manifest is unreachable at handoff time, the user-facing source action MUST still succeed. Wrap the Manifest call in try/except, log on failure, mark the handoff row `failed`, surface a retry control.
+4. **Roundtrip is the definition of "done."** When Manifest completes a packet, the source product's `on_manifest_approved(signed_pdf)` hook MUST: (a) attach the signed PDF to the source object's `Attachment` collection with `source=MANIFEST_SIGNED` and the Manifest packet UUID filled in, (b) advance the source's workflow status to its product-specific "approved" state via `WorkflowEngine.transition()`, (c) notify the owner and all active collaborators, (d) register the attachment with `keel.foia.export` so it's FOIA-discoverable.
+5. **Downstream export happens AFTER the roundtrip, not in place of it.** Bounty's "push to Harbor on grant win" and Beacon's "file state incentive" are downstream of the Manifest roundtrip, not substitutes for it.
+
+### Provenance and cross-product linkage
+
+When the Manifest handoff (or any downstream export) crosses a product boundary, follow the existing **Cross-Product Linkage** rules (see that section below): carry `source_product` / `source_url` / `source_label`, drop an activity-stream entry on the receiving record, treat the call as best-effort, and gate UI on `is_available()`. The signed-doc roundtrip is just a specific case of cross-product linkage.
+
+### Reference implementation
+
+**Harbor's `Application` is the reference** for the full lifecycle end-to-end: `ApplicationAssignment` (claim), `ApplicationDocument` / `StaffDocument` (pre-`AbstractAttachment` split), `ApplicationComment` (notes), `ApplicationComplianceItem` (checklist), `Award` + `SignatureRequest` (Manifest handoff). New products and retrofits should read harbor before implementing.
+
+**Why:** Users navigate between products constantly and need a consistent mental model. Products re-implementing variants of "claim / invite / diligence / stage / sign" drift over time — different role names, different invite lifecycles, different approval mechanics — and erode the suite's coherence. Pinning the lifecycle in keel prevents this drift and centralizes the places where the pattern evolves.
+
 ## Communications (keel.comms)
 
 - **Use `keel.comms` for all email communications** that are entity-routed (tied to a grant, request, case, etc.). Do not build product-specific email sending.
@@ -293,10 +388,14 @@ Every DockLabs product MUST include:
 
 ## Collaboration & Notes
 
+- **Project lifecycle:** Any product shepherding "a thing" through stages MUST use the standard lifecycle primitives — see **Project Lifecycle Standard** above.
+- **Claim / assignment:** Extend `keel.core.models.AbstractAssignment` for the explicit claim gesture. Do not conflate "create record" with "claim record."
+- **Collaborators:** Extend `keel.core.models.AbstractCollaborator`. Canonical roles are LEAD / CONTRIBUTOR / REVIEWER / OBSERVER only — do not add product-specific role enum values.
 - **Internal notes:** Extend `keel.core.models.AbstractInternalNote` (provides `is_internal` visibility flag). Do not create custom note models without this pattern.
+- **Document attachments:** Extend `keel.core.models.AbstractAttachment` for uploaded files, including signed PDFs returned from Manifest. Provides the applicant-visible / staff-only `visibility` split.
 - **Comments with visibility:** Always support internal (staff-only) and external visibility.
 
-**Why:** Harbor's comment system is the reference — government staff need to add internal-only notes that applicants can't see.
+**Why:** Harbor's comment system is the reference — government staff need to add internal-only notes that applicants can't see. Every workflow-carrying product needs the same claim / collaborate / diligence primitives, and pinning them in keel prevents drift.
 
 ## FOIA Compliance
 

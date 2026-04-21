@@ -295,3 +295,215 @@ class KeelBaseModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+# ---------------------------------------------------------------------------
+# Project Lifecycle abstracts
+#
+# These three abstracts back the suite-wide "project lifecycle" pattern
+# documented in keel/CLAUDE.md (Project Lifecycle Standard): something
+# enters a product, gets CLAIMED by a principal driver, accumulates
+# COLLABORATORS, gathers diligence in the form of notes
+# (AbstractInternalNote) and ATTACHMENTS, progresses through stages via
+# WorkflowEngine, and — if signature is required — hands off to Manifest
+# via keel.signatures.client.send_to_manifest.
+#
+# Products subclass these abstracts and add the ForeignKey to the owning
+# domain model (Opportunity, TrackedBill, Application, etc.).
+# ---------------------------------------------------------------------------
+
+
+class AbstractAssignment(models.Model):
+    """Claim / assignment of a project-lifecycle object to a principal driver.
+
+    Captures the explicit "claim" gesture — distinct from record creation —
+    so a product can maintain an unowned pool of work that users or managers
+    pull from. Modeled on Harbor's ``ApplicationAssignment``.
+
+    Products subclass and add a ForeignKey to the owning entity:
+
+        class OpportunityAssignment(AbstractAssignment):
+            opportunity = models.ForeignKey(Opportunity, on_delete=models.CASCADE)
+
+    Pairs with WorkflowModelMixin; the ``status`` field here tracks the
+    assignment's own lifecycle, not the owning object's workflow.
+    """
+
+    class AssignmentType(models.TextChoices):
+        CLAIMED = 'claimed', _('Self-claimed')
+        MANAGER_ASSIGNED = 'manager_assigned', _('Manager-assigned')
+
+    class Status(models.TextChoices):
+        ASSIGNED = 'assigned', _('Assigned')
+        IN_PROGRESS = 'in_progress', _('In progress')
+        COMPLETED = 'completed', _('Completed')
+        REASSIGNED = 'reassigned', _('Reassigned')
+        RELEASED = 'released', _('Released back to pool')
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='%(app_label)s_%(class)s_assigned',
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='%(app_label)s_%(class)s_delegated',
+        help_text=_('Manager who made the assignment; null for self-claims.'),
+    )
+    assignment_type = models.CharField(
+        max_length=20, choices=AssignmentType.choices,
+        default=AssignmentType.CLAIMED,
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.ASSIGNED,
+    )
+    claimed_at = models.DateTimeField(auto_now_add=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-claimed_at']
+
+    def __str__(self):
+        who = self.assigned_to.get_full_name() if self.assigned_to else 'unassigned'
+        return f"{self.get_assignment_type_display()} — {who} ({self.get_status_display()})"
+
+
+class AbstractCollaborator(models.Model):
+    """A person (internal user OR external email invite) collaborating on a
+    project-lifecycle object.
+
+    Canonical role vocabulary across the suite. Supports both internal users
+    (``user`` FK set) and external invites (``user`` null, ``email``/``name``
+    set). Tracks the full invite lifecycle.
+
+    Products subclass and add a ForeignKey to the owning entity:
+
+        class OpportunityCollaborator(AbstractCollaborator):
+            opportunity = models.ForeignKey(Opportunity, on_delete=models.CASCADE)
+
+            class Meta(AbstractCollaborator.Meta):
+                unique_together = [('opportunity', 'user'), ('opportunity', 'email')]
+    """
+
+    class Role(models.TextChoices):
+        LEAD = 'lead', _('Lead')
+        CONTRIBUTOR = 'contributor', _('Contributor')
+        REVIEWER = 'reviewer', _('Reviewer')
+        OBSERVER = 'observer', _('Observer')
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='%(app_label)s_%(class)s_memberships',
+        help_text=_('Internal user; null for external email invites.'),
+    )
+    email = models.EmailField(blank=True, help_text=_('Set for external invites.'))
+    name = models.CharField(max_length=255, blank=True)
+    role = models.CharField(
+        max_length=20, choices=Role.choices, default=Role.CONTRIBUTOR,
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='%(app_label)s_%(class)s_invited',
+    )
+    invited_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    notify_on_notes = models.BooleanField(default=True)
+    notify_on_status = models.BooleanField(default=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-invited_at']
+
+    def __str__(self):
+        who = (
+            self.user.get_full_name() if self.user
+            else (self.name or self.email or 'unknown')
+        )
+        return f"{who} ({self.get_role_display()})"
+
+    @property
+    def is_external(self):
+        """True when this is an email-only invite (no internal user linked)."""
+        return self.user_id is None
+
+    @property
+    def is_pending(self):
+        """True when the invite has not yet been accepted."""
+        return self.accepted_at is None
+
+
+class AbstractAttachment(models.Model):
+    """A document or file attached to a project-lifecycle object.
+
+    Provides the same applicant-visible / staff-only visibility split that
+    Harbor's ``ApplicationDocument`` / ``StaffDocument`` pair established,
+    unified in a single abstract via the ``visibility`` field. Also the
+    destination for signed PDFs returned from the Manifest roundtrip.
+
+    Products subclass and add a ForeignKey to the owning entity:
+
+        class OpportunityAttachment(AbstractAttachment):
+            opportunity = models.ForeignKey(Opportunity, on_delete=models.CASCADE)
+
+    File storage uses the product's configured default storage. Products
+    that need FOIA export must register their concrete attachment subclass
+    with ``keel.foia.export``.
+    """
+
+    class Visibility(models.TextChoices):
+        EXTERNAL = 'external', _('External (applicant-visible)')
+        INTERNAL = 'internal', _('Internal (staff-only)')
+
+    class Source(models.TextChoices):
+        UPLOAD = 'upload', _('Manually uploaded')
+        MANIFEST_SIGNED = 'manifest_signed', _('Signed document returned from Manifest')
+        SYSTEM = 'system', _('System-generated')
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    file = models.FileField(upload_to='attachments/%Y/%m/')
+    filename = models.CharField(max_length=255, blank=True)
+    content_type = models.CharField(max_length=100, blank=True)
+    size_bytes = models.PositiveBigIntegerField(default=0)
+    description = models.TextField(blank=True)
+    visibility = models.CharField(
+        max_length=10, choices=Visibility.choices, default=Visibility.INTERNAL,
+    )
+    source = models.CharField(
+        max_length=20, choices=Source.choices, default=Source.UPLOAD,
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='%(app_label)s_%(class)s_uploaded',
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    # String back-pointer to a Manifest packet when source==MANIFEST_SIGNED.
+    # No cross-DB FK — products and Manifest may run on separate databases.
+    manifest_packet_uuid = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return self.filename or (self.file.name if self.file else f'Attachment {self.id}')
+
+    def save(self, *args, **kwargs):
+        # Auto-populate filename and size_bytes from the uploaded file when
+        # not explicitly provided, so product views don't have to repeat this.
+        if self.file and not self.filename:
+            self.filename = self.file.name.rsplit('/', 1)[-1]
+        if self.file and not self.size_bytes:
+            try:
+                self.size_bytes = self.file.size
+            except (OSError, ValueError):
+                pass
+        super().save(*args, **kwargs)
