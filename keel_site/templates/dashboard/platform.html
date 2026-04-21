@@ -159,12 +159,15 @@
           <div class="d-flex gap-2">
             <select id="feed-filter-product" class="form-select form-select-sm" style="width: auto; font-size: 0.8rem;">
               <option value="">All Products</option>
-              <option value="beacon">Beacon</option>
               <option value="admiralty">Admiralty</option>
-              <option value="harbor">Harbor</option>
-              <option value="manifest">Manifest</option>
-              <option value="lookout">Lookout</option>
+              <option value="beacon">Beacon</option>
               <option value="bounty">Bounty</option>
+              <option value="harbor">Harbor</option>
+              <option value="helm">Helm</option>
+              <option value="lookout">Lookout</option>
+              <option value="manifest">Manifest</option>
+              <option value="purser">Purser</option>
+              <option value="yeoman">Yeoman</option>
               <option value="keel">Keel</option>
             </select>
             <select id="feed-filter-action" class="form-select form-select-sm" style="width: auto; font-size: 0.8rem;">
@@ -253,22 +256,11 @@
           {% for stat in product_stats %}
           <div class="d-flex justify-content-between align-items-center mb-2">
             <div class="d-flex align-items-center">
-              <span class="me-2">
-                {% if stat.product == 'beacon' %}
-                  <i class="bi bi-broadcast text-primary"></i>
-                {% elif stat.product == 'admiralty' %}
-                  <i class="bi bi-shield-lock text-warning"></i>
-                {% elif stat.product == 'harbor' %}
-                  <i class="bi bi-bank2 text-success"></i>
-                {% elif stat.product == 'manifest' %}
-                  <i class="bi bi-pen text-purple"></i>
-                {% elif stat.product == 'lookout' %}
-                  <i class="bi bi-binoculars text-info"></i>
-                {% elif stat.product == 'bounty' %}
-                  <i class="bi bi-search text-danger"></i>
-                {% else %}
-                  <i class="bi bi-box text-secondary"></i>
-                {% endif %}
+              <span class="me-2 d-inline-flex align-items-center" style="width:20px; height:20px;">
+                <img src="{% static 'img/fleet/' %}{{ stat.product }}.svg"
+                     alt="" width="20" height="20"
+                     style="border-radius:4px;"
+                     onerror="this.outerHTML='<i class=&quot;bi bi-box text-secondary&quot;></i>'">
               </span>
               <span class="text-capitalize">{{ stat.product }}</span>
             </div>
