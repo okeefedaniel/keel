@@ -6,13 +6,36 @@ Usage (in your template's extra_js block or at bottom of body):
 {% endcomment %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-    // DockLabs Chart.js defaults
-    Chart.defaults.font.family = "'Poppins', sans-serif";
-    Chart.defaults.font.size = 13;
-    Chart.defaults.plugins.legend.labels.usePointStyle = true;
-    Chart.defaults.plugins.legend.labels.padding = 16;
-    Chart.defaults.responsive = true;
-    Chart.defaults.maintainAspectRatio = false;
+    // DockLabs Chart.js v3 defaults
+    // Labels/legend in Instrument Sans; palette reads from CSS tokens
+    // so any token retokening propagates to every chart automatically.
+    (function() {
+        var root = getComputedStyle(document.documentElement);
+        function tok(name, fallback) {
+            var v = root.getPropertyValue(name).trim();
+            return v || fallback;
+        }
+        Chart.defaults.font.family = 'Instrument Sans, -apple-system, sans-serif';
+        Chart.defaults.font.size = 12;
+        Chart.defaults.color = tok('--text-secondary', '#5B5348');
+        Chart.defaults.borderColor = tok('--border', '#E8E3D9');
+        Chart.defaults.plugins.legend.labels.usePointStyle = true;
+        Chart.defaults.plugins.legend.labels.padding = 16;
+        Chart.defaults.responsive = true;
+        Chart.defaults.maintainAspectRatio = false;
+
+        // v3 chart palette — derived from design tokens. Use DockLabs.palette
+        // instead of hardcoded colors when building datasets.
+        window.DockLabs = window.DockLabs || {};
+        DockLabs.palette = [
+            tok('--chart-1', '#0A2B4E'),  // navy
+            tok('--chart-2', '#B8860B'),  // brass
+            tok('--chart-3', '#2D5F3F'),  // forest success
+            tok('--chart-4', '#2C5F8D'),  // info blue
+            tok('--chart-5', '#5B5348'),  // warm muted
+            tok('--chart-6', '#8B2E2A')   // brick error
+        ];
+    })();
 
     // Helper: read embedded JSON data for a chart
     window.DockLabs = window.DockLabs || {};
