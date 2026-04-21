@@ -1,20 +1,49 @@
 {% comment %}
-Fleet switcher — vertical product list with icons in sidebar footer.
+Fleet switcher — compact-by-default, hover/focus expanded.
+
+Default state: a single row of small icon chips at the sidebar footer,
+one per deployed product. Takes ~28px of vertical space.
+
+Hover or keyboard-focus on the switcher: the full vertical fleet list
+pops up above the compact row so the user can read product names and
+jump. Expands upward so it doesn't push the footer down or collide
+with other content.
+
+This prevents long product-nav sidebars from being visually masked
+by a vertical fleet list. See keel/core/static/css/docklabs-v2.css
+"Fleet switcher (v3)" section.
+
 Reads FLEET_PRODUCTS and CURRENT_PRODUCT from template context
 (injected by keel.core.context_processors.fleet_context).
 
 Each product in FLEET_PRODUCTS should have: name, label, code, url, icon
 {% endcomment %}
 {% if FLEET_PRODUCTS %}
-<div class="sb-section" style="margin-top:6px">
-  <div class="sb-section-label">Fleet</div>
-  {% for product in FLEET_PRODUCTS %}
-  <a class="sb-item{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
-     href="{{ product.url }}"
-     title="{{ product.name }}">
-    <span class="sb-icon"><i class="bi {{ product.icon|default:'bi-app' }}"></i></span>
-    <span class="sb-item-label">{{ product.name }}</span>
-  </a>
-  {% endfor %}
+<div class="fleet-switcher" aria-label="Switch product">
+  <!-- Expanded popover (shown on hover/focus) -->
+  <div class="fleet-expanded" role="menu">
+    <div class="fleet-expanded-label">Fleet</div>
+    {% for product in FLEET_PRODUCTS %}
+    <a class="sb-item{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
+       href="{{ product.url }}"
+       title="{{ product.name }}"
+       role="menuitem">
+      <span class="sb-icon"><i class="bi {{ product.icon|default:'bi-app' }}"></i></span>
+      <span class="sb-item-label">{{ product.name }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Collapsed row (always visible) -->
+  <div class="fleet-collapsed">
+    {% for product in FLEET_PRODUCTS %}
+    <a class="fleet-icon-chip{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
+       href="{{ product.url }}"
+       title="{{ product.name }}"
+       aria-label="{{ product.name }}">
+      <i class="bi {{ product.icon|default:'bi-app' }}"></i>
+    </a>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}

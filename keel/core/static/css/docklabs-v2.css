@@ -545,27 +545,112 @@ code, kbd, samp, pre,
     padding: 8px;
 }
 
-/* Fleet switcher */
-.fleet-row {
+/* =============================================
+   Fleet switcher (v3) — compact-by-default,
+   hover/focus expanded popover.
+
+   Default: a small row of icon chips in the sidebar
+   footer. Reserves ~32px of vertical space so long
+   product-nav sidebars aren't visually masked by a
+   tall vertical fleet list.
+
+   Hover or keyboard focus anywhere inside the
+   switcher: the full product list appears as a
+   popover above the compact row. Uses :focus-within
+   so keyboard users get the same expansion.
+
+   Legacy .fleet-row / .fleet-chip classes kept as
+   aliases at bottom of block for one release so any
+   product-specific CSS that referenced them doesn't
+   break immediately.
+   ============================================= */
+.fleet-switcher {
+    position: relative;
+    padding: 4px 2px 2px;
+}
+
+/* Collapsed state: single row of 22x22 icon chips */
+.fleet-collapsed {
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 4px 4px 6px;
-    overflow-x: auto;
+    flex-wrap: wrap;
 }
-.fleet-row::-webkit-scrollbar { display: none; }
 
-.fleet-chip {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 12px;
+.fleet-icon-chip {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
     color: var(--text-tertiary);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.15s;
+    font-size: 13px;
     text-decoration: none;
-    letter-spacing: 0.02em;
+    transition: background 0.12s, color 0.12s;
+}
+.fleet-icon-chip:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+.fleet-icon-chip.active {
+    background: rgba(10, 43, 78, 0.08);
+    color: var(--ct-blue);
+}
+.fleet-icon-chip:focus-visible {
+    outline: 2px solid var(--ct-blue);
+    outline-offset: 1px;
+}
+
+/* Expanded popover — opens upward above the compact row.
+   Hidden by default, shown on :hover or :focus-within of
+   the parent .fleet-switcher. */
+.fleet-expanded {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    margin-bottom: 4px;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    max-height: 60vh;
+    overflow-y: auto;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
+    z-index: 20;
+    pointer-events: none;
+}
+.fleet-switcher:hover .fleet-expanded,
+.fleet-switcher:focus-within .fleet-expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.fleet-expanded-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 2px 8px 4px;
+}
+
+/* Legacy aliases — kept for one release so product CSS
+   that still references .fleet-row / .fleet-chip keeps
+   rendering while we migrate. Remove in Phase E. */
+.fleet-row { display: flex; align-items: center; gap: 2px; padding: 4px 4px 6px; overflow-x: auto; }
+.fleet-row::-webkit-scrollbar { display: none; }
+.fleet-chip {
+    font-size: 10px; font-weight: 600; padding: 3px 8px;
+    border-radius: var(--radius-sm); color: var(--text-tertiary);
+    white-space: nowrap; text-decoration: none; letter-spacing: 0.02em;
+    transition: all 0.15s;
 }
 .fleet-chip:hover { color: var(--text-secondary); background: var(--bg-hover); }
 .fleet-chip.active { background: var(--ct-blue); color: white; }
