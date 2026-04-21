@@ -570,19 +570,17 @@ code, kbd, samp, pre,
 }
 
 /* Collapsed grid: 8 icons (current product excluded).
-   Responsive: 4 columns when sidebar is wide, 2 columns when
-   collapsed/narrow. Grid ensures even rows automatically. */
+   Compact grid centered in the sidebar footer. Uses auto-fit
+   columns sized to the chip width so icons cluster together
+   rather than stretching across the full sidebar width. */
 .fleet-collapsed {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, 32px);
     gap: 2px;
-    justify-items: center;
-}
-@media (max-width: 991.98px) {
-    .fleet-collapsed { grid-template-columns: repeat(4, 1fr); }
+    justify-content: center;
 }
 .dl-sidebar.collapsed .fleet-collapsed {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, 32px);
 }
 
 /* Logo chip — displays the product's favicon.svg.
