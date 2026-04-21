@@ -348,6 +348,14 @@ version = "0.10.9"
 
 Bump both files in the same commit as the code change, then bump pins in all product `requirements.txt` files referencing the new git commit.
 
+**Version strings MUST be valid PEP 440.** Pip's build backend validates `pyproject.toml` version against PEP 440 and fails the wheel build otherwise. Safe forms:
+- Release: `0.11.14`, `0.12.0`
+- Pre-release: `0.12.0a1` (alpha), `0.12.0b1` (beta), `0.12.0rc1` (release candidate)
+- Dev snapshot: `0.12.0.dev0`
+- Local identifier (rarely needed): `0.12.0+internal.build1` — dots only, no hyphens after `+`
+
+**Do NOT use hyphens in arbitrary positions** (e.g. `0.12.0-design-v3-preview`). Pip rejects them with `configuration error: 'project.version' must be pep440` and the product's demo/prod build dies at `Getting requirements to build wheel`. Descriptive version labels belong in commit messages and the plan file, not the version string itself.
+
 ### Railway CLI access
 
 - **The Railway CLI is installed and authenticated** (`railway` command, logged in as `inbox@okeefeweb.com`). Use it for managing env vars, checking deploy status, and triggering deployments across all 10 DockLabs services.
