@@ -52,7 +52,10 @@ def rate_limit(max_requests=10, window=60, key_func=None):
                 ip = forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '0.0.0.0')
                 ident = ip
 
-            hashed = hashlib.md5(ident.encode()).hexdigest()[:12]
+            # MD5 here is a short deterministic key, not a security hash;
+            # usedforsecurity=False tells Bandit + security scanners to stop
+            # flagging it. (Python 3.9+ kwarg.)
+            hashed = hashlib.md5(ident.encode(), usedforsecurity=False).hexdigest()[:12]
             cache_key = f'ratelimit:{view_func.__name__}:{hashed}'
 
             history = cache.get(cache_key, [])
