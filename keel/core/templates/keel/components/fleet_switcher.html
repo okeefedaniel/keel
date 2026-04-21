@@ -1,49 +1,94 @@
 {% comment %}
-Fleet switcher — compact-by-default, hover/focus expanded.
+Fleet switcher — compact-by-default, hover/focus expanded,
+with cross-highlighting between the chip row and the
+expanded product list.
 
-Default state: a single row of small icon chips at the sidebar footer,
-one per deployed product. Takes ~28px of vertical space.
+Default: a small row of product logo chips in the sidebar
+footer. Each chip shows that product's actual favicon SVG
+(loaded from keel/core/static/img/fleet/<code>.svg, which
+ships with keel so any deployment has all 9 logos).
 
-Hover or keyboard-focus on the switcher: the full vertical fleet list
-pops up above the compact row so the user can read product names and
-jump. Expands upward so it doesn't push the footer down or collide
-with other content.
+Hover or keyboard focus: the full product list appears as
+a popover above the compact row. Hovering a chip at the
+bottom highlights the matching row in the list above in a
+distinct "preview" color — so as the mouse slides
+left↔right across chips, the preview highlight moves
+up↔down in the list.
 
-This prevents long product-nav sidebars from being visually masked
-by a vertical fleet list. See keel/core/static/css/docklabs-v2.css
-"Fleet switcher (v3)" section.
+Colors:
+- .active    — current product (the one you're on now)
+- .hovering  — the product you'd go to if you click
+  (separate class so both can show simultaneously)
+
+Cross-highlight driven by data-product="<code>" on each
+chip + list item, and a tiny inline script.
 
 Reads FLEET_PRODUCTS and CURRENT_PRODUCT from template context
 (injected by keel.core.context_processors.fleet_context).
 
-Each product in FLEET_PRODUCTS should have: name, label, code, url, icon
+Each product in FLEET_PRODUCTS should have: name, label, code,
+url, icon. Icon is the Bootstrap Icons class used as fallback
+if the logo SVG fails to load.
 {% endcomment %}
+{% load static %}
 {% if FLEET_PRODUCTS %}
 <div class="fleet-switcher" aria-label="Switch product">
-  <!-- Expanded popover (shown on hover/focus) -->
+  <!-- Expanded popover (hover/focus) -->
   <div class="fleet-expanded" role="menu">
     <div class="fleet-expanded-label">Fleet</div>
     {% for product in FLEET_PRODUCTS %}
-    <a class="sb-item{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
+    <a class="sb-item fleet-list-item{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
        href="{{ product.url }}"
        title="{{ product.name }}"
-       role="menuitem">
-      <span class="sb-icon"><i class="bi {{ product.icon|default:'bi-app' }}"></i></span>
+       role="menuitem"
+       data-product="{{ product.code }}">
+      <span class="sb-icon fleet-icon-img">
+        <img src="{% static 'img/fleet/' %}{{ product.code }}.svg"
+             alt="" width="18" height="18"
+             onerror="this.outerHTML='<i class=&quot;bi {{ product.icon|default:'bi-app' }}&quot;></i>'">
+      </span>
       <span class="sb-item-label">{{ product.name }}</span>
     </a>
     {% endfor %}
   </div>
 
-  <!-- Collapsed row (always visible) -->
+  <!-- Collapsed row: one logo chip per product -->
   <div class="fleet-collapsed">
     {% for product in FLEET_PRODUCTS %}
-    <a class="fleet-icon-chip{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
+    <a class="fleet-logo-chip{% if product.code == CURRENT_PRODUCT %} active{% endif %}"
        href="{{ product.url }}"
        title="{{ product.name }}"
-       aria-label="{{ product.name }}">
-      <i class="bi {{ product.icon|default:'bi-app' }}"></i>
+       aria-label="{{ product.name }}"
+       data-product="{{ product.code }}">
+      <img src="{% static 'img/fleet/' %}{{ product.code }}.svg"
+           alt="" width="24" height="24"
+           onerror="this.outerHTML='<i class=&quot;bi {{ product.icon|default:'bi-app' }}&quot;></i>'">
     </a>
     {% endfor %}
   </div>
 </div>
+
+<script>
+// Cross-highlight: hovering a chip in the collapsed row adds
+// .hovering to the matching row in the expanded list, so the
+// preview highlight "tracks" across chips → up the list.
+// Scoped to the most recent .fleet-switcher in the DOM.
+(function() {
+  var root = document.currentScript.previousElementSibling;
+  if (!root || !root.classList.contains('fleet-switcher')) return;
+  var chips = root.querySelectorAll('.fleet-logo-chip');
+  var items = root.querySelectorAll('.fleet-list-item');
+  var byCode = {};
+  items.forEach(function(el) { byCode[el.dataset.product] = el; });
+  function preview(code) {
+    items.forEach(function(el) { el.classList.remove('hovering'); });
+    if (code && byCode[code]) byCode[code].classList.add('hovering');
+  }
+  chips.forEach(function(chip) {
+    chip.addEventListener('mouseenter', function() { preview(chip.dataset.product); });
+    chip.addEventListener('focus',      function() { preview(chip.dataset.product); });
+  });
+  root.addEventListener('mouseleave', function() { preview(null); });
+})();
+</script>
 {% endif %}

@@ -577,9 +577,103 @@ code, kbd, samp, pre,
     flex-wrap: wrap;
 }
 
-.fleet-icon-chip {
+/* Logo chip — displays the product's favicon.svg.
+   The SVG already carries its own navy background + brand mark,
+   so the chip is a transparent frame. Inactive chips are dimmed;
+   hovering brightens + lifts them slightly. Active chip has a
+   small navy dot below as a "you are here" marker. */
+.fleet-logo-chip {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    position: relative;
+    flex-shrink: 0;
+    padding: 0;
+    background: transparent;
+}
+.fleet-logo-chip img,
+.fleet-logo-chip > i {
     width: 24px;
     height: 24px;
+    display: block;
+    border-radius: 5px;
+    object-fit: contain;
+    opacity: 0.55;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    font-size: 14px;
+    line-height: 24px;
+    text-align: center;
+    color: var(--text-tertiary);
+}
+.fleet-logo-chip:hover img,
+.fleet-logo-chip:hover > i {
+    opacity: 1;
+    transform: scale(1.08);
+}
+.fleet-logo-chip.active img,
+.fleet-logo-chip.active > i {
+    opacity: 1;
+}
+.fleet-logo-chip.active::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -3px;
+    width: 16px;
+    height: 2px;
+    background: var(--ct-blue);
+    border-radius: 1px;
+    transform: translateX(-50%);
+}
+.fleet-logo-chip:focus-visible {
+    outline: 2px solid var(--ct-blue);
+    outline-offset: 2px;
+}
+
+/* Expanded list: "active" = where you are, "hovering" = where
+   you'd go if you click. Both can be set at once; hovering wins
+   visually via higher contrast so the preview is obvious. */
+.fleet-list-item.active {
+    background: rgba(10, 43, 78, 0.06);
+    color: var(--ct-blue);
+    font-weight: 600;
+    border-left: 2px solid var(--ct-blue);
+    padding-left: calc(8px - 2px);
+}
+.fleet-list-item.hovering {
+    background: var(--brass-soft);
+    color: var(--brass-text);
+    box-shadow: inset 2px 0 0 var(--brass);
+    padding-left: calc(8px - 2px);
+}
+.fleet-list-item.active.hovering {
+    /* when user hovers the chip for the product they're already on —
+       layer both: keep the navy border but brighten background */
+    background: rgba(10, 43, 78, 0.12);
+    color: var(--ct-blue);
+    box-shadow: inset 2px 0 0 var(--ct-blue);
+}
+
+/* Logo inside expanded-list rows. Slightly smaller than the chip
+   since it sits next to a text label. */
+.fleet-icon-img img,
+.fleet-icon-img > i {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: block;
+    object-fit: contain;
+}
+
+/* Backwards-compat alias — earlier templates may still reference
+   .fleet-icon-chip. Remove in Phase E. */
+.fleet-icon-chip {
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -589,18 +683,8 @@ code, kbd, samp, pre,
     text-decoration: none;
     transition: background 0.12s, color 0.12s;
 }
-.fleet-icon-chip:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-.fleet-icon-chip.active {
-    background: rgba(10, 43, 78, 0.08);
-    color: var(--ct-blue);
-}
-.fleet-icon-chip:focus-visible {
-    outline: 2px solid var(--ct-blue);
-    outline-offset: 1px;
-}
+.fleet-icon-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.fleet-icon-chip.active { background: rgba(10, 43, 78, 0.08); color: var(--ct-blue); }
 
 /* Expanded popover — opens upward above the compact row.
    Hidden by default, shown on :hover or :focus-within of
