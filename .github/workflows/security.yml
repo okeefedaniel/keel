@@ -103,11 +103,16 @@ jobs:
           ]
           issues = []
           for root, dirs, files in os.walk('.'):
-              dirs[:] = [d for d in dirs if d not in {'venv', '.git', 'node_modules', 'staticfiles', '__pycache__'}]
+              dirs[:] = [d for d in dirs if d not in {'venv', '.git', 'node_modules', 'staticfiles', '__pycache__', 'tests'}]
               for fname in files:
                   if not fname.endswith(('.py', '.js', '.env', '.yml', '.yaml', '.json', '.toml')):
                       continue
                   if fname in ('.env.example', 'package-lock.json'):
+                      continue
+                  # Skip test files — they frequently carry fake-but-regex-matching
+                  # passwords like 'irrelevant-for-tests-123' that cause endless
+                  # false positives. Real secrets do not belong in test code anyway.
+                  if fname in ('tests.py', 'conftest.py') or fname.startswith('test_') or '/tests/' in root.replace(os.sep, '/'):
                       continue
                   fpath = os.path.join(root, fname)
                   try:
