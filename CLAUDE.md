@@ -155,6 +155,34 @@ Before any feature ships that adds cross-product integration, verify:
 - **Google Fonts: Poppins** — consistent typeface across all products.
 - **Shared components in `keel/core/templates/keel/components/`:**
   - `stat_card.html` / `stat_cards_row.html` — KPI metric cards. Every dashboard MUST use these; do not hand-roll `<div class="card border-primary">` stacks. Accepted colors: `green`, `gold`, `red`, `blue`, `purple`, `orange`, `teal`. Use `url=` to make the card clickable as a filter shortcut.
+
+### Summary card click-through rule (suite-wide)
+
+**Every summary card on every dashboard MUST link through to a destination that is most relevant to the user, not a generic unfiltered list.**
+
+- **If the metric is a "mine" / "owned by me" / "assigned to me" count and the user has ≥1 matching record:** the card links to the underlying list page **with the `mine=1` filter applied** (or whatever the equivalent personal-scope query param is on that list view). The user lands on a view of *their* records, not the whole population.
+- **If the user has 0 matching records:** the card links to the **unfiltered** list page so the user sees something useful (the broader population, an empty state with a call to action, or the curated "all" view) instead of an empty filtered page.
+- **If the metric is global (e.g. "Pending Approvals", "All Open Cases"):** the card links to the relevant filtered list (`?status=pending`, `?status=open`) — the destination is "what this number represents", never a generic landing page.
+- **No card should be a dead link or link to the bare list page when a more specific destination exists.**
+
+**Implementation pattern.** In the dashboard view, compute the personal count and pass a precomputed URL into the template:
+
+```python
+my_count = Company.objects.filter(relationship_owner=user).count()
+ctx['my_companies_url'] = (
+    reverse('companies:company_list') + '?mine=1' if my_count else reverse('companies:company_list')
+)
+```
+
+Then in the template:
+
+```django
+{% include "keel/components/stat_card.html" with value=stats.companies label="My Companies" icon="bi-building" color="blue" url=my_companies_url %}
+```
+
+The list view MUST honor the personal-scope query param (e.g. `?mine=1` filters to `relationship_owner=request.user` / `assigned_to=request.user` / `created_by=request.user` as appropriate). Use a consistent param name within a product; `mine=1` is the suite default.
+
+**Why:** A dashboard's job is to give the user a single click to "see my work" or "see what needs attention." Linking every card to the bare list page forces the user to refilter every time and undercuts the whole point of a personalized summary. Linking to an empty filtered view when the user has nothing is worse — they see a wall of nothing and bounce. The rule is: the card's number IS the link's filter, except when that filter would be empty, in which case fall back to the unfiltered view.
   - `sidebar.html`, `topbar.html`, `fleet_switcher.html`
   - `empty_state.html`, `deadline_card.html`, `page_tabs.html`
   - `chart.html`, `chart_scripts.html`
