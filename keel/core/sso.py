@@ -47,12 +47,22 @@ class KeelAccountAdapter(DefaultAccountAdapter):
     def is_open_for_signup(self, request):
         """Close public signup across the suite by default.
 
-        Provisioning happens via Keel OIDC (the ``product_access`` claim
-        creates ``ProductAccess`` rows on first sign-in) or by a Keel admin
-        explicitly seeding a user. Products that want self-service signup
-        can opt in by setting ``KEEL_ALLOW_SIGNUP = True`` in their
-        settings — e.g. a future grantee-self-registration flow on Harbor.
+        Three modes:
+        - Suite (KEEL_OIDC_CLIENT_ID set, not DEMO_MODE): signup is
+          FORCED CLOSED — users must come through Keel OIDC. The
+          KEEL_ALLOW_SIGNUP setting is ignored in this mode to prevent
+          accidental local-only user creation that can't SSO.
+        - Demo (DEMO_MODE true): gated by KEEL_ALLOW_SIGNUP. Demo
+          instances often want signup open so evaluators can try the
+          product without coordination.
+        - Standalone (KEEL_OIDC_CLIENT_ID unset): gated by
+          KEEL_ALLOW_SIGNUP. Products that want self-service signup
+          can opt in (e.g. a future grantee self-registration flow
+          on Harbor in a solo deployment).
         """
+        from keel.core.utils import is_suite_mode
+        if is_suite_mode():
+            return False
         return bool(getattr(settings, 'KEEL_ALLOW_SIGNUP', False))
 
     def get_login_redirect_url(self, request):

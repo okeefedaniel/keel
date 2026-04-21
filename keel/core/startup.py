@@ -64,9 +64,16 @@ def run_startup(extra_commands=None):
     commands = [
         [sys.executable, 'manage.py', 'migrate', '--noinput'],
         [sys.executable, 'manage.py', 'collectstatic', '--noinput'],
+        # Always ensure the dokadmin bootstrap superuser exists. Required
+        # for SSO — Keel's JWT carries preferred_username=dokadmin and each
+        # product's adapter matches that against the local username before
+        # falling back to email. Without dokadmin, SSO fails with "Signup
+        # currently closed" on fresh deployments. Idempotent.
+        [sys.executable, 'manage.py', 'ensure_dokadmin'],
     ]
 
-    # Seed demo users when DEMO_MODE is enabled
+    # Seed the full demo-user set (per-product roles) only in DEMO_MODE.
+    # dokadmin is handled above unconditionally.
     if os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes'):
         commands.append([sys.executable, 'manage.py', 'seed_keel_users'])
 

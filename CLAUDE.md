@@ -106,6 +106,18 @@ Before any feature ships that adds cross-product integration, verify:
 
 **Why:** Split identity prevents cross-product SSO, complicates Helm's executive dashboard, and creates maintenance burden with N copies of auth logic. OIDC also eliminates the cookie-domain fragility that kept invalidating dokadmin sessions on every `SECRET_KEY` rotation.
 
+### User Provisioning Rules
+
+- **Three deployment modes.** `keel.core.utils.is_suite_mode()` is the canonical detector. Returns `True` only when `KEEL_OIDC_CLIENT_ID` is set AND `DEMO_MODE` is false. Use it before branching on deployment topology.
+  - **Standalone** (`KEEL_OIDC_CLIENT_ID` unset): local signup works if `KEEL_ALLOW_SIGNUP=True`. Django admin user creation works normally. Users exist only in that product's DB.
+  - **Suite** (suite_mode=True): **public signup is force-closed**, and **Django admin blocks "+ Add user"**. All user creation happens in Keel's admin, then OIDC auto-links on first SSO. A user created in an individual product admin under suite mode lives only in that product's DB, has no Keel `SocialAccount` link, and can never SSO — an invisible failure.
+  - **Demo** (`DEMO_MODE=True`): signup + admin work regardless. Demo users are seeded via management commands.
+- **`dokadmin` is the canonical bootstrap superuser.** Every product auto-creates it on startup via `keel.core.startup.run_startup()` → `manage.py ensure_dokadmin`, unconditional of DEMO_MODE. Without dokadmin, SSO 403s with "Signup currently closed" because allauth can't auto-create on a closed-signup adapter. The command is idempotent: re-running is a no-op. Set `DOKADMIN_EMAIL` env var to override the default `dok@dok.net`.
+- **Migrating existing local users into the suite.** `pre_social_login()` auto-links by `preferred_username` first, then email. So the flow is: (1) create the user in Keel admin with the same username, (2) add `ProductAccess` rows, (3) user logs into the product via "Sign in with DockLabs" → accounts auto-link. No manual per-product user creation needed.
+- **Never create users in individual product admins when deployed as a suite.** The Django admin "+ Add user" button is blocked and shows a suite-mode banner to reinforce this. Use Keel's admin (https://keel.docklabs.ai/admin/) as the single pane for user identity + product access.
+
+**Why:** Prevents the "orphan local user" footgun — a user created in Beacon's admin can only reach Beacon and can't SSO. Keeping all user creation in Keel keeps identity coherent across the fleet.
+
 ## Demo Mode
 
 - **`DEMO_MODE=True`** activates demo branding and seed data across the suite.

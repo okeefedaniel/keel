@@ -26,6 +26,34 @@ class KeelUserAdmin(UserAdmin):
         }),
     )
 
+    def has_add_permission(self, request):
+        """Block the "+ Add user" button when running in suite mode.
+
+        In suite mode all user creation must happen in the Keel admin.
+        A user created in a product admin lives only in that product's
+        DB, has no SocialAccount link to Keel, and can never SSO — which
+        gives the illusion of working while silently stranding the user.
+        See keel/core/utils.py is_suite_mode() for the detection rule.
+        """
+        from keel.core.utils import is_suite_mode
+        if is_suite_mode():
+            return False
+        return super().has_add_permission(request)
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        """Surface a suite-mode warning banner on the user-edit form."""
+        from keel.core.utils import is_suite_mode
+        extra_context = extra_context or {}
+        if is_suite_mode():
+            extra_context['suite_mode_warning'] = (
+                'This product is deployed in suite mode. Create and manage '
+                'users at the Keel admin (https://keel.docklabs.ai/admin/) '
+                "instead. Users created here will only exist in this "
+                "product's database and will not be able to sign in via "
+                'Keel OIDC.'
+            )
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
 
 @admin.register(Agency)
 class AgencyAdmin(admin.ModelAdmin):

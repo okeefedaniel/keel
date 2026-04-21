@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block content %}
+{% if suite_mode_warning %}
+<div style="background: #fff3cd; border-left: 4px solid #b8860b; border-radius: 0; padding: 12px 16px; margin-bottom: 16px; color: #7a5a07; font-size: 13px; line-height: 1.5;">
+  <strong>Suite Mode:</strong> {{ suite_mode_warning }}
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

@@ -3,9 +3,30 @@ import functools
 import hashlib
 import time
 
+from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.utils.http import url_has_allowed_host_and_scheme
+
+
+def is_suite_mode():
+    """True when this product is federated to Keel IdP (suite/partial-suite).
+
+    Three deployment modes the suite supports:
+    - Standalone: KEEL_OIDC_CLIENT_ID unset → users created locally, signup
+      gated by KEEL_ALLOW_SIGNUP, admin "Add User" works normally.
+    - Suite: KEEL_OIDC_CLIENT_ID set, DEMO_MODE false → users MUST come
+      through Keel OIDC. Public signup disabled, admin "Add User" blocked.
+    - Demo: DEMO_MODE true → signup and admin work regardless; demo users
+      are seeded via management commands for interactive demos.
+
+    Returns True only in suite mode so callers can guard user-creation
+    surfaces (signup, admin "Add User") while leaving standalone + demo
+    deployments untouched.
+    """
+    if getattr(settings, 'DEMO_MODE', False):
+        return False
+    return bool(getattr(settings, 'KEEL_OIDC_CLIENT_ID', ''))
 
 
 def safe_redirect_url(request, url, fallback='/dashboard/'):
