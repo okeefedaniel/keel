@@ -29,6 +29,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .utils import rate_limit
@@ -134,6 +135,7 @@ def get_role_display(role):
     return ROLE_DISPLAY.get(role, default)
 
 
+@csrf_exempt
 @require_POST
 @rate_limit(max_requests=10, window=60)
 def demo_login_view(request):
@@ -142,6 +144,13 @@ def demo_login_view(request):
     Works with both legacy per-product User models and centralized
     KeelUser + ProductAccess. The demo user's username matches the role
     name, and ProductAccessMiddleware resolves the role from ProductAccess.
+
+    CSRF-exempt because: (1) the DEMO_MODE gate below immediately returns
+    403 on non-demo instances, (2) the role allowlist blocks arbitrary
+    usernames, (3) the view is rate-limited 10/min. Exempting prevents
+    403s from stale CSRF tokens on cached login pages — a common issue
+    for reviewers clicking demo-login buttons from a browser tab that's
+    been sitting open.
     """
     if not getattr(settings, 'DEMO_MODE', False):
         return _error(request, 'Demo mode is not enabled', 403)
