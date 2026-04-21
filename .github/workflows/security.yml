@@ -93,10 +93,10 @@ jobs:
       - name: Check for secrets in code
         run: |
           # Simple pattern check for common secrets
-          python -c "
+          python <<'PY'
           import os, re, sys
           patterns = [
-              (r'(?:password|secret|token|key)\s*=\s*[\"'][^\"']{8,}[\"']', 'Hardcoded secret'),
+              (r'''(?:password|secret|token|key)\s*=\s*["'][^"']{8,}["']''', 'Hardcoded secret'),
               (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
               (r'sk-[a-zA-Z0-9]{48}', 'API Secret Key'),
               (r'-----BEGIN (?:RSA )?PRIVATE KEY-----', 'Private Key'),
@@ -124,7 +124,7 @@ jobs:
                   print(f'  {i}')
               sys.exit(1)
           print('No hardcoded secrets detected')
-          "
+          PY
 
       - name: Upload security reports
         if: always()
