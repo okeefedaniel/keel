@@ -1,57 +1,148 @@
 /* ============================================
-   DockLabs Design System — "Warm Harbor" v2
-   CT Brand Identity · Notion-inspired
-   Used by: All DockLabs applications
-   Requires: Bootstrap 5.3+, Poppins (Google Fonts)
+   DockLabs Design System — "Civic Institution" v3
+   Typography-forward · Warm paper · Document-first
+   Used by: All DockLabs applications (authenticated surfaces)
+   Requires: Bootstrap 5.3+, Fraunces + Instrument Sans + JetBrains Mono
+
+   Public/marketing surfaces (base_public.html) keep Poppins
+   for CT state brand alignment. See keel/CLAUDE.md "Deployment
+   Flexibility" and docs/plans/design-v3-migration.md.
    ============================================ */
+
+/* =============================================
+   0. Fonts — self-hosted variable WOFF2
+   Latin + Latin-Extended subsets only. Browsers fetch the
+   latin subset by default (~128KB across all 3 families);
+   latin-ext only pulled on accented chars (+83KB).
+   Served via WhiteNoise; files in keel/core/static/fonts/.
+   ============================================= */
+
+/* Fraunces — variable (opsz 9..144, wght 400..700) */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/static/fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/static/fonts/fraunces-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Instrument Sans — variable (wght 400..700) */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('/static/fonts/instrument-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('/static/fonts/instrument-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* JetBrains Mono — variable (wght 400..600) */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/static/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/static/fonts/jetbrains-mono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 /* =============================================
    1. Design Tokens (CSS Custom Properties)
    ============================================= */
 :root {
-    /* CT Brand Accents */
-    --ct-blue: #1a3a6b;
+    /* CT Brand Accents — v3 values */
+    --ct-blue: #0A2B4E;           /* navy, was #1a3a6b — institutional */
     --ct-blue-light: #e8eef6;
-    --ct-blue-hover: #254d8f;
-    --accent-teal: #0fb8a9;
-    --accent-teal-light: #e6f9f7;
-    --accent-yellow: #f5c542;
-    --accent-yellow-light: #fef8e7;
+    --ct-blue-hover: #12395F;     /* was #254d8f */
 
-    /* Neutral Palette (Warm) */
-    --bg-page: #ffffff;
-    --bg-sidebar: #fbfaf8;
-    --bg-card: #ffffff;
-    --bg-hover: #f7f6f3;
-    --bg-warm: #faf9f7;
-    --border: #e8e5e0;
-    --border-light: #f0ede8;
+    /* Brass / FOIA accent — heraldic, rare, meaningful */
+    --brass: #B8860B;             /* UI only on paper — 3.58:1 */
+    --brass-soft: #F5EAD0;        /* FOIA pill background */
+    --brass-text: #7A5A07;        /* text on paper OR brass-soft — 8.24:1 / 4.74:1 */
+
+    /* Deprecated aliases — kept resolving for one release so
+       product-specific CSS doesn't break. Remove in Phase E. */
+    --accent-teal: var(--success);          /* map teal → success */
+    --accent-teal-light: var(--success-bg);
+    --accent-yellow: var(--brass);          /* map yellow → brass */
+    --accent-yellow-light: var(--brass-soft);
+
+    /* Neutral Palette — warm paper, not white */
+    --bg-page: #FAF7F2;           /* paper, was #ffffff — biggest token shift */
+    --bg-sidebar: #FCFAF5;        /* subtle paper-warm */
+    --bg-card: #FFFFFF;           /* cards stand out against paper */
+    --surface: #FFFFFF;           /* alias for clarity */
+    --bg-hover: #F1ECE2;          /* warm hover on paper */
+    --bg-warm: #F7F3EA;
+    --border: #E8E3D9;            /* rule — marginally warmer */
+    --border-light: #F0EDE8;
+    --border-strong: #D8D2C4;     /* rule-strong — for form fields / kbd pills */
 
     /* Text */
-    --text-primary: #1a1a1a;
-    --text-secondary: #6b6b6b;
-    --text-tertiary: #9b9b9b;
-    --text-on-blue: #ffffff;
+    --text-primary: #1A1A1A;      /* 16.8:1 on paper */
+    --text-secondary: #5B5348;    /* 6.14:1 on paper — AA everywhere */
+    --text-tertiary: #8A8275;     /* lighter — for de-emphasized metadata */
+    --text-on-blue: #FFFFFF;
 
-    /* Semantic */
-    --success: #0d9488;
-    --success-bg: #e6f9f7;
-    --warning: #b8860b;
-    --warning-bg: #fef8e7;
-    --error: #e55353;
-    --error-bg: #fef2f2;
-    --info: #1a3a6b;
-    --info-bg: #e8eef6;
+    /* Semantic — institutional, not alarm */
+    --success: #2D5F3F;           /* forest, was teal #0d9488 */
+    --success-bg: #E4EEE7;
+    --warning: #B8860B;           /* brass */
+    --warning-bg: var(--brass-soft);
+    --error: #8B2E2A;             /* brick, was #e55353 */
+    --error-bg: #F7E8E6;
+    --info: #2C5F8D;              /* distinct from primary navy */
+    --info-bg: #E8EEF6;
 
-    /* Elevation */
+    /* Chart palette — derived from tokens, 6 colors for multi-series */
+    --chart-1: var(--ct-blue);    /* navy */
+    --chart-2: var(--brass);      /* brass */
+    --chart-3: var(--success);    /* forest */
+    --chart-4: var(--info);       /* info blue */
+    --chart-5: var(--text-secondary); /* warm muted */
+    --chart-6: var(--error);      /* brick */
+
+    /* Typography */
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Elevation — unchanged from v2 */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
 
-    /* Radius */
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
+    /* Radius — v3 is sharp. Buttons/inputs keep a hint for touch. */
+    --radius-sm: 4px;             /* buttons, form inputs, kbd pills */
+    --radius-md: 0;               /* cards, alerts, tables (was 10px) */
+    --radius-lg: 0;               /* modals, large containers (was 14px) */
 
     /* Layout */
     --sidebar-width: 260px;
@@ -85,40 +176,73 @@ a { color: var(--ct-blue); }
 a:hover { color: var(--ct-blue-hover); }
 
 /* =============================================
-   3. Body & Typography
+   3. Body & Typography — v3 Civic Institution
+   Fraunces for display, Instrument Sans for UI,
+   JetBrains Mono for codes/data. Three voices for
+   three data zones.
    ============================================= */
 body {
-    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg-page);
     color: var(--text-primary);
-    line-height: 1.6;
+    line-height: 1.55;
+    font-size: 14px;
 }
 
-h1, h2, h3, h4, h5, h6,
-.h1, .h2, .h3, .h4, .h5, .h6 {
-    font-family: 'Poppins', -apple-system, sans-serif;
+h1, h2, h3,
+.h1, .h2, .h3 {
+    font-family: var(--font-display);
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    margin: 0;
 }
 
-h1, .h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
-h2, .h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
-h3, .h3 { font-size: 16px; }
-h4, .h4 { font-size: 14px; }
-h5, .h5 { font-size: 13px; }
-h6, .h6 { font-size: 12px; }
+h1, .h1 { font-size: 40px; line-height: 1.05; letter-spacing: -0.02em; }
+h2, .h2 { font-size: 28px; line-height: 1.15; }
+h3, .h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
+
+/* h4-h6 treated as section labels — mono, uppercase, eyebrow style */
+h4, .h4, h5, .h5, h6, .h6 {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0;
+}
+h4, .h4 { font-size: 13px; }
+h5, .h5 { font-size: 12px; }
+h6, .h6 { font-size: 11px; }
+
+/* Mono utilities — for codes, IDs, FOIA sections, tabular figures */
+code, kbd, samp, pre,
+.font-mono, .mono {
+    font-family: var(--font-mono);
+}
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Section label — the mono eyebrow pattern for grouping */
+.section-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
 
 /* =============================================
    4. Buttons
-   Canonical button radius is --radius-sm (6px).
+   Canonical button radius is --radius-sm (4px in v3).
    Do not override per-product; round pills /
    icon circles should use dedicated utility
    classes (e.g. .rounded-circle) instead.
    ============================================= */
 .btn {
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-sans);
     font-weight: 500;
     font-size: 13px;
+    letter-spacing: 0.01em;
     border-radius: var(--radius-sm);
     transition: all 0.15s ease;
     position: relative;
@@ -267,7 +391,7 @@ h6, .h6 { font-size: 12px; }
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.15s;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-sans);
 }
 .sidebar-quick-btn:hover {
     background: var(--bg-hover);
@@ -318,10 +442,15 @@ h6, .h6 { font-size: 12px; }
     background: var(--bg-hover);
     color: var(--text-primary);
 }
+/* v3 active state: subtle navy fill + 2px navy left border.
+   Reads as "selected section" without the pill-shaped highlight
+   that feels SaaS-y in v2. */
 .sb-item.active {
-    background: var(--ct-blue-light);
+    background: rgba(10, 43, 78, 0.06);
     color: var(--ct-blue);
-    font-weight: 500;
+    font-weight: 600;
+    border-left: 2px solid var(--ct-blue);
+    padding-left: calc(8px - 2px);  /* compensate border to preserve icon alignment */
 }
 
 .sb-icon {
@@ -345,13 +474,15 @@ h6, .h6 { font-size: 12px; }
 
 .sb-badge {
     margin-left: auto;
-    background: var(--accent-teal-light);
-    color: var(--accent-teal);
+    background: var(--success-bg);
+    color: var(--success);
     font-size: 10px;
     font-weight: 600;
     padding: 1px 6px;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
 }
 
 .sb-item-actions {
@@ -414,27 +545,196 @@ h6, .h6 { font-size: 12px; }
     padding: 8px;
 }
 
-/* Fleet switcher */
-.fleet-row {
+/* =============================================
+   Fleet switcher (v3) — compact-by-default,
+   hover/focus expanded popover.
+
+   Default: a small row of icon chips in the sidebar
+   footer. Reserves ~32px of vertical space so long
+   product-nav sidebars aren't visually masked by a
+   tall vertical fleet list.
+
+   Hover or keyboard focus anywhere inside the
+   switcher: the full product list appears as a
+   popover above the compact row. Uses :focus-within
+   so keyboard users get the same expansion.
+
+   Legacy .fleet-row / .fleet-chip classes kept as
+   aliases at bottom of block for one release so any
+   product-specific CSS that referenced them doesn't
+   break immediately.
+   ============================================= */
+.fleet-switcher {
+    position: relative;
+    padding: 4px 2px 2px;
+}
+
+/* Collapsed state: single row of 22x22 icon chips */
+.fleet-collapsed {
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 4px 4px 6px;
-    overflow-x: auto;
+    flex-wrap: wrap;
 }
-.fleet-row::-webkit-scrollbar { display: none; }
 
-.fleet-chip {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 12px;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.15s;
+/* Logo chip — displays the product's favicon.svg.
+   The SVG already carries its own navy background + brand mark,
+   so the chip is a transparent frame. Inactive chips are dimmed;
+   hovering brightens + lifts them slightly. Active chip has a
+   small navy dot below as a "you are here" marker. */
+.fleet-logo-chip {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
     text-decoration: none;
-    letter-spacing: 0.02em;
+    position: relative;
+    flex-shrink: 0;
+    padding: 0;
+    background: transparent;
+}
+.fleet-logo-chip img,
+.fleet-logo-chip > i {
+    width: 24px;
+    height: 24px;
+    display: block;
+    border-radius: 5px;
+    object-fit: contain;
+    opacity: 0.55;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    font-size: 14px;
+    line-height: 24px;
+    text-align: center;
+    color: var(--text-tertiary);
+}
+.fleet-logo-chip:hover img,
+.fleet-logo-chip:hover > i {
+    opacity: 1;
+    transform: scale(1.08);
+}
+.fleet-logo-chip.active img,
+.fleet-logo-chip.active > i {
+    opacity: 1;
+}
+.fleet-logo-chip.active::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -3px;
+    width: 16px;
+    height: 2px;
+    background: var(--ct-blue);
+    border-radius: 1px;
+    transform: translateX(-50%);
+}
+.fleet-logo-chip:focus-visible {
+    outline: 2px solid var(--ct-blue);
+    outline-offset: 2px;
+}
+
+/* Expanded list: "active" = where you are, "hovering" = where
+   you'd go if you click. Both can be set at once; hovering wins
+   visually via higher contrast so the preview is obvious. */
+.fleet-list-item.active {
+    background: rgba(10, 43, 78, 0.06);
+    color: var(--ct-blue);
+    font-weight: 600;
+    border-left: 2px solid var(--ct-blue);
+    padding-left: calc(8px - 2px);
+}
+.fleet-list-item.hovering {
+    background: var(--brass-soft);
+    color: var(--brass-text);
+    box-shadow: inset 2px 0 0 var(--brass);
+    padding-left: calc(8px - 2px);
+}
+.fleet-list-item.active.hovering {
+    /* when user hovers the chip for the product they're already on —
+       layer both: keep the navy border but brighten background */
+    background: rgba(10, 43, 78, 0.12);
+    color: var(--ct-blue);
+    box-shadow: inset 2px 0 0 var(--ct-blue);
+}
+
+/* Logo inside expanded-list rows. Slightly smaller than the chip
+   since it sits next to a text label. */
+.fleet-icon-img img,
+.fleet-icon-img > i {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: block;
+    object-fit: contain;
+}
+
+/* Backwards-compat alias — earlier templates may still reference
+   .fleet-icon-chip. Remove in Phase E. */
+.fleet-icon-chip {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    font-size: 13px;
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+}
+.fleet-icon-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.fleet-icon-chip.active { background: rgba(10, 43, 78, 0.08); color: var(--ct-blue); }
+
+/* Expanded popover — opens upward above the compact row.
+   Hidden by default, shown on :hover or :focus-within of
+   the parent .fleet-switcher. */
+.fleet-expanded {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    margin-bottom: 4px;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    max-height: 60vh;
+    overflow-y: auto;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
+    z-index: 20;
+    pointer-events: none;
+}
+.fleet-switcher:hover .fleet-expanded,
+.fleet-switcher:focus-within .fleet-expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.fleet-expanded-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 2px 8px 4px;
+}
+
+/* Legacy aliases — kept for one release so product CSS
+   that still references .fleet-row / .fleet-chip keeps
+   rendering while we migrate. Remove in Phase E. */
+.fleet-row { display: flex; align-items: center; gap: 2px; padding: 4px 4px 6px; overflow-x: auto; }
+.fleet-row::-webkit-scrollbar { display: none; }
+.fleet-chip {
+    font-size: 10px; font-weight: 600; padding: 3px 8px;
+    border-radius: var(--radius-sm); color: var(--text-tertiary);
+    white-space: nowrap; text-decoration: none; letter-spacing: 0.02em;
+    transition: all 0.15s;
 }
 .fleet-chip:hover { color: var(--text-secondary); background: var(--bg-hover); }
 .fleet-chip.active { background: var(--ct-blue); color: white; }
@@ -512,19 +812,22 @@ h6, .h6 { font-size: 12px; }
 .dl-breadcrumb {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 13px;
-    color: var(--text-tertiary);
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
     flex: 1;
     min-width: 0;
 }
 .dl-breadcrumb a {
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     text-decoration: none;
     transition: color 0.1s;
 }
 .dl-breadcrumb a:hover { color: var(--text-primary); }
-.breadcrumb-sep { opacity: 0.4; font-size: 11px; }
+.breadcrumb-sep { color: var(--border-strong); font-size: 11px; }
 .breadcrumb-current { color: var(--text-primary); font-weight: 500; }
 
 .topbar-actions {
@@ -547,7 +850,7 @@ h6, .h6 { font-size: 12px; }
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.15s;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-sans);
     white-space: nowrap;
     text-decoration: none;
 }
@@ -602,7 +905,7 @@ h6, .h6 { font-size: 12px; }
     color: var(--text-tertiary);
     cursor: pointer;
     transition: all 0.15s;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-sans);
 }
 .search-trigger:hover { border-color: var(--ct-blue); background: var(--bg-warm); }
 
@@ -613,7 +916,7 @@ h6, .h6 { font-size: 12px; }
     padding: 0px 4px;
     border-radius: 3px;
     color: var(--text-tertiary);
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-mono);
     line-height: 1.6;
 }
 
@@ -682,12 +985,13 @@ h6, .h6 { font-size: 12px; }
    <h1> inside .page-header so existing markup keeps working. */
 .page-title,
 .page-header h1 {
-    font-size: 26px;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 500;
     color: var(--text-primary);
     letter-spacing: -0.02em;
+    line-height: 1.05;
     margin-bottom: 3px;
-    font-family: 'Poppins', -apple-system, sans-serif;
 }
 .page-header p,
 .page-subtitle {
@@ -719,9 +1023,10 @@ h6, .h6 { font-size: 12px; }
     padding: 16px 18px;
     border-bottom: 1px solid var(--border-light);
     background: transparent;
+    font-family: var(--font-display);
     font-weight: 600;
-    font-family: 'Poppins', sans-serif;
     line-height: 1.4;
+    letter-spacing: -0.005em;
 }
 
 .card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
@@ -756,53 +1061,81 @@ h6, .h6 { font-size: 12px; }
 .stat-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 0;
     padding: 16px 18px;
-    transition: all 0.2s ease;
+    transition: box-shadow 0.2s ease;
     cursor: default;
 }
-.stat-card:hover { box-shadow: var(--shadow-md); border-color: transparent; }
+.stat-card:hover { box-shadow: var(--shadow-md); }
 
 .stat-label {
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 500;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 4px;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
     gap: 5px;
 }
 
+/* v3 stat value: mono, tabular-nums, larger. Reads like a dashboard
+   readout (briefing-deck vibe), not a SaaS "big number" KPI. */
 .stat-value {
-    font-size: 26px;
-    font-weight: 700;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 28px;
+    font-weight: 500;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
 }
 
 .stat-change {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 11px;
     font-weight: 500;
-    margin-top: 3px;
+    margin-top: 4px;
     display: flex;
     align-items: center;
     gap: 3px;
 }
-.stat-change.up { color: var(--accent-teal); }
+.stat-change.up { color: var(--success); }
 .stat-change.down { color: var(--error); }
+
+/* v3 stat-card accent variants — left border picks up a semantic color.
+   Value stays in --text-primary by default for scannability; only the
+   left border colors to avoid color-clash when rendering dense dashboards. */
+.stat-card.accent-green  { border-left-color: var(--success); }
+.stat-card.accent-gold   { border-left-color: var(--brass); }
+.stat-card.accent-red    { border-left-color: var(--error); }
+.stat-card.accent-blue   { border-left-color: var(--ct-blue); }
+.stat-card.accent-purple { border-left-color: #6A4C9C; }
+.stat-card.accent-orange { border-left-color: var(--brass); }
+.stat-card.accent-teal   { border-left-color: var(--success); }
+
+/* stat-card-link: when the card is wrapped in an <a>, dim the hover
+   transition to signal clickability. */
+.stat-card-link:hover { background: var(--bg-hover); }
 
 /* =============================================
    13. Status Badges
+   v3: sharper radius, mono-ready for codes; semantic
+   color classes below pick the right token.
    ============================================= */
 .badge {
-    font-size: 10px;
+    font-family: var(--font-sans);
+    font-size: 11px;
     font-weight: 500;
-    padding: 2px 9px;
-    border-radius: 20px;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.02em;
     white-space: nowrap;
+    border: 1px solid transparent;
 }
 
 /* Semantic badge colors */
@@ -812,8 +1145,9 @@ h6, .h6 { font-size: 12px; }
 }
 .badge-review, .badge-pending, .badge-under-review, .badge-under_review,
 .badge-on-hold, .badge-forecasted, .badge-preparing {
-    background: var(--warning-bg);
-    color: var(--warning);
+    background: var(--brass-soft);
+    color: var(--brass-text);
+    border-color: #e3c98a;
 }
 .badge-draft, .badge-inactive, .badge-archived {
     background: #f3f3f3;
@@ -1007,17 +1341,39 @@ th.sortable:hover { color: var(--ct-blue); }
 }
 
 .form-control, .form-select {
-    background: var(--bg-warm);
-    border: 1px solid var(--border);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-family: var(--font-sans);
     color: var(--text-primary);
+    padding: 8px 12px;
 }
 
 .form-control:focus, .form-select:focus {
     border-color: var(--ct-blue);
-    box-shadow: 0 0 0 3px rgba(26, 58, 107, 0.1);
+    box-shadow: 0 0 0 3px rgba(10, 43, 78, 0.08);
+    outline: none;
+}
+
+/* Mono input — use for codes, IDs, NAICS, statute refs */
+.form-control.mono,
+.form-control[type="text"].mono,
+input.mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* v3 keyboard shortcut pill — for ⌘K, shortcut hints */
+kbd, .kbd, .tb-kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 2px 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    line-height: 1.4;
 }
 
 .required-field::after { content: ' *'; color: var(--error); }
@@ -1050,12 +1406,155 @@ summary:focus-visible,
 }
 
 /* =============================================
-   21. Alerts
+   21. Alerts — v3 left-border treatment
+   Flat surface, 3px left border in the semantic color,
+   minimal background tint. Reads as a margin note, not
+   a chrome box.
    ============================================= */
 .alert {
-    border-radius: var(--radius-sm);
+    border-radius: 0;
     border: none;
+    border-left: 3px solid;
+    padding: 12px 16px;
+    font-size: 13px;
+    background: var(--bg-card);
+    line-height: 1.5;
+}
+.alert-info    { border-left-color: var(--info);    background: var(--info-bg); }
+.alert-success { border-left-color: var(--success); background: var(--success-bg); }
+.alert-warning { border-left-color: var(--warning); background: var(--warning-bg); color: var(--brass-text); }
+.alert-danger,
+.alert-error   { border-left-color: var(--error);   background: var(--error-bg); }
+
+.alert-title {
+    font-family: var(--font-display);
+    font-weight: 600;
     font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+.alert-body { color: var(--text-secondary); }
+
+/* =============================================
+   21b. FOIA & Document Utilities — v3 vocabulary
+   The "civic institution" details: FOIA classification
+   chips, document callouts, eyebrow section markers.
+   Used across Admiralty, Beacon, Manifest wherever
+   records reference statute or retention status.
+   ============================================= */
+
+/* FOIA classification chip — mono, brass-on-paper,
+   small heraldic dot prefix. Use on records that
+   carry a statute reference or retention flag. */
+.foia {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    background: var(--brass-soft);
+    border: 1px solid #e3c98a;
+    color: var(--brass-text);
+    text-transform: uppercase;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+}
+.foia-dot {
+    width: 5px;
+    height: 5px;
+    background: var(--brass);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Callout — document-style attention block.
+   Heavier than an inline note, lighter than an alert.
+   Use for "retention risk flagged" / "pending response" /
+   similar prose notes attached to a record. */
+.callout {
+    background: var(--brass-soft);
+    border-left: 3px solid var(--brass);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--brass-text);
+    line-height: 1.5;
+}
+.callout strong {
+    color: #3d2d04;
+    font-weight: 600;
+}
+
+/* Eyebrow — a mono section marker with a brass prefix line.
+   Use above a <h2>/<h3> to give the section a "dateline"
+   feel. Variant of .section-label with visual punctuation. */
+.eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--brass-text);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 10px;
+}
+.eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--brass);
+    flex-shrink: 0;
+}
+
+/* =============================================
+   21c. Pills — rectangular tag chips, v3 style
+   Bootstrap's .badge is still available for semantic
+   status. Use .pill for categorical tags (CT HQ, region,
+   industry, user-applied labels). Sharp corners, mono
+   for code-like content, warm-neutral palette.
+   ============================================= */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 3px 9px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    background: var(--surface);
+}
+.pill-navy {
+    background: rgba(10, 43, 78, 0.06);
+    border-color: rgba(10, 43, 78, 0.2);
+    color: var(--ct-blue);
+}
+.pill-brass,
+.pill-amber {
+    background: var(--brass-soft);
+    border-color: #e3c98a;
+    color: var(--brass-text);
+}
+.pill-success {
+    background: var(--success-bg);
+    border-color: #b5c9ba;
+    color: var(--success);
+}
+.pill-muted {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+    color: var(--text-secondary);
+}
+.pill-error {
+    background: var(--error-bg);
+    border-color: #d9b5b3;
+    color: var(--error);
 }
 
 /* =============================================
