@@ -19,6 +19,31 @@ These principles ensure consistency across the DockLabs suite (Admiralty, Beacon
 3. **When in Claude Code**: read `keel/CLAUDE.md` and relevant app `CLAUDE.md` files before responding to code questions.
 4. **When in claude.ai chat**: work from memory/context; ask Dan to paste files or use `git show` output if code review is needed.
 
+## Deployment Flexibility — Solo, Partial, or Full Suite
+
+**Core principle:** Every DockLabs product MUST be deployable in any combination — standalone (one product, no peers), partial (a subset like Harbor + Beacon), or full suite (all 9 products + Helm + Keel). A customer buying only Harbor gets a fully functional Harbor. A customer adding Beacon later gets the cross-product features automatically. No feature should hard-require a peer product to be deployed.
+
+### What this means in practice
+
+1. **Every cross-product dependency is optional.** Environment variables that reference peer products (e.g. `BEACON_INTAKE_URL`, `HELM_FEED_API_KEY`) must be optional. Code paths that call peers must wrap the call in a try/except or pre-check and gracefully no-op when the env var is unset.
+2. **Gate UI, not just wire calls.** Cross-product action controls (e.g., "Add to Beacon" buttons, fleet switcher entries, Helm feed cards) must be HIDDEN when the peer isn't configured. Don't render a button that silently no-ops or 404s. Use an `is_available()` helper per integration.
+3. **Fleet switcher is dynamic.** `KEEL_FLEET_PRODUCTS` is the full list, but the template filters it to "only products this customer has deployed" based on env-var presence. A Harbor-only customer sees no fleet switcher (or just Harbor).
+4. **Standalone auth fallback.** Every product must support local auth + direct Microsoft SSO when `KEEL_OIDC_CLIENT_ID` is unset. `AutoOIDCLoginMiddleware` only intercepts when OIDC is configured. Login templates show the right buttons based on what's available.
+5. **Standalone database.** No cross-product foreign keys. All cross-product references are string slugs + URLs (see "Cross-Product Linkage" below). A product deployed alone has no cross-product rows.
+6. **Suite-mode features are additive.** FOIA export to Admiralty, Helm feed publishing, Yeoman-to-Beacon contact creation, etc. all enrich the experience when peers exist but cause zero degradation when they don't.
+7. **Shared CSS/design system ships with every product.** The `keel` pip package carries shared CSS, fonts, and components. Every product consuming keel gets the full design system, whether it's deployed alone or with 8 peers. No customer is stuck on a stripped-down visual.
+8. **Demo mode works for any subset.** `DEMO_MODE=true` must seed the product's own demo data without requiring peer products. `seed_keel_users` reads from the local `PRODUCT_ROLES` entry for that product only.
+
+### Testing standalone-ness
+
+Before any feature ships that adds cross-product integration, verify:
+- [ ] Product boots with peer env vars unset
+- [ ] UI renders without peer-dependent controls
+- [ ] No 500s, no silent no-op buttons, no broken links in the rendered HTML
+- [ ] `DEMO_MODE=true` seeds work without peer products
+
+**Why:** Selling DockLabs to agencies means different customers need different subsets. A CT-only agency buys Harbor + Admiralty. A larger customer takes the full suite. A pilot might start with just Beacon. Architectural decisions that assume "all 9 are always deployed" break the sales motion and force redeployment churn every time a customer adds a product. Standalone-ness is a product requirement, not an engineering nicety.
+
 ## Authentication & Identity
 
 ### Suite SSO — Keel as the OIDC Identity Provider (Phase 2b)
