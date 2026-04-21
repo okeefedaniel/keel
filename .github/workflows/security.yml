@@ -120,6 +120,22 @@ jobs:
                           content = f.read()
                       for pattern, desc in patterns:
                           for match in re.finditer(pattern, content, re.IGNORECASE):
+                              matched = match.group().lower()
+                              # Dev-only fallback SECRET_KEYs are a Django convention,
+                              # not a real secret. Skip matches that self-identify as
+                              # dev-only via well-known markers.
+                              if any(m in matched for m in (
+                                  'django-insecure-',
+                                  'insecure-dev',
+                                  'change-in-production',
+                                  'change-me',
+                                  'changeme',
+                                  'not-for-production',
+                                  'example.com',
+                                  'placeholder',
+                                  'your-secret-here',
+                              )):
+                                  continue
                               issues.append(f'{fpath}: {desc}')
                   except (UnicodeDecodeError, PermissionError):
                       pass
