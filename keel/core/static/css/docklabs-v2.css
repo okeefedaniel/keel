@@ -442,10 +442,15 @@ code, kbd, samp, pre,
     background: var(--bg-hover);
     color: var(--text-primary);
 }
+/* v3 active state: subtle navy fill + 2px navy left border.
+   Reads as "selected section" without the pill-shaped highlight
+   that feels SaaS-y in v2. */
 .sb-item.active {
-    background: var(--ct-blue-light);
+    background: rgba(10, 43, 78, 0.06);
     color: var(--ct-blue);
-    font-weight: 500;
+    font-weight: 600;
+    border-left: 2px solid var(--ct-blue);
+    padding-left: calc(8px - 2px);  /* compensate border to preserve icon alignment */
 }
 
 .sb-icon {
@@ -638,19 +643,22 @@ code, kbd, samp, pre,
 .dl-breadcrumb {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 13px;
-    color: var(--text-tertiary);
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
     flex: 1;
     min-width: 0;
 }
 .dl-breadcrumb a {
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     text-decoration: none;
     transition: color 0.1s;
 }
 .dl-breadcrumb a:hover { color: var(--text-primary); }
-.breadcrumb-sep { opacity: 0.4; font-size: 11px; }
+.breadcrumb-sep { color: var(--border-strong); font-size: 11px; }
 .breadcrumb-current { color: var(--text-primary); font-weight: 500; }
 
 .topbar-actions {
@@ -884,43 +892,66 @@ code, kbd, samp, pre,
 .stat-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 0;
     padding: 16px 18px;
-    transition: all 0.2s ease;
+    transition: box-shadow 0.2s ease;
     cursor: default;
 }
-.stat-card:hover { box-shadow: var(--shadow-md); border-color: transparent; }
+.stat-card:hover { box-shadow: var(--shadow-md); }
 
 .stat-label {
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 500;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 4px;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
     gap: 5px;
 }
 
+/* v3 stat value: mono, tabular-nums, larger. Reads like a dashboard
+   readout (briefing-deck vibe), not a SaaS "big number" KPI. */
 .stat-value {
-    font-size: 26px;
-    font-weight: 700;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 28px;
+    font-weight: 500;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
 }
 
 .stat-change {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 11px;
     font-weight: 500;
-    margin-top: 3px;
+    margin-top: 4px;
     display: flex;
     align-items: center;
     gap: 3px;
 }
-.stat-change.up { color: var(--accent-teal); }
+.stat-change.up { color: var(--success); }
 .stat-change.down { color: var(--error); }
+
+/* v3 stat-card accent variants — left border picks up a semantic color.
+   Value stays in --text-primary by default for scannability; only the
+   left border colors to avoid color-clash when rendering dense dashboards. */
+.stat-card.accent-green  { border-left-color: var(--success); }
+.stat-card.accent-gold   { border-left-color: var(--brass); }
+.stat-card.accent-red    { border-left-color: var(--error); }
+.stat-card.accent-blue   { border-left-color: var(--ct-blue); }
+.stat-card.accent-purple { border-left-color: #6A4C9C; }
+.stat-card.accent-orange { border-left-color: var(--brass); }
+.stat-card.accent-teal   { border-left-color: var(--success); }
+
+/* stat-card-link: when the card is wrapped in an <a>, dim the hover
+   transition to signal clickability. */
+.stat-card-link:hover { background: var(--bg-hover); }
 
 /* =============================================
    13. Status Badges
@@ -1141,17 +1172,39 @@ th.sortable:hover { color: var(--ct-blue); }
 }
 
 .form-control, .form-select {
-    background: var(--bg-warm);
-    border: 1px solid var(--border);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    font-size: 14px;
+    font-size: 13px;
     font-family: var(--font-sans);
     color: var(--text-primary);
+    padding: 8px 12px;
 }
 
 .form-control:focus, .form-select:focus {
     border-color: var(--ct-blue);
-    box-shadow: 0 0 0 3px rgba(26, 58, 107, 0.1);
+    box-shadow: 0 0 0 3px rgba(10, 43, 78, 0.08);
+    outline: none;
+}
+
+/* Mono input — use for codes, IDs, NAICS, statute refs */
+.form-control.mono,
+.form-control[type="text"].mono,
+input.mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* v3 keyboard shortcut pill — for ⌘K, shortcut hints */
+kbd, .kbd, .tb-kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 2px 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    line-height: 1.4;
 }
 
 .required-field::after { content: ' *'; color: var(--error); }
