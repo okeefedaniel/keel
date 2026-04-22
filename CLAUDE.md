@@ -120,6 +120,30 @@ Before any feature ships that adds cross-product integration, verify:
 
 ## Demo Mode
 
+### Architecture
+
+**The demo site runs the exact same code as production.** There is one git branch, one image, one set of models, one set of URLs. The only thing that changes between `<product>` and `<product>-demo` is configuration:
+
+| Axis | Production | Demo |
+|---|---|---|
+| Git repo / branch | `main` | `main` (same commit, auto-deployed together) |
+| Railway project | `<product>` | `<product>` (same project) |
+| Railway service | `<product>` | `<product>-demo` |
+| Postgres **service** | shared | shared (one container) |
+| Postgres **database** | `railway` | `<product>_demo` (separate DB on the same server) |
+| Hostname | `<product>.docklabs.ai` | `demo-<product>.docklabs.ai` |
+| `DEMO_MODE` env var | unset | `True` |
+| OIDC client ID | points at `keel.docklabs.ai` | points at `demo-keel.docklabs.ai` |
+| Logout chain endpoint | `keel.docklabs.ai` | `demo-keel.docklabs.ai` (auto-detected from Host) |
+
+**Why two services, not one process with a flag?** Isolation. A bad deploy on demo doesn't take prod down. A failed migration on demo doesn't block the prod service. Env-var secrets (Manifest tokens, webhook secrets, API keys) are scoped per service. Demo can be paused or redeployed independently while prod iterates.
+
+**Why two databases, not one with a tenant column?** Seed data. `run_startup()` auto-seeds demo users + domain data when `DEMO_MODE=True` and the DB is empty — if demo shared prod's DB, the seed would either corrupt production data or require complex scoping. Separate DBs let demo be wiped and reseeded freely while prod stays stable.
+
+This is what lets a customer with only `harbor` purchased buy only the `harbor` service (no demo service at all) and still get a functional Harbor. Demo is a deployment pattern, not a code branch.
+
+### What `DEMO_MODE=True` changes at runtime
+
 - **`DEMO_MODE=True`** activates demo branding and seed data across the suite.
 - **Product name:** `site_context` appends " Demo" to `SITE_NAME` so the sidebar brand reads "Harbor Demo", "Beacon Demo", etc.
 - **Role display:** `get_role_display()` prepends "Demo" to every role label (→ "Demo System Admin", "Demo Analyst").
@@ -526,6 +550,7 @@ When one DockLabs product creates a record in another (e.g., Yeoman creates a Co
 ## Deployment & Configuration
 
 - **Startup:** Use `keel.core.startup.run_startup()` in Railway Procfile. It runs migrate, collectstatic, configures Site objects, and optionally seeds demo users (`DEMO_MODE=true`). Pass `extra_commands` for product-specific post-startup tasks.
+- **Startup failures MUST be fatal.** `run_startup()` already exits with the failed command's return code, but several products (bounty, harbor, helm, yeoman as of 2026-04-22) ship their own `startup.py` with a local `run()` helper that defaults `fatal=False`. Every invocation of migrate / collectstatic / ensure_dokadmin in those scripts **must** pass `fatal=True`, or a failed migration becomes a log line that nobody sees while gunicorn happily starts on top of a broken schema. Observed symptom: a deploy "succeeds" (Railway status: SUCCESS, healthcheck responds) but the DB is partially migrated or entirely empty, and every page 500s with `UndefinedTable` until someone notices. Default to failing loud.
 - **Email:** Resend backend via Keel in production, console backend in development.
 - **Static files:** WhiteNoise compressed manifest storage.
 - **Database:** PostgreSQL in production, SQLite in development (except for search/comms features which require PostgreSQL). Use `dj-database-url`.
