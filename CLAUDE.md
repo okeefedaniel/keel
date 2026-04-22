@@ -296,7 +296,7 @@ flowchart LR
 | Notes (internal / external) | `AbstractInternalNote` | `from keel.core.models import AbstractInternalNote` |
 | Typed document attachments | `AbstractAttachment` | `from keel.core.models import AbstractAttachment` |
 | Stage progression | `WorkflowEngine` + `WorkflowModelMixin` + `AbstractStatusHistory` | `from keel.core.workflow import WorkflowEngine, Transition`; `from keel.core.models import WorkflowModelMixin, AbstractStatusHistory` |
-| Manifest signing handoff | `keel.signatures.client.send_to_manifest` (pending — see `keel/signatures/__init__.py`) | `from keel.signatures.client import send_to_manifest` |
+| Manifest signing handoff | `keel.signatures.client.send_to_manifest` + `keel.signatures.signals.packet_approved` | `from keel.signatures.client import send_to_manifest, local_sign, is_available`; `from keel.signatures.signals import packet_approved` |
 
 Product-level models are concrete subclasses with the owning-entity ForeignKey added. Example for bounty:
 
@@ -340,6 +340,63 @@ class OpportunityNote(AbstractInternalNote):
 ### Provenance and cross-product linkage
 
 When the Manifest handoff (or any downstream export) crosses a product boundary, follow the existing **Cross-Product Linkage** rules (see that section below): carry `source_product` / `source_url` / `source_label`, drop an activity-stream entry on the receiving record, treat the call as best-effort, and gate UI on `is_available()`. The signed-doc roundtrip is just a specific case of cross-product linkage.
+
+### How to wire the Manifest handoff in a product
+
+```python
+# In the source product's views.py or services:
+from keel.signatures.client import send_to_manifest, local_sign, is_available
+
+if is_available():
+    handoff = send_to_manifest(
+        source_obj=tracked_opportunity,
+        packet_label=f'Internal Approval: {opp.title}',
+        signers=[{'email': user.email, 'name': user.get_full_name()}],
+        attachment_model='opportunities.OpportunityAttachment',
+        attachment_fk_name='tracked_opportunity',
+        on_approved_status='approved',
+        created_by=request.user,
+        callback_url=request.build_absolute_uri(
+            reverse('keel_signatures:webhook')
+        ),
+    )
+else:
+    # Local-sign fallback — user uploads a signed PDF manually.
+    handoff = local_sign(source_obj=tracked_opportunity, signed_pdf=upload, ...)
+```
+
+```python
+# In the source product's signals module:
+from django.apps import apps
+from django.dispatch import receiver
+from keel.signatures.signals import packet_approved
+
+@receiver(packet_approved)
+def on_packet_approved(sender, handoff, source_obj, signed_pdf, **kwargs):
+    attachment_cls = apps.get_model(*handoff.attachment_model.split('.'))
+    attachment_cls.objects.create(
+        **{handoff.attachment_fk_name: source_obj},
+        file=signed_pdf,
+        source='manifest_signed',
+        visibility='internal',
+        manifest_packet_uuid=handoff.manifest_packet_uuid,
+    )
+    source_obj.transition(handoff.on_approved_status, user=handoff.created_by,
+                          comment='Signed via Manifest handoff')
+```
+
+Products MUST mount the webhook route so Manifest can reach it:
+
+```python
+# product/urls.py
+path('keel/signatures/', include('keel.signatures.urls')),
+```
+
+And configure three settings (all optional — product runs standalone when unset):
+
+- `MANIFEST_URL` — base URL of the Manifest deployment.
+- `MANIFEST_API_TOKEN` — outbound auth.
+- `MANIFEST_WEBHOOK_SECRET` — HMAC secret for inbound completion webhooks. Webhook rejects all requests when unset.
 
 ### Reference implementation
 
@@ -529,7 +586,7 @@ Bump both files in the same commit as the code change, then bump pins in all pro
 - **`keel.requests` mount-path drift:** admiralty/beacon/harbor/helm/manifest mount at `/keel/requests/`; bounty/lookout mount at `/feedback/`; purser and yeoman don't include the module. Unify in a follow-up so the feedback widget always has a stable endpoint.
 - **`/search/` endpoint is registered on all 8 products** with product-specific `keel.search`-backed views. The shared ⌘K modal resolves correctly on every product.
 - **Bounty has a legacy `core_user` table** with orphan FK constraints. Most were dropped during the Phase 2b cleanup, but some product-specific tables may still reference it. See Railway deployment notes for the recovery pattern.
-- **Signing workflow deduplication pending.** Harbor and Manifest both ship `signatures/` with byte-identical `services.py` and 12-line-diff `views.py`. The extraction plan is scaffolded at `keel/keel/signatures/__init__.py` but the move is blocked on a migration strategy (both products' `signatures` app label carries live migration history).
+- **Signing workflow deduplication pending.** Harbor and Manifest both ship `signatures/` with byte-identical `services.py` and 12-line-diff `views.py`. `keel.signatures` now hosts the cross-product handoff layer (`ManifestHandoff`, `send_to_manifest`, inbound webhook, `packet_approved` signal — see the Project Lifecycle Standard section). The per-product `services.py` dedup is still deferred: both products' `signatures` app label carries live migration history, and moving the models needs a `SeparateDatabaseAndState` plan + test coverage for the signing flow. Treat the scaffolding layer and the dedup as two separate workstreams.
 - **Helm feed pipeline is wired for all 8 products.** `keel.feed` provides the shared framework (`helm_feed_view` decorator + `fetch_product_feed` client). All 8 products expose `/api/v1/helm-feed/` with real-time metrics from live data. Helm's `fetch_feeds` management command pulls data into `CachedFeedSnapshot`. **Deployment:** set `HELM_FEED_API_KEY` as a shared env var on all 9 Railway services (8 products + Helm). In `DEMO_MODE`, auth is bypassed and `seed_helm` provides static demo data as a fallback. Feed endpoint files: `harbor/api/helm_feed.py` (reference), `bounty/api/helm_feed.py`, `beacon/api/helm_feed.py`, `admiralty/foia/helm_feed.py`, `manifest/signatures/helm_feed.py`, `lookout/api/helm_feed.py`, `purser/purser/helm_feed.py`, `yeoman/yeoman/helm_feed.py`.
 
 ---
