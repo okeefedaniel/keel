@@ -150,8 +150,26 @@
 
 /* =============================================
    2. Bootstrap Primary Overrides
+   Tell Bootstrap our CT blue is the "primary" RGB so its built-in
+   opacity modifiers (bg-opacity-10, bg-opacity-25, etc.) keep
+   working. Use rgba(var(--bs-primary-rgb), var(--bs-bg-opacity, 1))
+   instead of a hardcoded color so `bg-primary bg-opacity-10` tints
+   correctly instead of rendering solid navy.
    ============================================= */
-.bg-primary { background-color: var(--ct-blue) !important; }
+:root {
+    --bs-primary-rgb: 10, 43, 78;     /* --ct-blue as RGB triplet */
+    --bs-secondary-rgb: 91, 83, 72;   /* --text-secondary */
+    --bs-success-rgb: 45, 95, 63;     /* --success (forest) */
+    --bs-warning-rgb: 184, 134, 11;   /* --brass */
+    --bs-danger-rgb: 139, 46, 42;     /* --error (brick) */
+    --bs-info-rgb: 44, 95, 141;       /* --info */
+}
+.bg-primary   { background-color: rgba(var(--bs-primary-rgb),   var(--bs-bg-opacity, 1)) !important; }
+.bg-secondary { background-color: rgba(var(--bs-secondary-rgb), var(--bs-bg-opacity, 1)) !important; }
+.bg-success   { background-color: rgba(var(--bs-success-rgb),   var(--bs-bg-opacity, 1)) !important; }
+.bg-warning   { background-color: rgba(var(--bs-warning-rgb),   var(--bs-bg-opacity, 1)) !important; }
+.bg-danger    { background-color: rgba(var(--bs-danger-rgb),    var(--bs-bg-opacity, 1)) !important; }
+.bg-info      { background-color: rgba(var(--bs-info-rgb),      var(--bs-bg-opacity, 1)) !important; }
 .btn-primary {
     background-color: var(--ct-blue);
     border-color: var(--ct-blue);
