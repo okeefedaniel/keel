@@ -1,0 +1,25 @@
+{% extends "keel/layouts/auth.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Sign-In Failed" %} | {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 450px; margin: 0 auto;">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-md-5 text-center">
+            <div class="mb-3">
+                <i class="bi bi-exclamation-triangle-fill display-4 text-warning"></i>
+            </div>
+            <h2 class="fw-bold mb-3">{% trans "Sign-In Failed" %}</h2>
+            <p class="text-muted mb-4">
+                {% blocktrans %}We couldn't complete your sign-in. This usually happens when the login link expires or is opened twice. Please try again.{% endblocktrans %}
+            </p>
+            <div class="d-grid">
+                <a href="{% url 'account_login' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-arrow-left me-2"></i>{% trans "Back to Sign In" %}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
