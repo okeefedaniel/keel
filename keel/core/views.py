@@ -182,7 +182,7 @@ class SuiteLogoutView(LogoutView):
 
     Drop-in replacement for ``django.contrib.auth.views.LogoutView``.
     Django's LogoutView clears the product's local session as usual, and
-    then ``get_next_page()`` chains the redirect through Keel's
+    then ``get_success_url()`` chains the redirect through Keel's
     ``/suite/logout/?next=<product_home>`` endpoint so the IdP session
     is also cleared. After Keel logs the user out it redirects back to
     the product's home page.
@@ -212,9 +212,14 @@ class SuiteLogoutView(LogoutView):
     def get(self, request, *args, **kwargs):
         return self.post(request, *args, **kwargs)
 
-    def get_next_page(self):
-        # The parent LogoutView still runs auth.logout() before this is
-        # called, so the product-side session is already gone by now.
+    def get_success_url(self):
+        # Django 5's LogoutView dispatches redirects through
+        # get_success_url() (via RedirectURLMixin), not the old
+        # get_next_page() hook. Always chain through Keel's
+        # /suite/logout/ so the IdP session is torn down too — any
+        # same-host ?next= is intentionally ignored so products can't
+        # short-circuit the suite-wide logout chain. auth_logout() has
+        # already run by the time this is called.
         host = self.request.get_host().split(':', 1)[0]
         keel_host = 'demo-keel.docklabs.ai' if host.startswith('demo-') else 'keel.docklabs.ai'
         product_home = self.request.build_absolute_uri('/')
