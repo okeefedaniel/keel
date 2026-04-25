@@ -47,6 +47,22 @@ def _microsoft_login_url(request):
         return None
 
 
+def _signup_is_open(request):
+    """Return True iff the active allauth adapter accepts new signups.
+
+    Mirrors the gate used by the actual signup view so the login card
+    only advertises Register when the destination won't dead-end on the
+    signup_closed page. Falls back to False if allauth isn't installed or
+    the adapter raises — better to hide a working link than show a dead
+    one.
+    """
+    try:
+        from allauth.account.adapter import get_adapter
+        return bool(get_adapter(request).is_open_for_signup(request))
+    except Exception:
+        return False
+
+
 def _keel_oidc_login_url(request):
     """Resolve the Keel OIDC ("Sign in with DockLabs") login URL.
 
@@ -99,9 +115,15 @@ def site_context(request):
     }
 
     # ── Auth URLs for the shared login card ──────────────────────────
-    register_url = _safe_reverse('account_signup')
-    if register_url:
-        context['register_url'] = register_url
+    # Only expose the Register link when signup is actually open. The
+    # adapter (KeelAccountAdapter.is_open_for_signup) keeps it closed in
+    # suite mode, in demo mode, and in standalone unless KEEL_ALLOW_SIGNUP
+    # is set — so the login template no longer dead-ends users on the
+    # signup_closed page when they click Register.
+    if _signup_is_open(request):
+        register_url = _safe_reverse('account_signup')
+        if register_url:
+            context['register_url'] = register_url
 
     reset_password_url = (
         _safe_reverse('account_reset_password')
