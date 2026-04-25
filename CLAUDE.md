@@ -466,6 +466,44 @@ And configure three settings (all optional — product runs standalone when unse
 
 **Why:** Users navigate between products constantly and need a consistent mental model. Products re-implementing variants of "claim / invite / diligence / stage / sign" drift over time — different role names, different invite lifecycles, different approval mechanics — and erode the suite's coherence. Pinning the lifecycle in keel prevents this drift and centralizes the places where the pattern evolves.
 
+## Scheduling (keel.scheduling)
+
+Suite-wide registry + run log + admin dashboard for scheduled management commands. **The scheduler itself is external** — Railway cron services, GitHub Actions schedules, cron-job.org, whatever your deployment uses. Keel does NOT invoke commands itself. This module provides observability on top of the existing pattern.
+
+**Three pieces:**
+
+1. **Registry** — declare a scheduled command with the `@scheduled_job` decorator on its `BaseCommand` subclass. The decorator registers a `ScheduledJobSpec` in a module-level dict at import time:
+
+   ```python
+   from django.core.management.base import BaseCommand
+   from keel.scheduling import scheduled_job
+
+   @scheduled_job(
+       slug='helm-notify-due-tasks',
+       name='Helm — Daily due-task notifications',
+       cron='0 9 * * *',          # display only — runs externally
+       owner='helm',
+       notes='Fires task_due_soon and task_overdue. Idempotent via Task.last_*_notif_at.',
+   )
+   class Command(BaseCommand):
+       help = 'Fire daily task notifications.'
+
+       def handle(self, *args, **opts):
+           ...
+   ```
+
+2. **Run log** — the decorator wraps `Command.handle()` so every invocation creates a `CommandRun` row capturing `started_at` / `finished_at` / `status` / `error_message` / `duration_ms`. Errors are captured AND re-raised so the cron exits non-zero. If the `ScheduledJob` row hasn't been synced yet (DB not ready, missing migration, etc.), `handle()` still runs — the run-log machinery never breaks the actual job.
+
+3. **Dashboard** at `/scheduling/` — staff-only single page listing every job in this service with: name, owner product, cron expression, last run, status, recent-24-runs sparkline, success rate, admin-editable `enabled` flag + `notes` field. Per-job page at `/scheduling/<slug>/` shows the last 100 runs.
+
+**Sync command:** Run `python manage.py sync_scheduled_jobs` on every deploy (idempotent) so the DB stays in step with the in-code registry. Admin-edited fields (`enabled`, `notes`) are preserved across syncs. Orphaned rows (in DB but no longer declared) are flagged on the dashboard but NOT deleted automatically — admins decide whether to clean up.
+
+**Per-service scope:** Each Railway service has its own DB and its own `/scheduling/` showing only that service's jobs. There is no cross-service aggregation in v1; a future Helm "fleet scheduling" view could pull each product's jobs via its helm-feed.
+
+**`enabled` flag is display-only.** Toggling `enabled=False` does NOT pause the cron — only the external scheduler can do that. Use `enabled=False` to mark a job as expected-disabled so the dashboard doesn't flag missing runs.
+
+**Why this exists:** Cron jobs were running in production with no visibility. The old pattern (Beacon's `compute_health_scores`, `generate_cadence_reminders`, `send_adoption_report`) had docstring comments saying "run daily via cron" but no record of whether they actually ran, no error capture, no place to find them all in one view. This module adds that observability without changing how scheduling itself works.
+
 ## Communications (keel.comms)
 
 - **Use `keel.comms` for all email communications** that are entity-routed (tied to a grant, request, case, etc.). Do not build product-specific email sending.
