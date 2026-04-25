@@ -12,3 +12,6 @@ db.sqlite3
 staticfiles/
 .gstack/
 .DS_Store
+
+# Claude Code runtime state
+.claude/*.lock
