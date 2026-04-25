@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% comment %}
+  Generic archived-items list. Consumers extend this template directly or
+  override the layout in their own app (e.g. tasks/archived_projects.html).
+
+  Context:
+    object_list   — paginated archived rows
+    archive_label — human label for the heading (e.g. "Projects")
+    page_obj      — Django Paginator page object
+    is_paginated  — bool
+{% endcomment %}
+
+{% block content %}
+  <div class="archived-list-page">
+    <h1>Archived {{ archive_label }}</h1>
+
+    {% if object_list %}
+      <ul class="archived-list">
+        {% for obj in object_list %}
+          <li>
+            {{ obj }}
+            <small class="text-muted">
+              archived {{ obj.archived_at|date:"M j, Y" }}
+            </small>
+          </li>
+        {% endfor %}
+      </ul>
+
+      {% if is_paginated %}
+        <nav aria-label="Archived pagination">
+          {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+          {% endif %}
+          <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">Next</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    {% else %}
+      <p class="text-muted">No archived {{ archive_label|lower }}.</p>
+    {% endif %}
+  </div>
+{% endblock %}

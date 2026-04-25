@@ -276,6 +276,44 @@ Every DockLabs product MUST include:
 
 **Why:** Ad-hoc status management in views bypasses role checks, skips audit logging, and makes the transition rules invisible. Harbor's 4 declarative workflows are the reference implementation.
 
+### Object-scoped roles (`obj=` parameter)
+
+`WorkflowEngine.execute()`, `can_transition()`, and `get_available_transitions()` all pass an `obj=` argument down to `_user_has_role(user, required_roles, obj=None)`. The base implementation ignores it; subclasses use it to resolve roles that depend on the model instance — e.g. Helm's `ProjectWorkflowEngine` resolves the `'lead'` keyword by checking whether the user holds an active `ProjectCollaborator(role=LEAD)` row for the bound project. **Subclasses overriding `_user_has_role` MUST accept the `obj=None` keyword** even if they ignore it, or the engine will raise `TypeError` when keel passes it through.
+
+## Archive (keel.core.archive)
+
+Any workflow-bearing model can opt into archive/unarchive. The primitive is intentionally small:
+
+- **`ArchivableMixin`** — adds an indexed nullable `archived_at` timestamp and an `is_archived` property to the live row. The mixin does NOT define `archive()` / `unarchive()` methods; consumers wire those in their service layer so the live-row update, the retention-record write, the audit log, and notifications all happen in one `transaction.atomic` block.
+- **`ArchiveQuerySetMixin`** — `.active()` / `.archived()` helpers for managers and querysets. Use as `class FooQuerySet(ArchiveQuerySetMixin, models.QuerySet): ...` and `objects = FooQuerySet.as_manager()`.
+- **`ArchiveListView`** — generic `ListView` that returns archived rows ordered by `archived_at` desc, paginated 25/page. Subclass and set `model`, `template_name`, `archive_label`. Override `get_queryset()` to add per-user ACL filters when needed.
+- **Template:** `keel/core/archived_list.html` — minimal layout consumers extend or replace.
+
+### Required workflow convention
+
+A consumer using `ArchivableMixin` MUST add an `archived` terminal status to its `WorkflowEngine` reachable from the natural "done" states. Example:
+
+```python
+PROJECT_WORKFLOW = WorkflowEngine([
+    # ...
+    Transition('completed', 'archived', roles=['lead', 'system_admin'], label='Archive'),
+    Transition('cancelled', 'archived', roles=['lead', 'system_admin'], label='Archive'),
+    Transition('archived',  'active',   roles=['lead', 'system_admin'], label='Unarchive'),
+])
+```
+
+### Pair with `AbstractArchivedRecord` for retention compliance
+
+`ArchivableMixin` is the soft-archive flag on the live row (fast filtering, no JOIN). `AbstractArchivedRecord` (existing — `keel/core/models.py`) is the **retention-policy row** with `retention_policy` (STANDARD 7y / EXTENDED 10y / PERMANENT), `retention_expires_at`, `metadata` JSONField, and `is_purged` / `purged_at`. Consumers should write **both** in their archive service: live-row `archived_at` + a per-archive `ArchivedRecord` subclass row. The pair separates UX speed from NARA-shaped retention bookkeeping. `purge_expired_archives` (existing keel mgmt command) consumes the retention rows.
+
+### Audit actions
+
+`AbstractAuditLog.Action` includes `archive` and `unarchive` choices. Consumer audit-log subclasses inherit these automatically — the column is a CharField and choices are advisory in Django, so no migration is required for products that already have a concrete `AuditLog` table on `0.15.x` schema.
+
+### Reference implementation
+
+Helm's `tasks.Project` is the first consumer (`tasks/services.py:archive_project` writes both `archived_at` and a `tasks.ArchivedProjectRecord(AbstractArchivedRecord)` row).
+
 ## Project Lifecycle Standard
 
 Every workflow-carrying DockLabs product (beacon, bounty, lookout, harbor, purser — and any future product that shepherds "a thing" through stages) MUST follow the same high-level lifecycle so that a user moving between products encounters a familiar motion. The shape:

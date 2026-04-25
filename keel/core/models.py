@@ -68,6 +68,8 @@ class AbstractAuditLog(models.Model):
         VIEW = 'view', _('View')
         LOGIN_FAILED = 'login_failed', _('Login Failed')
         SECURITY_EVENT = 'security_event', _('Security Event')
+        ARCHIVE = 'archive', _('Archive')
+        UNARCHIVE = 'unarchive', _('Unarchive')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(

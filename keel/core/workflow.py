@@ -88,16 +88,16 @@ class WorkflowEngine:
         self._index: dict[str, list[Transition]] = {}
         self._rebuild_index()
 
-    def get_available_transitions(self, current_status: str, user=None):
+    def get_available_transitions(self, current_status: str, user=None, obj=None):
         candidates = self._index.get(current_status, [])
         if user is None:
             return candidates
-        return [t for t in candidates if self._user_has_role(user, t.roles)]
+        return [t for t in candidates if self._user_has_role(user, t.roles, obj=obj)]
 
-    def can_transition(self, current_status: str, target_status: str, user=None) -> bool:
+    def can_transition(self, current_status: str, target_status: str, user=None, obj=None) -> bool:
         for t in self._index.get(current_status, []):
             if t.to_status == target_status:
-                if user is None or self._user_has_role(user, t.roles):
+                if user is None or self._user_has_role(user, t.roles, obj=obj):
                     return True
         return False
 
@@ -110,7 +110,7 @@ class WorkflowEngine:
                 f"Transition from '{current}' to '{target_status}' is not allowed."
             )
 
-        if user is not None and not self._user_has_role(user, transition.roles):
+        if user is not None and not self._user_has_role(user, transition.roles, obj=obj):
             raise PermissionDenied(
                 f"User role '{getattr(user, 'role', 'unknown')}' cannot perform "
                 f"transition '{transition}'."
@@ -189,8 +189,15 @@ class WorkflowEngine:
                 return t
         return None
 
-    @classmethod
-    def _user_has_role(cls, user, required_roles: list[str]) -> bool:
+    def _user_has_role(self, user, required_roles: list[str], obj=None) -> bool:
+        """Check whether ``user`` may perform a transition with ``required_roles``.
+
+        ``obj`` is the model instance the transition is being attempted on.
+        It is ignored by the base implementation; subclasses can use it to
+        resolve object-scoped roles (e.g. ``'lead'`` against a project's
+        collaborator set). See Helm's ``ProjectWorkflowEngine`` for a
+        reference implementation.
+        """
         if not required_roles or 'any' in required_roles:
             return True
 
@@ -203,7 +210,7 @@ class WorkflowEngine:
 
         for r in required_roles:
             # Check role keyword -> property mapping
-            prop = cls.ROLE_PROPERTY_MAP.get(r)
+            prop = self.ROLE_PROPERTY_MAP.get(r)
             if prop and getattr(user, prop, False):
                 return True
             # Exact role match
