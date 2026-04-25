@@ -30,7 +30,6 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
 
 from .utils import rate_limit
 
@@ -136,14 +135,14 @@ def get_role_display(role):
 
 
 @csrf_exempt
-@require_POST
 @rate_limit(max_requests=10, window=60)
 def demo_login_view(request):
     """One-click demo login. POST with role= to log in as that demo user.
 
-    GET requests intentionally return 405 (via ``@require_POST``); the URL
-    is a form target, not a navigable page. Reach demo login by clicking
-    a demo button on ``/accounts/login/`` (or ``/auth/login/``).
+    GET requests redirect to the product's login page rather than
+    returning 405. The URL is a form target, not a navigable page —
+    but a 405 surprises crawlers, link unfurlers, and users who
+    bookmark the URL by accident.
 
     Works with both legacy per-product User models and centralized
     KeelUser + ProductAccess. The demo user's username matches the role
@@ -156,6 +155,9 @@ def demo_login_view(request):
     for reviewers clicking demo-login buttons from a browser tab that's
     been sitting open.
     """
+    if request.method != 'POST':
+        return redirect(getattr(settings, 'LOGIN_URL', '/accounts/login/'))
+
     if not getattr(settings, 'DEMO_MODE', False):
         return _error(request, 'Demo mode is not enabled', 403)
 
