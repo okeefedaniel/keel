@@ -597,6 +597,7 @@ Bump both files in the same commit as the code change, then bump pins in all pro
 
 ## Data Patterns
 
+- **`RunPython` data migrations MUST be idempotent.** A migration that re-runs (manual `migrate <app> zero`, restored DB snapshot with stale `django_migrations` row, deploy crashloop re-applying migrations) silently accumulates duplicates — bounty's `OpportunityAssignment` ate 26 dupe rows this way before being noticed. When the underlying model legitimately allows multiple rows per key (assignment history, audit logs), a DB-level UNIQUE can't backstop it; the migration itself must guard. Use `keel.core.migration_utils.idempotent_backfill(model, key_fields, rows)`: it filters out rows whose `key_fields` tuple already exists before `bulk_create`. Also: never write a `reverse()` that does `Model.objects.all().delete()` — that wipes real user data along with the backfill. Use `migrations.RunPython.noop` if there's no clean reverse.
 - **Compliance tracking:** Use `keel.compliance` (ComplianceTemplate, ComplianceObligation, ComplianceItem) instead of product-specific compliance models.
 - **Fiscal periods:** Use `keel.periods` for any product dealing with fiscal years/months.
 - **Archived records:** Use `AbstractArchivedRecord` with retention policies for data governance.
