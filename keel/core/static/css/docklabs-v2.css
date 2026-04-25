@@ -94,6 +94,24 @@
     --accent-yellow: var(--brass);          /* map yellow → brass */
     --accent-yellow-light: var(--brass-soft);
 
+    /* Legacy --ct-* aliases from docklabs.css (pre-v2 palette). Without
+       these, product CSS that still references `var(--ct-green)` etc.
+       resolves to nothing — making the property invalid and exposing
+       any underlying rule (e.g. .pill's light --surface bg with white
+       text on top, unreadable). Resolves to the closest v2 token. */
+    --ct-dark-blue: var(--ct-blue);
+    --ct-bold-blue: var(--ct-blue);
+    --ct-light-blue: var(--ct-blue-light);
+    --ct-pale-blue: var(--ct-blue-light);
+    --ct-orange: var(--brass);
+    --ct-yellow: var(--warning);
+    --ct-brown: var(--brass-text);
+    --ct-red: var(--error);
+    --ct-green: var(--success);
+    --ct-dark-gray: var(--text-primary);
+    --ct-light-gray: var(--bg-warm);
+    --ct-sidebar-width: var(--sidebar-width);
+
     /* Neutral Palette — warm paper, not white */
     --bg-page: #FAF7F2;           /* paper, was #ffffff — biggest token shift */
     --bg-sidebar: #FCFAF5;        /* subtle paper-warm */
