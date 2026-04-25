@@ -141,6 +141,10 @@ def get_role_display(role):
 def demo_login_view(request):
     """One-click demo login. POST with role= to log in as that demo user.
 
+    GET requests intentionally return 405 (via ``@require_POST``); the URL
+    is a form target, not a navigable page. Reach demo login by clicking
+    a demo button on ``/accounts/login/`` (or ``/auth/login/``).
+
     Works with both legacy per-product User models and centralized
     KeelUser + ProductAccess. The demo user's username matches the role
     name, and ProductAccessMiddleware resolves the role from ProductAccess.

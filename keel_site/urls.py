@@ -6,7 +6,7 @@ from django.urls import include, path
 
 from keel.accounts.forms import LoginForm
 from keel.core.demo import demo_login_view
-from keel.core.views import suite_logout_endpoint
+from keel.core.views import favicon_view, robots_txt, suite_logout_endpoint
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
 
@@ -20,6 +20,8 @@ def home(request):
 urlpatterns = [
     # Home → platform dashboard
     path('', home, name='home'),
+    path('favicon.ico', favicon_view, name='favicon'),
+    path('robots.txt', robots_txt, name='robots_txt'),
     path('dashboard/', dashboard.platform_dashboard, name='platform_dashboard'),
     path('api/activity/', dashboard.activity_feed_api, name='activity_feed_api'),
 
