@@ -233,6 +233,25 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
     default_role: str = 'analyst'
     state_user_domains: set = set()
 
+    def is_open_for_signup(self, request, sociallogin):
+        """Allow OIDC auto-provisioning even when public signup is closed.
+
+        ``KeelAccountAdapter.is_open_for_signup`` force-closes signup in
+        suite mode so the local form can't create users that bypass Keel.
+        But Keel-issued OIDC logins are already vetted by the IdP — when
+        ``pre_social_login`` can't find a matching local user, allauth
+        should be allowed to provision one rather than dead-end on
+        ``signup_closed.html``. Without this override, every new user
+        added in Keel admin requires a manual ``createsuperuser``-style
+        seed in every product's DB before they can SSO.
+
+        Form-based signups still fall through to the account adapter's
+        ``is_open_for_signup``, which stays closed in suite mode.
+        """
+        if _is_keel_provider(sociallogin):
+            return True
+        return super().is_open_for_signup(request, sociallogin)
+
     # ------------------------------------------------------------------
     # Pre-login linking
     # ------------------------------------------------------------------

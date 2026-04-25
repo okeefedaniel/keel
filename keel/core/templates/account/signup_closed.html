@@ -1,0 +1,25 @@
+{% extends "keel/layouts/auth.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Sign Up Closed" %} | {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 450px; margin: 0 auto;">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-md-5 text-center">
+            <div class="mb-3">
+                <i class="bi bi-lock-fill display-4 text-secondary"></i>
+            </div>
+            <h2 class="fw-bold mb-3">{% trans "Sign Up Closed" %}</h2>
+            <p class="text-muted mb-4">
+                {% blocktrans %}Self-service sign up isn't available here. If you need access, please ask a DockLabs administrator to provision your account, then sign in with DockLabs.{% endblocktrans %}
+            </p>
+            <div class="d-grid">
+                <a href="{% url 'account_login' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-arrow-left me-2"></i>{% trans "Back to Sign In" %}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
