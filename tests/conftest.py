@@ -12,8 +12,8 @@ import django
 
 def pytest_configure(config):
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'keel_site.settings')
-    # Keel's keel_site.settings raises when DJANGO_SECRET_KEY is unset
-    # outside DEBUG. Force a debug key for the test run.
-    os.environ.setdefault('DJANGO_DEBUG', '1')
-    os.environ.setdefault('DJANGO_SECRET_KEY', 'test-only-secret-key-do-not-use-in-prod')
+    # Keel's keel_site.settings now refuses to start without SECRET_KEY
+    # outside DEBUG. Force DEBUG + a fixed key for the test run.
+    os.environ.setdefault('DEBUG', '1')
+    os.environ.setdefault('SECRET_KEY', 'test-only-secret-key-do-not-use-in-prod')
     django.setup()

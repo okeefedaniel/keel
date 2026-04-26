@@ -33,7 +33,7 @@ from django.http import HttpResponseForbidden
 logger = logging.getLogger('keel.security')
 
 
-def _get_client_ip(request):
+def get_client_ip(request):
     """Return the real client IP, honoring X-Forwarded-For only when trusted.
 
     Django sees ``REMOTE_ADDR`` as the last hop — on Railway, that's Railway's
@@ -57,6 +57,10 @@ def _get_client_ip(request):
         if idx >= 0 and idx < len(hops):
             return hops[idx]
     return request.META.get('REMOTE_ADDR', '0.0.0.0')
+
+
+# Back-compat alias — older imports may still use the leading-underscore form.
+_get_client_ip = get_client_ip
 
 
 class SecurityHeadersMiddleware:
@@ -111,7 +115,7 @@ class FailedLoginMonitor:
         ])
 
     def __call__(self, request):
-        ip = _get_client_ip(request)
+        ip = get_client_ip(request)
 
         # Check if IP is currently locked out
         if self._is_locked_out(ip):
@@ -202,7 +206,7 @@ class AdminIPAllowlistMiddleware:
     Behavior: if KEEL_ADMIN_ALLOWED_IPS is unset or empty, the middleware is
     a no-op (all IPs allowed). This keeps local dev working without extra
     config but means production MUST populate the list to get protection.
-    Pull the client IP from a trusted proxy header — see _get_client_ip.
+    Pull the client IP from a trusted proxy header — see get_client_ip.
     """
 
     def __init__(self, get_response):
@@ -218,7 +222,7 @@ class AdminIPAllowlistMiddleware:
     def __call__(self, request):
         admin_prefix = getattr(settings, 'KEEL_ADMIN_URL_PREFIX', '/admin/')
         if self.networks and request.path.startswith(admin_prefix):
-            ip = _get_client_ip(request)
+            ip = get_client_ip(request)
             try:
                 addr = ipaddress.ip_address(ip)
             except ValueError:

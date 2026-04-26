@@ -45,7 +45,33 @@ def _error(request, message, status, login_url='/accounts/login/'):
     messages.error(request, message)
     return redirect(login_url)
 
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo2026!')
+_INSECURE_DEMO_PASSWORD = 'demo2026!'  # publicly known; rejected at startup
+DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', '')
+
+
+def _validate_demo_password():
+    """Refuse to boot with the publicly-known demo password.
+
+    Demo sites are advertised entry points (`demo-*.docklabs.ai`); the
+    suite-wide hardcoded fallback `demo2026!` would otherwise let any
+    visitor log in as the demo admin.
+    """
+    try:
+        demo_mode = getattr(settings, 'DEMO_MODE', False)
+    except Exception:
+        # Settings not configured (tooling import); next real boot will catch it.
+        return
+    if not demo_mode:
+        return
+    if not DEMO_PASSWORD or DEMO_PASSWORD == _INSECURE_DEMO_PASSWORD:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            'DEMO_MODE=True requires a non-default DEMO_PASSWORD env var. '
+            'Set DEMO_PASSWORD to a unique value per deployment.'
+        )
+
+
+_validate_demo_password()
 
 # Display labels and icons for common roles across DockLabs products.
 # Roles missing from this dict still work — get_role_display() generates

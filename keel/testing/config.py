@@ -16,7 +16,13 @@ BASE_DIR = Path(os.environ.get(
     os.path.expanduser('~/SynologyDrive/Work/CT/Web'),
 ))
 
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo2026!')
+# DEMO_PASSWORD lives in keel.core.demo as the canonical source. Avoid
+# duplicating the env-var read so the publicly-known fallback can't drift
+# back into a sibling module.
+try:
+    from keel.core.demo import DEMO_PASSWORD
+except Exception:  # pragma: no cover — import-time fallback for tooling
+    DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', '')
 
 
 @dataclass

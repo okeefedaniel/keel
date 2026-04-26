@@ -71,14 +71,23 @@ def webhook(request):
         return HttpResponse(status=200)
 
     # Download the signed PDF so the source product can file it on the
-    # object's Attachment collection in one shot.
+    # object's Attachment collection in one shot. Use safe_get so an
+    # attacker who has compromised Manifest (or the webhook secret) can't
+    # pivot to SSRF or RAM-exhaustion via a malicious signed_pdf_url.
+    from keel.security.http import safe_get, UnsafeURLError
+    import requests
     try:
-        import requests
-        pdf_resp = requests.get(signed_pdf_url, timeout=30)
+        pdf_resp = safe_get(signed_pdf_url, timeout=30, max_bytes=20 * 1024 * 1024)
         pdf_resp.raise_for_status()
         signed_pdf = BytesIO(pdf_resp.content)
         signed_pdf.name = f'{handoff.packet_label or "signed"}.pdf'
-    except Exception as exc:  # noqa: BLE001
+    except UnsafeURLError as exc:
+        logger.warning('Refused unsafe signed PDF URL for handoff %s: %s', handoff.pk, exc)
+        handoff.status = ManifestHandoff.Status.FAILED
+        handoff.error_message = f'Unsafe signed PDF URL: {exc}'[:500]
+        handoff.save(update_fields=['status', 'error_message', 'updated_at'])
+        return HttpResponse(status=400)
+    except (requests.RequestException, Exception) as exc:  # noqa: BLE001
         logger.exception('Failed to download signed PDF for handoff %s: %s', handoff.pk, exc)
         handoff.status = ManifestHandoff.Status.FAILED
         handoff.error_message = f'Signed PDF download failed: {exc}'[:500]

@@ -24,6 +24,58 @@ _RATE_LIMIT_REQUESTS = 60
 _RATE_LIMIT_WINDOW_SECONDS = 60
 
 
+def _accepted_keys(*, demo_mode: bool) -> list[str]:
+    """Return the list of bearer tokens that are accepted on this service.
+
+    Per-product keys (``HELM_FEED_API_KEYS`` dict) are preferred; the
+    suite-wide ``HELM_FEED_API_KEY`` is honored as a fallback so existing
+    deploys keep working. In ``DEMO_MODE`` the demo-specific key is also
+    accepted.
+    """
+    keys: list[str] = []
+    per_product = getattr(settings, 'HELM_FEED_API_KEYS', None) or {}
+    if isinstance(per_product, dict):
+        keys.extend(v for v in per_product.values() if v)
+    suite = getattr(settings, 'HELM_FEED_API_KEY', '') or ''
+    if suite:
+        keys.append(suite)
+    if demo_mode:
+        demo = getattr(settings, 'HELM_FEED_DEMO_API_KEY', '') or ''
+        if demo:
+            keys.append(demo)
+    # Dedupe while preserving order.
+    seen = set()
+    out = []
+    for k in keys:
+        if k not in seen:
+            seen.add(k)
+            out.append(k)
+    return out
+
+
+def _authenticate_helm_bearer(request) -> str | None:
+    """Return the matched key on success, ``None`` on failure.
+
+    Compares against every accepted key with constant-time semantics so a
+    Helm aggregator carrying any one of N per-product keys is accepted.
+    """
+    demo_mode = getattr(settings, 'DEMO_MODE', False)
+    accepted = _accepted_keys(demo_mode=demo_mode)
+    if not accepted:
+        return None
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    presented = auth_header[7:].strip()
+    matched = None
+    # Compare against every key — never short-circuit, so timing doesn't
+    # leak which key matched.
+    for k in accepted:
+        if hmac.compare_digest(presented, k):
+            matched = k
+    return matched
+
+
 def _rate_limited(api_key: str) -> bool:
     """Per-key token bucket: 60 req / 60 s."""
     key = f'keel:helm_feed_rate:{api_key[:16]}'
@@ -54,32 +106,17 @@ def helm_feed_view(build_feed_func):
     @require_GET
     @functools.wraps(build_feed_func)
     def wrapper(request):
-        demo_mode = getattr(settings, 'DEMO_MODE', False)
-
-        # Resolve the expected key — demo hosts accept HELM_FEED_DEMO_API_KEY
-        # if configured, falling back to HELM_FEED_API_KEY.
-        if demo_mode:
-            expected = (
-                getattr(settings, 'HELM_FEED_DEMO_API_KEY', '')
-                or getattr(settings, 'HELM_FEED_API_KEY', '')
-                or ''
-            )
-        else:
-            expected = getattr(settings, 'HELM_FEED_API_KEY', '') or ''
-
-        if not expected:
+        if not _accepted_keys(demo_mode=getattr(settings, 'DEMO_MODE', False)):
             return JsonResponse(
                 {'error': 'Helm feed not configured (HELM_FEED_API_KEY missing).'},
                 status=503,
             )
 
-        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        if not auth_header.startswith('Bearer ') or not hmac.compare_digest(
-            auth_header[7:].strip(), expected,
-        ):
+        matched = _authenticate_helm_bearer(request)
+        if matched is None:
             return JsonResponse({'error': 'Invalid API key.'}, status=401)
 
-        if _rate_limited(expected):
+        if _rate_limited(matched):
             return JsonResponse(
                 {'error': 'Rate limit exceeded.'},
                 status=429,
@@ -162,29 +199,17 @@ def helm_inbox_view(build_inbox_func):
     @require_GET
     @functools.wraps(build_inbox_func)
     def wrapper(request):
-        demo_mode = getattr(settings, 'DEMO_MODE', False)
-        if demo_mode:
-            expected = (
-                getattr(settings, 'HELM_FEED_DEMO_API_KEY', '')
-                or getattr(settings, 'HELM_FEED_API_KEY', '')
-                or ''
-            )
-        else:
-            expected = getattr(settings, 'HELM_FEED_API_KEY', '') or ''
-
-        if not expected:
+        if not _accepted_keys(demo_mode=getattr(settings, 'DEMO_MODE', False)):
             return JsonResponse(
                 {'error': 'Helm feed not configured (HELM_FEED_API_KEY missing).'},
                 status=503,
             )
 
-        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        if not auth_header.startswith('Bearer ') or not hmac.compare_digest(
-            auth_header[7:].strip(), expected,
-        ):
+        matched = _authenticate_helm_bearer(request)
+        if matched is None:
             return JsonResponse({'error': 'Invalid API key.'}, status=401)
 
-        if _rate_limited(expected):
+        if _rate_limited(matched):
             return JsonResponse({'error': 'Rate limit exceeded.'}, status=429)
 
         user_sub = (request.GET.get('user_sub') or '').strip()

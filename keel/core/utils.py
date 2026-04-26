@@ -69,9 +69,10 @@ def rate_limit(max_requests=10, window=60, key_func=None):
             if key_func:
                 ident = key_func(request)
             else:
-                forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
-                ip = forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '0.0.0.0')
-                ident = ip
+                # Use the trusted-proxy-aware extractor; the leftmost
+                # X-Forwarded-For hop is forgeable by any client.
+                from keel.security.middleware import get_client_ip
+                ident = get_client_ip(request)
 
             # MD5 here is a short deterministic key, not a security hash;
             # usedforsecurity=False tells Bandit + security scanners to stop

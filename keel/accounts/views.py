@@ -16,7 +16,8 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -334,6 +335,25 @@ def accept_invitation(request, token):
             while KeelUser.objects.filter(username=username).exists():
                 username = f'{base}_{counter}'
                 counter += 1
+
+            # AUTH_PASSWORD_VALIDATORS is only invoked by form .clean_password()
+            # or an explicit validate_password() call — create_user() skips it.
+            try:
+                validate_password(
+                    password,
+                    user=KeelUser(
+                        username=username,
+                        email=email,
+                        first_name=first_name,
+                        last_name=last_name,
+                    ),
+                )
+            except ValidationError as exc:
+                for msg in exc.messages:
+                    messages.error(request, msg)
+                return render(request, 'accounts/accept_invitation.html', {
+                    'invitation': invitation,
+                })
 
             user = KeelUser.objects.create_user(
                 username=username,

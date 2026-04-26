@@ -3,18 +3,36 @@
 Reads configuration from environment variables (Railway sets these automatically).
 """
 import os
+import secrets
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------------------------
 # Core
 # ---------------------------------------------------------------------------
-SECRET_KEY = os.environ.get('SECRET_KEY', 'change-me-in-production')
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-dev-only-' + secrets.token_urlsafe(32)
+    else:
+        raise ImproperlyConfigured(
+            'SECRET_KEY env var is required in production (DEBUG=False).'
+        )
+
+_default_hosts = 'localhost,127.0.0.1' if DEBUG else ''
+ALLOWED_HOSTS = [
+    h.strip() for h in os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',') if h.strip()
+]
+if not DEBUG and not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        'ALLOWED_HOSTS env var is required in production (DEBUG=False).'
+    )
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://keel.docklabs.ai').split(',')

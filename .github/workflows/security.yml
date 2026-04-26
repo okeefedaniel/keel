@@ -1,13 +1,15 @@
 # Reusable security scanning workflow for DockLabs products.
 #
-# Usage in a product repo's .github/workflows/ci.yml:
+# Usage in a product repo's .github/workflows/ci.yml — pin to a tagged
+# release or full commit SHA, NOT @main, so a compromised keel commit
+# can't ship into every consumer's CI on the next run:
+#
 #   jobs:
 #     security:
-#       uses: okeefedaniel/keel/.github/workflows/security.yml@main
+#       uses: okeefedaniel/keel/.github/workflows/security.yml@v1.0.0
+#       # or: @<full-40-char-sha>
 #       with:
 #         python-version: '3.12'
-#
-# Or copy this workflow directly into each product repo.
 
 name: Security Scan
 
@@ -24,9 +26,17 @@ on:
   pull_request:
     branches: [main]
 
+# Drop unneeded permissions — this workflow only reads code and uploads
+# artifacts. No id-token, no contents:write, no packages:write.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 

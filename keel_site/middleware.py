@@ -1,4 +1,10 @@
 """Keel site middleware."""
+from urllib.parse import urlparse
+
+from django.conf import settings
+
+
+_DEFAULT_ORIGIN = 'https://keel.docklabs.ai'
 
 
 class APICorsMiddleware:
@@ -33,11 +39,24 @@ class APICorsMiddleware:
         return response
 
     def _get_origin(self, request):
-        """Return the requesting origin if it's a DockLabs domain."""
+        """Return the requesting origin if it's a DockLabs domain.
+
+        Uses parsed-host comparison (NOT substring) so origins like
+        ``https://attackerdocklabs.ai`` and ``https://docklabs.ai.evil``
+        cannot be reflected into ``Access-Control-Allow-Origin``.
+        """
         origin = request.META.get('HTTP_ORIGIN', '')
-        if origin and 'docklabs.ai' in origin:
+        if not origin:
+            return _DEFAULT_ORIGIN
+        try:
+            parsed = urlparse(origin)
+        except Exception:
+            return _DEFAULT_ORIGIN
+        if parsed.scheme not in ('http', 'https'):
+            return _DEFAULT_ORIGIN
+        host = (parsed.hostname or '').lower()
+        if host == 'docklabs.ai' or host.endswith('.docklabs.ai'):
             return origin
-        # Also allow localhost for development
-        if origin and ('localhost' in origin or '127.0.0.1' in origin):
+        if getattr(settings, 'DEBUG', False) and host in ('localhost', '127.0.0.1'):
             return origin
-        return 'https://keel.docklabs.ai'
+        return _DEFAULT_ORIGIN
