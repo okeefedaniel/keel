@@ -1942,6 +1942,13 @@ summary:focus-visible,
     text-decoration: none;
 }
 
+/* Public topbar buttons need 44px touch targets (mobile a11y).
+   Scoped to .dl-public-topbar so the dense dashboard .tb-btn is unchanged. */
+.dl-public-topbar .tb-btn {
+    padding: 13px 16px;
+    font-size: 13px;
+}
+
 .dl-public-content {
     min-height: calc(100vh - 120px);
 }
@@ -1954,7 +1961,12 @@ summary:focus-visible,
     font-size: 12px;
     color: var(--text-tertiary);
 }
-.dl-footer a { color: var(--text-secondary); text-decoration: none; }
+.dl-footer a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    display: inline-block;
+    padding: 14px 6px;
+}
 .dl-footer a:hover { color: var(--ct-blue); }
 
 /* =============================================
