@@ -1372,7 +1372,21 @@ th.sortable:hover { color: var(--ct-blue); }
     color: var(--text-primary);
 }
 
-.form-control, .form-select {
+.form-control, .form-select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="tel"],
+input[type="search"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"],
+input[type="week"],
+select,
+textarea {
     background: var(--surface);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
@@ -1382,7 +1396,21 @@ th.sortable:hover { color: var(--ct-blue); }
     padding: 8px 12px;
 }
 
-.form-control:focus, .form-select:focus {
+.form-control:focus, .form-select:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="url"]:focus,
+input[type="tel"]:focus,
+input[type="search"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+input[type="month"]:focus,
+input[type="time"]:focus,
+input[type="week"]:focus,
+select:focus,
+textarea:focus {
     border-color: var(--ct-blue);
     box-shadow: 0 0 0 3px rgba(10, 43, 78, 0.08);
     outline: none;
@@ -2053,10 +2081,8 @@ summary:focus-visible,
     background: var(--accent-yellow-light);
     color: var(--warning);
 }
-.feature-card h5 {
-    font-weight: 700;
+.feature-card h3 {
     margin-bottom: 0.75rem;
-    color: var(--text-primary);
 }
 .feature-card p {
     color: var(--text-secondary);
