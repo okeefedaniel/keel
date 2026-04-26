@@ -7,7 +7,7 @@ psycopg2-binary>=2.9
 
 # SMS & webhooks
 twilio>=9.0
-requests>=2.30
+requests>=2.33.1
 
 # HTML sanitizer for inbound email (parser-based; regex approach was unsafe)
 nh3>=0.2
