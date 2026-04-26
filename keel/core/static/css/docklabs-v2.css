@@ -2059,47 +2059,64 @@ summary:focus-visible,
     box-shadow: 0 4px 12px rgba(26, 58, 107, 0.25);
 }
 
-/* Feature card (used in features grid) */
-.feature-card {
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: 2rem 1.5rem;
-    background: var(--bg-card);
-    height: 100%;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-    text-align: center;
+/* Features section — editorial spread layout (replaces the 3-col icon-in-circle
+   grid that was AI Slop blacklist #2). Brass numerals, no card containers,
+   left-aligned heading. Pairs with F-004 (kills centered-everything). */
+.features-section .features-head {
+    max-width: 640px;
+    margin-bottom: 4rem;
 }
-.feature-card:hover {
-    box-shadow: var(--shadow-lg);
-    transform: translateY(-2px);
+.features-section .features-head h2 {
+    text-align: left;
+    margin: 0;
 }
-.feature-card .feature-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: var(--ct-blue-light);
+.features-section .features-head .section-intro {
+    text-align: left;
+    margin: 1rem 0 0;
+    max-width: 560px;
+}
+.features-section .features-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4rem 3rem;
+}
+@media (max-width: 900px) {
+    .features-section .features-list {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2.5rem 2rem;
+    }
+}
+@media (max-width: 600px) {
+    .features-section .features-list { grid-template-columns: 1fr; gap: 2rem; }
+}
+.features-section .feature-item .feature-num {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--brass);
+    font-size: 3.25rem;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+.features-section .feature-item .feature-rule {
+    height: 1px;
+    width: 48px;
+    background: var(--brass);
+    margin: 1rem 0 1.25rem;
+}
+.features-section .feature-item h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
     color: var(--ct-blue);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.75rem;
-    margin: 0 auto 1rem auto;
+    font-size: 1.15rem;
+    line-height: 1.3;
+    margin: 0 0 0.75rem;
 }
-.feature-card .feature-icon.teal {
-    background: var(--accent-teal-light);
-    color: var(--accent-teal);
-}
-.feature-card .feature-icon.yellow {
-    background: var(--accent-yellow-light);
-    color: var(--warning);
-}
-.feature-card h3 {
-    margin-bottom: 0.75rem;
-}
-.feature-card p {
+.features-section .feature-item p {
     color: var(--text-secondary);
-    margin-bottom: 0;
-    font-size: 0.95rem;
+    line-height: 1.6;
+    font-size: 0.97rem;
+    margin: 0;
 }
 
 /* Generic "opp-card" used by Harbor & Bounty for content cards */

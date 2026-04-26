@@ -1,23 +1,23 @@
 {% comment %}
-Reusable features grid for landing pages.
+Reusable features section for landing pages — editorial spread layout.
 
 Usage:
     {% include "keel/landing/_features.html" with features=my_features title="What We Do" %}
 
 Where my_features is a list of dicts:
     [
-      {"icon": "bi-building", "title": "Company Management",
-       "description": "Centralized records...", "color": "blue"},
-      {"icon": "bi-shield-check", "title": "FOIA Compliance",
-       "description": "...", "color": "yellow"},
+      {"title": "Cross-Fleet Dashboards",
+       "description": "Centralized records..."},
       ...
     ]
 
 Each item supports:
-    icon: bootstrap icon class (without 'bi' prefix)
     title: heading
     description: paragraph text
-    color: blue (default) | teal | yellow
+
+Legacy keys ``icon`` and ``color`` are accepted for back-compat but no longer
+rendered — the editorial layout uses brass numerals (01, 02, ...) instead of
+icon-in-colored-circle, which removed the AI-template look (audit F-002).
 
 Optional outer params:
     title: section heading (defaults to "Features")
@@ -25,22 +25,21 @@ Optional outer params:
     section_class: CSS class for the section (defaults to "landing-section")
 {% endcomment %}
 {% if features %}
-<section class="{{ section_class|default:'landing-section' }}">
+<section class="{{ section_class|default:'landing-section' }} features-section">
   <div class="container">
-    <h2 class="text-center">{{ title|default:"Features" }}</h2>
-    {% if intro %}
-    <p class="section-intro">{{ intro }}</p>
-    {% endif %}
-    <div class="row g-4 justify-content-center">
+    <div class="features-head">
+      <h2>{{ title|default:"Features" }}</h2>
+      {% if intro %}
+      <p class="section-intro">{{ intro }}</p>
+      {% endif %}
+    </div>
+    <div class="features-list">
       {% for feature in features %}
-      <div class="col-md-6 col-lg-4">
-        <div class="feature-card">
-          <div class="feature-icon{% if feature.color %} {{ feature.color }}{% endif %}">
-            <i class="bi {{ feature.icon }}"></i>
-          </div>
-          <h3>{{ feature.title }}</h3>
-          <p>{{ feature.description }}</p>
-        </div>
+      <div class="feature-item">
+        <div class="feature-num">{{ forloop.counter|stringformat:"02d" }}</div>
+        <div class="feature-rule" aria-hidden="true"></div>
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.description }}</p>
       </div>
       {% endfor %}
     </div>
