@@ -711,3 +711,7 @@ These items were completed during the Phase 2b OIDC rollout session:
 ---
 
 *Last updated: 2026-04-09.*
+
+## Design Partner
+
+Dan O'Keefe — Commissioner of Economic Development, State of Connecticut. Leads the Department of Economic and Community Development (DECD). Built the DockLabs suite to solve real state government problems. He is the design partner for every product in the suite.
