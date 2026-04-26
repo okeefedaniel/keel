@@ -2191,18 +2191,37 @@ summary:focus-visible,
     opacity: 0.5;
 }
 
-/* Section spacing helpers */
+/* Section spacing — varied rhythm so the page reads as a narrative
+   instead of a stack of equal-weight blocks (audit F-003). Each named
+   section type gets purpose-fit padding; the unmodified `.landing-section`
+   default is the fallback for product-specific extras. */
 .landing-section {
-    padding: 4rem 0;
+    padding: 5rem 0;
 }
 .landing-section.alt {
     background: var(--bg-warm);
+}
+.landing-section.features-section {
+    /* breathes — first major content section after hero */
+    padding: 6rem 0 7rem;
+}
+.landing-section.how-it-works {
+    /* tight — pairs visually with features above */
+    padding: 4rem 0;
+}
+.landing-section.cta-band {
+    /* breathes — last impression before the footer */
+    padding: 6rem 0 7rem;
 }
 .landing-section h2 {
     font-family: 'Poppins', sans-serif;
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 2.5rem;
+}
+.landing-section.how-it-works h2 {
+    /* left-aligned to match features (audit F-004) */
+    text-align: left;
 }
 .landing-section .section-intro {
     color: var(--text-secondary);

@@ -16,9 +16,9 @@ Optional outer params:
     title: section heading (defaults to "How It Works")
 {% endcomment %}
 {% if steps %}
-<section class="landing-section alt">
+<section class="landing-section alt how-it-works">
   <div class="container">
-    <h2 class="text-center">{{ title|default:"How It Works" }}</h2>
+    <h2>{{ title|default:"How It Works" }}</h2>
     <div class="row g-4 text-center">
       {% for step in steps %}
       <div class="col-md-6 col-lg-3">
