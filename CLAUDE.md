@@ -267,6 +267,8 @@ Every DockLabs product MUST include:
 
 **Why:** This is the baseline that gives us audit trails, security monitoring, notifications, consistent branding, and a working suite-wide SSO.
 
+**Pin keel by version tag, not branch SHA — `main` is rebased.** In `requirements.txt` use `keel @ git+https://github.com/okeefedaniel/keel.git@v0.18.1`, not `@<sha>`. Branch SHAs can be orphaned by a force-push and break CI in every consumer.
+
 ## Workflows & Status Tracking
 
 - **Any model with a `status` field MUST use `keel.core.workflow.WorkflowEngine`** with declarative `Transition` definitions. No ad-hoc status updates in views.
