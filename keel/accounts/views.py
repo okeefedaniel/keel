@@ -18,6 +18,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.mail import send_mail
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -265,17 +266,58 @@ def send_invitation(request):
             f'Pending invitation already exists for {email} → {", ".join(skipped)}.',
         )
     if created_invitations:
-        invite_url = request.build_absolute_uri(
-            f'/invite/{created_invitations[0].token}/'
-        )
+        invite_links = [
+            (inv, request.build_absolute_uri(f'/invite/{inv.token}/'))
+            for inv in created_invitations
+        ]
         product_names = ', '.join(
             f'{inv.product} ({inv.role})' for inv in created_invitations
         )
-        messages.success(
-            request,
-            f'Invitations created for {email} → {product_names}. '
-            f'Share this link: {invite_url}',
-        )
+
+        # Send the actual invitation email.
+        try:
+            inviter = request.user.get_full_name() or request.user.email
+            body_lines = [
+                f'{inviter} has invited you to the DockLabs suite.',
+                '',
+                'Click the link for each product below to accept access:',
+                '',
+            ]
+            for inv, url in invite_links:
+                beta = ' (beta tester)' if inv.is_beta_tester else ''
+                body_lines.append(
+                    f'• {inv.product.title()} — {inv.role}{beta}\n  {url}'
+                )
+            body_lines += [
+                '',
+                'Each link expires in '
+                f'{getattr(settings, "KEEL_INVITATION_EXPIRY_DAYS", 7)} days.',
+            ]
+            send_mail(
+                subject=f'You have been invited to DockLabs ({len(created_invitations)} product{"s" if len(created_invitations) != 1 else ""})',
+                message='\n'.join(body_lines),
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            email_sent = True
+        except Exception as exc:  # noqa: BLE001 — best-effort; surface to admin
+            logger.exception('Failed to send invitation email to %s: %s', email, exc)
+            email_sent = False
+
+        if email_sent:
+            messages.success(
+                request,
+                f'Sent invitation email to {email} → {product_names}.',
+            )
+        else:
+            # Fallback: surface the first link so the admin can hand-share.
+            messages.warning(
+                request,
+                f'Invitations created for {email} → {product_names}, but the '
+                f'email failed to send. First accept link: {invite_links[0][1]} '
+                f'(see the invitations table below for all links).',
+            )
         logger.info('Admin %s created invitation(s): %s', request.user, created_invitations)
 
     return redirect('keel_accounts:invitation_list')

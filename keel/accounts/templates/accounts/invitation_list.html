@@ -114,6 +114,11 @@
             <td>{{ inv.expires_at|date:"M d" }}</td>
             <td class="text-end">
               {% if inv.status == "pending" %}
+              <button type="button" class="btn btn-sm btn-outline-secondary inv-copy-link"
+                      data-link="{{ request.scheme }}://{{ request.get_host }}/invite/{{ inv.token }}/"
+                      title="Copy accept link">
+                <i class="bi bi-link-45deg"></i>
+              </button>
               <form method="post" action="{% url 'keel_accounts:revoke_invitation' invitation_id=inv.pk %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
@@ -150,6 +155,23 @@
       const noneChecked = Array.from(rows).every(function(r) { return !r.checked; });
       master.checked = allChecked;
       master.indeterminate = !allChecked && !noneChecked;
+    });
+  });
+
+  document.querySelectorAll('.inv-copy-link').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const link = btn.getAttribute('data-link');
+      navigator.clipboard.writeText(link).then(function() {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2"></i>';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-secondary');
+        setTimeout(function() {
+          btn.innerHTML = orig;
+          btn.classList.remove('btn-success');
+          btn.classList.add('btn-outline-secondary');
+        }, 1500);
+      });
     });
   });
 })();
