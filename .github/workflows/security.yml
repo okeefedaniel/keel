@@ -128,8 +128,15 @@ jobs:
                   try:
                       with open(fpath) as f:
                           content = f.read()
+                      lines = content.splitlines()
                       for pattern, desc in patterns:
                           for match in re.finditer(pattern, content, re.IGNORECASE):
+                              # Honor line-level pragma `# noqa: secret-scan`
+                              # for known tripwire/sentinel literals that exist
+                              # to be detected and refused at startup.
+                              line_no = content.count('\n', 0, match.start())
+                              if line_no < len(lines) and 'noqa: secret-scan' in lines[line_no]:
+                                  continue
                               matched = match.group().lower()
                               # Dev-only fallback SECRET_KEYs are a Django convention,
                               # not a real secret. Skip matches that self-identify as

@@ -45,7 +45,7 @@ def _error(request, message, status, login_url='/accounts/login/'):
     messages.error(request, message)
     return redirect(login_url)
 
-_INSECURE_DEMO_PASSWORD = 'demo2026!'  # publicly known; rejected at startup
+_INSECURE_DEMO_PASSWORD = 'demo2026!'  # noqa: secret-scan — tripwire sentinel; refused at boot, see _validate_demo_password
 DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', '')
 
 
