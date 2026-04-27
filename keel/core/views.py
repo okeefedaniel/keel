@@ -15,8 +15,9 @@ Usage in urls.py:
 """
 from urllib.parse import urlencode, urlparse
 
-from django.contrib.auth import logout as auth_logout
+from django.contrib.auth import get_user_model, logout as auth_logout
 from django.contrib.auth.views import LogoutView
+from django.utils import timezone
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect
@@ -170,6 +171,14 @@ def suite_logout_endpoint(request):
         from keel.core.views import suite_logout_endpoint
         path('suite/logout/', suite_logout_endpoint, name='suite_logout'),
     """
+    if request.user.is_authenticated:
+        # Stamp the suite-wide logout epoch so peer products can detect
+        # this on their next request and tear down their stale local
+        # session. .update() avoids signal noise and is atomic.
+        User = get_user_model()
+        User.objects.filter(pk=request.user.pk).update(
+            last_logout_at=timezone.now(),
+        )
     auth_logout(request)
     next_url = request.GET.get('next') or request.POST.get('next') or ''
     if not _is_allowed_docklabs_redirect(next_url):

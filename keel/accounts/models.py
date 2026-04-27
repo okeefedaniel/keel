@@ -171,6 +171,11 @@ class KeelUser(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Suite-wide logout epoch. Stamped by Keel's /suite/logout/ endpoint
+    # so consumer products can detect that a user logged out elsewhere
+    # and invalidate their per-product Django session on the next request.
+    last_logout_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     class Meta:
         db_table = 'keel_user'
         verbose_name = _('user')
