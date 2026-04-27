@@ -214,62 +214,66 @@ def invitation_list(request):
 @admin_required
 @require_POST
 def send_invitation(request):
-    """Create and send an invitation to a new or existing user."""
+    """Create per-product invitations from the matrix form."""
     email = request.POST.get('email', '').strip().lower()
-    product = request.POST.get('product', '').strip()
-    role = request.POST.get('role', '').strip()
-    is_beta_tester = request.POST.get('is_beta_tester') == '1'
+    if not email:
+        messages.error(request, 'Email is required.')
+        return redirect('keel_accounts:invitation_list')
 
-    if not email or not product or not role:
-        messages.error(request, 'Email, product, and role are required.')
+    selected = request.POST.getlist('products')
+    if not selected:
+        messages.error(request, 'Select at least one product.')
         return redirect('keel_accounts:invitation_list')
 
     days = getattr(settings, 'KEEL_INVITATION_EXPIRY_DAYS', 7)
     expires_at = timezone.now() + timedelta(days=days)
 
-    # "all" = invite to every product in the suite
-    if product == 'all':
-        products_to_invite = [
-            code for code, _ in get_product_choices() if code != 'keel'
-        ]
-    else:
-        products_to_invite = [product]
-
     created_invitations = []
     skipped = []
-    for prod in products_to_invite:
-        existing = Invitation.objects.filter(
+    invalid = []
+    for prod in selected:
+        role = request.POST.get(f'role__{prod}', '').strip()
+        valid_roles = {r for r, _ in get_product_roles(prod) or []}
+        if role not in valid_roles:
+            invalid.append(prod)
+            continue
+        is_beta = request.POST.get(f'beta__{prod}') == '1'
+
+        if Invitation.objects.filter(
             email=email, product=prod, status='pending',
-        ).first()
-        if existing:
+        ).exists():
             skipped.append(prod)
             continue
 
-        inv = Invitation.objects.create(
+        created_invitations.append(Invitation.objects.create(
             email=email,
             product=prod,
             role=role,
-            is_beta_tester=is_beta_tester,
+            is_beta_tester=is_beta,
             invited_by=request.user,
             expires_at=expires_at,
-        )
-        created_invitations.append(inv)
+        ))
 
+    if invalid:
+        messages.error(
+            request,
+            f'Invalid role for: {", ".join(invalid)}.',
+        )
     if skipped:
         messages.warning(
             request,
             f'Pending invitation already exists for {email} → {", ".join(skipped)}.',
         )
-
     if created_invitations:
-        # Use the first invitation's token for the link
         invite_url = request.build_absolute_uri(
             f'/invite/{created_invitations[0].token}/'
         )
-        product_names = ', '.join(inv.product for inv in created_invitations)
+        product_names = ', '.join(
+            f'{inv.product} ({inv.role})' for inv in created_invitations
+        )
         messages.success(
             request,
-            f'Invitation created for {email} → {product_names} ({role}). '
+            f'Invitations created for {email} → {product_names}. '
             f'Share this link: {invite_url}',
         )
         logger.info('Admin %s created invitation(s): %s', request.user, created_invitations)

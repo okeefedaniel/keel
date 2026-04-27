@@ -1,4 +1,5 @@
 {% extends base_template|default:"base.html" %}
+{% load keel_tags %}
 
 {% block title %}Invitations{% endblock %}
 
@@ -10,39 +11,54 @@
   <div class="card mb-4">
     <div class="card-header"><strong>Send Invitation</strong></div>
     <div class="card-body">
-      <form method="post" action="{% url 'keel_accounts:send_invitation' %}" class="row g-2 align-items-end">
+      <form method="post" action="{% url 'keel_accounts:send_invitation' %}">
         {% csrf_token %}
-        <div class="col-md-3">
+        <div class="mb-3">
           <label class="form-label small text-muted">Email</label>
           <input type="email" name="email" class="form-control" placeholder="user@example.com" required>
         </div>
-        <div class="col-md-3">
-          <label class="form-label small text-muted">Product</label>
-          <select name="product" id="inv-product" class="form-select" required>
-            <option value="">Select product...</option>
-            <option value="all">All Products (Full Suite)</option>
+
+        <table class="table table-sm align-middle mb-3">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 3rem;">
+                <input type="checkbox" id="inv-master" class="form-check-input" checked
+                       title="Select / deselect all">
+              </th>
+              <th>Product</th>
+              <th>Role</th>
+              <th style="width: 8rem;" class="text-center">Beta Tester</th>
+            </tr>
+          </thead>
+          <tbody>
             {% for value, label in products %}
-            <option value="{{ value }}">{{ label }}</option>
+              {% if value != 'keel' %}
+              <tr>
+                <td>
+                  <input type="checkbox" name="products" value="{{ value }}"
+                         class="form-check-input inv-product-row" checked>
+                </td>
+                <td>{{ label }}</td>
+                <td>
+                  <select name="role__{{ value }}" class="form-select form-select-sm">
+                    {% for role_value, role_label in product_roles|dict_get:value %}
+                    <option value="{{ role_value }}">{{ role_label }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td class="text-center">
+                  <input type="checkbox" name="beta__{{ value }}" value="1"
+                         class="form-check-input">
+                </td>
+              </tr>
+              {% endif %}
             {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label small text-muted">Role</label>
-          <select name="role" id="inv-role" class="form-select" required>
-            <option value="">Select product first...</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <div class="form-check mt-4">
-            <input type="checkbox" name="is_beta_tester" id="inv-beta" class="form-check-input" value="1">
-            <label class="form-check-label small" for="inv-beta">Beta Tester</label>
-          </div>
-        </div>
-        <div class="col-md-1">
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-envelope-plus me-1"></i>Send
-          </button>
-        </div>
+          </tbody>
+        </table>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-envelope-plus me-1"></i>Send Invitations
+        </button>
       </form>
     </div>
   </div>
@@ -120,31 +136,22 @@
 {% block extra_js %}
 <script>
 (function() {
-  const PRODUCT_ROLES = {{ product_roles_json|safe }};
+  const master = document.getElementById('inv-master');
+  const rows = document.querySelectorAll('.inv-product-row');
+  if (!master) return;
 
-  const productSelect = document.getElementById('inv-product');
-  const roleSelect = document.getElementById('inv-role');
+  master.addEventListener('change', function() {
+    rows.forEach(function(cb) { cb.checked = master.checked; });
+  });
 
-  function updateRoles() {
-    const product = productSelect.value;
-    roleSelect.innerHTML = '';
-
-    if (!product) {
-      roleSelect.innerHTML = '<option value="">Select product first...</option>';
-      return;
-    }
-
-    const roles = PRODUCT_ROLES[product] || [['admin', 'Admin']];
-    roleSelect.innerHTML = '<option value="">Select role...</option>';
-    roles.forEach(function(r) {
-      const opt = document.createElement('option');
-      opt.value = r[0];
-      opt.textContent = r[1];
-      roleSelect.appendChild(opt);
+  rows.forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      const allChecked = Array.from(rows).every(function(r) { return r.checked; });
+      const noneChecked = Array.from(rows).every(function(r) { return !r.checked; });
+      master.checked = allChecked;
+      master.indeterminate = !allChecked && !noneChecked;
     });
-  }
-
-  productSelect.addEventListener('change', updateRoles);
+  });
 })();
 </script>
 {% endblock %}
