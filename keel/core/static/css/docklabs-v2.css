@@ -2049,21 +2049,96 @@ summary:focus-visible,
     margin-top: 0.25rem;
 }
 
-/* Step icon for "How It Works" sections */
-.step-icon {
-    width: 64px;
-    height: 64px;
+/* "How It Works" — vertical timeline (audit F-006).
+   Pairs with the editorial features section: same palette + typography,
+   different geometry. Sequence reads top-to-bottom; the brass column
+   rule + dot markers replace the old centered numeric circles. */
+.how-it-works .how-head {
+    max-width: 640px;
+    margin-bottom: 3.5rem;
+}
+.how-it-works .how-head h2 {
+    font-family: var(--font-display);
+    text-align: left;
+    margin: 0;
+}
+.how-it-works .how-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    position: relative;
+    max-width: 840px;
+}
+.how-it-works .how-timeline::before {
+    content: "";
+    position: absolute;
+    left: 24px;
+    top: 1.85rem;
+    bottom: 1.85rem;
+    width: 1px;
+    background: var(--brass);
+    opacity: 0.45;
+}
+.how-it-works .how-step {
+    display: contents;
+}
+.how-it-works .how-marker {
+    position: relative;
+    padding: 1.5rem 0;
+}
+.how-it-works .how-marker .how-dot {
+    position: absolute;
+    left: 18px;
+    top: 1.85rem;
+    width: 13px;
+    height: 13px;
+    background: var(--bg-warm);
+    border: 2px solid var(--brass);
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--ct-blue) 0%, var(--ct-blue-hover) 100%);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+}
+.how-it-works .how-marker .how-num {
+    display: block;
+    padding: 1.15rem 0 0 52px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--brass);
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+}
+.how-it-works .how-body {
+    padding: 1.5rem 0 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-light);
+}
+.how-it-works .how-step:last-child .how-body {
+    border-bottom: 0;
+}
+.how-it-works .how-body h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--ct-blue);
     font-size: 1.5rem;
-    font-weight: 700;
-    font-family: 'Poppins', sans-serif;
-    margin: 0 auto 1rem auto;
-    box-shadow: 0 4px 12px rgba(26, 58, 107, 0.25);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.5rem;
+}
+.how-it-works .how-body p {
+    font-family: var(--font-sans);
+    color: var(--text-secondary);
+    line-height: 1.6;
+    font-size: 1rem;
+    margin: 0;
+    max-width: 560px;
+}
+@media (max-width: 600px) {
+    .how-it-works .how-timeline { grid-template-columns: 80px 1fr; }
+    .how-it-works .how-timeline::before { left: 14px; }
+    .how-it-works .how-marker .how-dot { left: 8px; }
+    .how-it-works .how-marker .how-num { padding-left: 36px; font-size: 0.75rem; }
+    .how-it-works .how-body { padding-left: 1.25rem; }
+    .how-it-works .how-body h3 { font-size: 1.25rem; }
 }
 
 /* Legacy `.feature-card` — still used by helm's "DockLabs Fleet" product grid
@@ -2213,8 +2288,8 @@ summary:focus-visible,
     padding: 6rem 0 7rem;
 }
 .landing-section.how-it-works {
-    /* tight — pairs visually with features above */
-    padding: 4rem 0;
+    /* breathes — editorial timeline needs vertical room (F-006) */
+    padding: 5rem 0 6rem;
 }
 .landing-section.cta-band {
     /* breathes — last impression before the footer */
@@ -2225,10 +2300,6 @@ summary:focus-visible,
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 2.5rem;
-}
-.landing-section.how-it-works h2 {
-    /* left-aligned to match features (audit F-004) */
-    text-align: left;
 }
 .landing-section .section-intro {
     color: var(--text-secondary);

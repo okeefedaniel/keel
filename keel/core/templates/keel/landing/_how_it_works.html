@@ -16,18 +16,25 @@ Optional outer params:
     title: section heading (defaults to "How It Works")
 {% endcomment %}
 {% if steps %}
-<section class="landing-section alt how-it-works">
+<section class="landing-section how-it-works">
   <div class="container">
-    <h2>{{ title|default:"How It Works" }}</h2>
-    <div class="row g-4 text-center">
-      {% for step in steps %}
-      <div class="col-md-6 col-lg-3">
-        <div class="step-icon">{{ forloop.counter }}</div>
-        <h3>{{ step.title }}</h3>
-        <p class="text-muted">{{ step.description }}</p>
-      </div>
-      {% endfor %}
+    <div class="how-head">
+      <h2>{{ title|default:"How It Works" }}</h2>
     </div>
+    <ol class="how-timeline">
+      {% for step in steps %}
+      <li class="how-step">
+        <div class="how-marker" aria-hidden="true">
+          <span class="how-dot"></span>
+          <span class="how-num">STEP {{ forloop.counter|stringformat:"02d" }}</span>
+        </div>
+        <div class="how-body">
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.description }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
   </div>
 </section>
 {% endif %}
