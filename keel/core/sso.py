@@ -266,12 +266,18 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
         if _is_keel_provider(sociallogin):
             claims = _extract_keel_claims(sociallogin)
             if hasattr(request, 'session'):
+                from django.utils import timezone
                 request.session['keel_oidc_claims'] = {
                     'product_access': claims.get('product_access') or {},
                     'is_state_user': bool(claims.get('is_state_user')),
                     'agency_abbr': claims.get('agency_abbr') or '',
                     'sub': claims.get('sub') or '',
                 }
+                # Marker used by SessionFreshnessMiddleware to detect
+                # that the user has logged out at Keel since this
+                # session was established. Compared against the
+                # last_logout_at value returned by /oauth/session-status/.
+                request.session['keel_oidc_login_at'] = timezone.now().isoformat()
             email = claims.get('email', '')
             preferred = (claims.get('preferred_username') or '').strip()
             if not sociallogin.is_existing:

@@ -7,6 +7,7 @@ from django.urls import include, path
 from keel.accounts.forms import LoginForm
 from keel.core.demo import demo_login_view
 from keel.core.views import favicon_view, robots_txt, suite_logout_endpoint
+from keel.oidc.views import session_status as oidc_session_status
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
 
@@ -87,6 +88,11 @@ urlpatterns = [
     #   /oauth/.well-known/openid-configuration      OIDC discovery
     #   /oauth/.well-known/jwks.json                 public signing keys
     path('oauth/', include('oauth2_provider.urls', namespace='oauth2_provider')),
+
+    # Suite-wide session-status lookup. Peer products poll this from
+    # SessionFreshnessMiddleware to detect that a user logged out at
+    # Keel from another product and tear down their stale local session.
+    path('oauth/session-status/', oidc_session_status, name='session_status'),
 
     # Keel admin modules
     path('keel/accounts/', include('keel.accounts.urls')),
