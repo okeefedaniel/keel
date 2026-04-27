@@ -217,6 +217,13 @@ a:hover { color: var(--ct-blue-hover); }
    JetBrains Mono for codes/data. Three voices for
    three data zones.
    ============================================= */
+html {
+    /* Prevents font-family: Times leak on the root element (audit F-005).
+       Body sets the same font, but anything that inherits from <html>
+       directly (widgets, fallbacks, non-standard elements) was hitting
+       the browser default. */
+    font-family: var(--font-sans);
+}
 body {
     font-family: var(--font-sans);
     background: var(--bg-page);
