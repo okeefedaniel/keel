@@ -18,14 +18,17 @@ Configuration:
     DEMO_ROLES = ['admin', 'analyst']   # roles to show buttons for
     LOGIN_REDIRECT_URL = '/dashboard/'  # where to go after login
 
-Convention:
-    Username = role name (e.g., 'admin', 'legislative_aid')
-    Password = DEMO_PASSWORD env var (all accounts)
+Auth contract:
+    Demo users are seeded with `set_unusable_password()` — they have no
+    real Django password hash. The only entry path is `demo_login_view`,
+    which short-circuits authentication after checking the role allowlist,
+    DEMO_MODE, and the rate limit. The standard `/accounts/login/` form
+    cannot log a demo user in (no password to verify against), which
+    closes the parallel attack surface that the historical shared
+    `DEMO_PASSWORD` opened up.
 """
-import os
-
 from django.conf import settings
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import get_user_model, login
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect
@@ -44,34 +47,6 @@ def _error(request, message, status, login_url='/accounts/login/'):
         return JsonResponse({'error': message}, status=status)
     messages.error(request, message)
     return redirect(login_url)
-
-_INSECURE_DEMO_PASSWORD = 'demo2026!'  # noqa: secret-scan — tripwire sentinel; refused at boot, see _validate_demo_password
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', '')
-
-
-def _validate_demo_password():
-    """Refuse to boot with the publicly-known demo password.
-
-    Demo sites are advertised entry points (`demo-*.docklabs.ai`); the
-    suite-wide hardcoded fallback `demo2026!` would otherwise let any
-    visitor log in as the demo admin.
-    """
-    try:
-        demo_mode = getattr(settings, 'DEMO_MODE', False)
-    except Exception:
-        # Settings not configured (tooling import); next real boot will catch it.
-        return
-    if not demo_mode:
-        return
-    if not DEMO_PASSWORD or DEMO_PASSWORD == _INSECURE_DEMO_PASSWORD:
-        from django.core.exceptions import ImproperlyConfigured
-        raise ImproperlyConfigured(
-            'DEMO_MODE=True requires a non-default DEMO_PASSWORD env var. '
-            'Set DEMO_PASSWORD to a unique value per deployment.'
-        )
-
-
-_validate_demo_password()
 
 # Display labels and icons for common roles across DockLabs products.
 # Roles missing from this dict still work — get_role_display() generates
@@ -195,15 +170,23 @@ def demo_login_view(request):
     if role not in allowed_roles:
         return _error(request, f'Invalid demo role: {role}', 400)
 
-    user = authenticate(request, username=role, password=DEMO_PASSWORD)
-    if user is not None:
-        login(request, user)
-        redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/')
-        return redirect(redirect_url)
+    User = get_user_model()
+    try:
+        user = User.objects.get(username=role)
+    except User.DoesNotExist:
+        return _error(
+            request,
+            f'Demo user "{role}" is not seeded on this instance yet. '
+            'Please try a different role or contact support.',
+            500,
+        )
 
-    return _error(
-        request,
-        f'Demo user "{role}" is not seeded on this instance yet. '
-        'Please try a different role or contact support.',
-        500,
-    )
+    if not user.is_active:
+        return _error(request, f'Demo user "{role}" is inactive', 403)
+
+    # Demo users have no usable password; bypass `authenticate()` entirely.
+    # Security boundary is the role allowlist + DEMO_MODE gate + rate limit
+    # checked above, not credential verification.
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/')
+    return redirect(redirect_url)

@@ -4,19 +4,20 @@ Discovers FK relationships dynamically so it works with any product's models.
 Reassigns data from duplicate demo users to the canonical one, then deletes
 the duplicates.
 
+All demo users are reset to unusable passwords on every run — login is
+exclusively through `keel.core.demo.demo_login_view`. Running this command
+on a legacy demo DB also wipes any lingering shared-password hash from the
+pre-0.20 era.
+
 Usage:
     python manage.py cleanup_demo_users
     python manage.py cleanup_demo_users --dry-run
 """
-import os
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 User = get_user_model()
-
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
 
 
 class Command(BaseCommand):
@@ -72,7 +73,7 @@ class Command(BaseCommand):
             self.stdout.write(f'  Creating demo user: {role}')
             if not dry_run:
                 user = User(username=role)
-                user.set_password(DEMO_PASSWORD)
+                user.set_unusable_password()
                 if hasattr(user, 'role'):
                     user.role = role
                 if hasattr(user, 'is_staff'):
@@ -85,9 +86,10 @@ class Command(BaseCommand):
         canonical = users[0]
         duplicates = users[1:]
 
-        # Reset the canonical user's password
+        # Reset the canonical user to unusable password (idempotent; also
+        # converges legacy demo DBs that still carry the historical hash).
         if not dry_run:
-            canonical.set_password(DEMO_PASSWORD)
+            canonical.set_unusable_password()
             if hasattr(canonical, 'is_staff'):
                 canonical.is_staff = role in ('admin', 'system_admin')
             canonical.save()

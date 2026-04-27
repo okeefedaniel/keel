@@ -18,7 +18,7 @@ import re
 import sys
 import traceback
 
-from .config import DEMO_PASSWORD, PRODUCTS
+from .config import PRODUCTS
 from .result import TestResult
 
 
@@ -144,12 +144,13 @@ import django
 django.setup()
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.test import Client
 
 if 'testserver' not in settings.ALLOWED_HOSTS and '*' not in settings.ALLOWED_HOSTS:
     settings.ALLOWED_HOSTS.append('testserver')
 
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
+User = get_user_model()
 results = []
 
 
@@ -230,13 +231,17 @@ auth_urls = {auth_urls}
 for role in demo_roles:
     section = f'Role: {{role}}'
     rc = Client()
-    creds = dict(username=role)
-    creds['password'] = DEMO_PASSWORD
-    login_ok = rc.login(**creds)
+    # Demo users have unusable passwords (keel >= 0.20.1); use force_login.
+    try:
+        demo_user = User.objects.get(username=role)
+        rc.force_login(demo_user)
+        login_ok = True
+    except User.DoesNotExist:
+        login_ok = False
     check(section, login_ok, f'{{role}} can log in')
 
     if not login_ok:
-        fail(section, f'Skipping {{role}} page tests — login failed')
+        fail(section, f'Skipping {{role}} page tests — user not seeded')
         continue
 
     # Test all pages for this role

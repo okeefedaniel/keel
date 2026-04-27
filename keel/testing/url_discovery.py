@@ -63,10 +63,15 @@ try:
     ok(section, f'Discovered {len(discovered)} parameterless URLs',
        f'{len(new_urls)} new, {len(already_tested)} already covered')
 
-    # Test each discovered URL as the first authenticated role
+    # Test each discovered URL as the first authenticated role.
+    # Demo users have unusable passwords (keel >= 0.20.1); use force_login.
     if demo_roles:
         disc_client = Client()
-        disc_client.login(username=demo_roles[0], password=DEMO_PASSWORD)
+        try:
+            disc_user = User.objects.get(username=demo_roles[0])
+            disc_client.force_login(disc_user)
+        except User.DoesNotExist:
+            disc_user = None
         tested = 0
         errors = 0
         for url in new_urls:

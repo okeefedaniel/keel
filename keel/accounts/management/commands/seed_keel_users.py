@@ -3,18 +3,20 @@
 Dynamically reads roles from PRODUCT_ROLES so every product gets demo
 users without maintaining a separate hardcoded list.
 
+All seeded demo users have unusable passwords (`set_unusable_password()`).
+The only way to log them in is the one-click `demo_login_view` flow at
+`/demo-login/`, gated by DEMO_MODE + role allowlist + rate limit. There is
+no shared demo password and no equivalent of one — the standard auth form
+cannot log demo users in.
+
 Usage:
     python manage.py seed_keel_users
     python manage.py seed_keel_users --product harbor
     python manage.py seed_keel_users --dry-run
 """
-import os
-
 from django.core.management.base import BaseCommand
 
 from keel.accounts.models import Agency, KeelUser, PRODUCT_ROLES, ProductAccess
-
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
 
 # Roles that indicate a superuser / admin account (first match wins).
 _ADMIN_ROLE_KEYWORDS = ('system_admin', 'admin')
@@ -106,7 +108,9 @@ class Command(BaseCommand):
                 'accepted_terms': True,
             },
         )
-        user.set_password(DEMO_PASSWORD)
+        # Always reset to unusable on every seed run — converges legacy demo
+        # DBs that still carry the historical shared-password hash.
+        user.set_unusable_password()
         user.save()
 
         # Grant access to all products being seeded
@@ -158,7 +162,9 @@ class Command(BaseCommand):
         )
         # Ensure is_staff stays True on re-seeds of existing users.
         user.is_staff = True
-        user.set_password(DEMO_PASSWORD)
+        # Always reset to unusable on every seed run — converges legacy demo
+        # DBs that still carry the historical shared-password hash.
+        user.set_unusable_password()
         user.save()
 
         access, access_created = ProductAccess.objects.update_or_create(

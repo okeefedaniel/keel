@@ -16,7 +16,7 @@ import os
 import subprocess
 import tempfile
 
-from .config import DEMO_PASSWORD, PRODUCTS
+from .config import PRODUCTS
 from .result import TestResult
 
 logger = logging.getLogger(__name__)
@@ -124,7 +124,6 @@ from django.contrib.auth import get_user_model
 if 'testserver' not in settings.ALLOWED_HOSTS and '*' not in settings.ALLOWED_HOSTS:
     settings.ALLOWED_HOSTS.append('testserver')
 
-DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'demo' + '2026!')
 User = get_user_model()
 results = []
 WORKFLOWS = {workflows_json}
@@ -159,10 +158,19 @@ def get_csrf(client, url):
 
 
 def login_as(role):
-    """Login and return a Client for the given demo role."""
+    """Login and return a Client for the given demo role.
+
+    Demo users have unusable passwords (keel >= 0.20.1), so use
+    `force_login` to bypass authentication after looking up the user
+    by username.
+    """
+    try:
+        user = User.objects.get(username=role)
+    except User.DoesNotExist:
+        return None
     c = Client(enforce_csrf_checks=False)
-    ok_ = c.login(username=role, password=DEMO_PASSWORD)
-    return c if ok_ else None
+    c.force_login(user)
+    return c
 
 
 def post_form(client, url, data, section, label):
