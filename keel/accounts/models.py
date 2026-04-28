@@ -388,6 +388,14 @@ class Invitation(models.Model):
         help_text=_('Grant beta tester status when invitation is accepted.'),
     )
 
+    batch_id = models.UUIDField(
+        null=True, blank=True, db_index=True,
+        help_text=_(
+            'Groups invitations created in the same admin submission so that '
+            'accepting any token in the batch accepts all of them.'
+        ),
+    )
+
     invited_by = models.ForeignKey(
         KeelUser, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='sent_invitations',

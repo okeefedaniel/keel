@@ -10,6 +10,7 @@ product's urls.py:
 """
 import json
 import logging
+import uuid
 from datetime import timedelta
 
 from django.conf import settings
@@ -228,6 +229,7 @@ def send_invitation(request):
 
     days = getattr(settings, 'KEEL_INVITATION_EXPIRY_DAYS', 7)
     expires_at = timezone.now() + timedelta(days=days)
+    batch_id = uuid.uuid4()
 
     created_invitations = []
     skipped = []
@@ -251,6 +253,7 @@ def send_invitation(request):
             product=prod,
             role=role,
             is_beta_tester=is_beta,
+            batch_id=batch_id,
             invited_by=request.user,
             expires_at=expires_at,
         ))
@@ -266,8 +269,13 @@ def send_invitation(request):
             f'Pending invitation already exists for {email} → {", ".join(skipped)}.',
         )
     if created_invitations:
-        invite_links = [
-            (inv, request.build_absolute_uri(f'/invite/{inv.token}/'))
+        # Any token in the batch accepts the whole batch — pick the first.
+        accept_url = request.build_absolute_uri(
+            f'/invite/{created_invitations[0].token}/'
+        )
+        product_lines = [
+            f'  • {inv.product.title()} — {inv.role}'
+            f'{" (beta tester)" if inv.is_beta_tester else ""}'
             for inv in created_invitations
         ]
         product_names = ', '.join(
@@ -277,25 +285,20 @@ def send_invitation(request):
         # Send the actual invitation email.
         try:
             inviter = request.user.get_full_name() or request.user.email
-            body_lines = [
-                f'{inviter} has invited you to the DockLabs suite.',
+            body = '\n'.join([
+                f'{inviter} has invited you to DockLabs.',
                 '',
-                'Click the link for each product below to accept access:',
+                'You have been granted access to:',
+                *product_lines,
                 '',
-            ]
-            for inv, url in invite_links:
-                beta = ' (beta tester)' if inv.is_beta_tester else ''
-                body_lines.append(
-                    f'• {inv.product.title()} — {inv.role}{beta}\n  {url}'
-                )
-            body_lines += [
+                f'Click here to accept all access in one step: {accept_url}',
                 '',
-                'Each link expires in '
+                f'This link expires in '
                 f'{getattr(settings, "KEEL_INVITATION_EXPIRY_DAYS", 7)} days.',
-            ]
+            ])
             send_mail(
                 subject=f'You have been invited to DockLabs ({len(created_invitations)} product{"s" if len(created_invitations) != 1 else ""})',
-                message='\n'.join(body_lines),
+                message=body,
                 from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
                 recipient_list=[email],
                 fail_silently=False,
@@ -311,12 +314,10 @@ def send_invitation(request):
                 f'Sent invitation email to {email} → {product_names}.',
             )
         else:
-            # Fallback: surface the first link so the admin can hand-share.
             messages.warning(
                 request,
                 f'Invitations created for {email} → {product_names}, but the '
-                f'email failed to send. First accept link: {invite_links[0][1]} '
-                f'(see the invitations table below for all links).',
+                f'email failed to send. Accept link: {accept_url}',
             )
         logger.info('Admin %s created invitation(s): %s', request.user, created_invitations)
 
@@ -410,18 +411,51 @@ def accept_invitation(request, token):
             )
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
-        # Grant product access
-        access = invitation.accept(user)
-        messages.success(
-            request,
-            f'Welcome! You now have access to {invitation.product}.',
-        )
+        # Grant product access — accept the whole batch if this invitation
+        # was part of a multi-product invite, otherwise just this one row.
+        if invitation.batch_id:
+            siblings = list(Invitation.objects.filter(
+                batch_id=invitation.batch_id,
+                email=invitation.email,
+                status='pending',
+            ))
+        else:
+            siblings = [invitation]
+
+        accepted = []
+        for inv in siblings:
+            if inv.is_usable:
+                inv.accept(user)
+                accepted.append(inv.product)
+
+        if len(accepted) == 1:
+            messages.success(
+                request,
+                f'Welcome! You now have access to {accepted[0]}.',
+            )
+        else:
+            messages.success(
+                request,
+                f'Welcome! You now have access to: {", ".join(accepted)}.',
+            )
 
         # Redirect to the product
         redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/')
         return redirect(redirect_url)
 
+    # GET: list all sibling invitations in the batch so the recipient sees
+    # the full set they're about to accept.
+    if invitation.batch_id:
+        batch_invitations = list(Invitation.objects.filter(
+            batch_id=invitation.batch_id,
+            email=invitation.email,
+            status='pending',
+        ))
+    else:
+        batch_invitations = [invitation]
+
     return render(request, 'accounts/accept_invitation.html', {
         'invitation': invitation,
+        'batch_invitations': batch_invitations,
         'user_exists': request.user.is_authenticated,
     })
