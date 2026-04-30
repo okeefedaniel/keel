@@ -61,9 +61,13 @@ ROLE_DISPLAY = {
     'foia_attorney': {'label': 'FOIA Attorney', 'icon': 'bi-briefcase', 'color': 'warning'},
     'analyst': {'label': 'Analyst', 'icon': 'bi-graph-up', 'color': 'info'},
     'executive': {'label': 'Executive', 'icon': 'bi-bar-chart-line', 'color': 'secondary'},
-    'act_admin': {'label': 'AdvanceCT Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
-    'act_relationship_mgr': {'label': 'AdvanceCT RM', 'icon': 'bi-person-lines-fill', 'color': 'primary'},
-    'act_analyst': {'label': 'AdvanceCT Analyst', 'icon': 'bi-graph-up', 'color': 'info'},
+    # Demo branding is intentionally neutral ("Quasi") even though these role
+    # slugs map to AdvanceCT in production beacon. ROLE_DISPLAY only feeds the
+    # demo login buttons and the get_role_display() label inside DEMO_MODE,
+    # both of which must stay deployment-neutral.
+    'act_admin': {'label': 'Quasi Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
+    'act_relationship_mgr': {'label': 'Quasi RM', 'icon': 'bi-person-lines-fill', 'color': 'primary'},
+    'act_analyst': {'label': 'Quasi Analyst', 'icon': 'bi-graph-up', 'color': 'info'},
     'quasi_rm': {'label': 'Quasi RM', 'icon': 'bi-building', 'color': 'secondary'},
     # Admiralty
     'foia_manager': {'label': 'FOIA Manager', 'icon': 'bi-folder2-open', 'color': 'warning'},

@@ -19,6 +19,8 @@ from django.conf import settings
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
+from keel.core.utils import is_suite_mode
+
 
 def _safe_reverse(url_name):
     """Return the URL for *url_name*, or ``None`` if it is not registered."""
@@ -112,6 +114,11 @@ def site_context(request):
         'PRODUCT_SUBTITLE': getattr(settings, 'KEEL_PRODUCT_SUBTITLE', ''),
         'CURRENT_YEAR': timezone.now().year,
         'DEMO_MODE': demo_mode,
+        # SUITE_MODE — true when this product federates auth to Keel IdP and
+        # is NOT in demo mode. Templates use this to hide UI surfaces that
+        # would dead-end in suite deployments (self-registration, "Add User"
+        # admin links, etc.) per the standalone/suite/demo contract.
+        'SUITE_MODE': is_suite_mode(),
     }
 
     # ── Auth URLs for the shared login card ──────────────────────────
