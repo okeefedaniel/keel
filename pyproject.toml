@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sso = ["django-allauth>=65.0"]
+sso = ["django-allauth>=65.16.1"]
 foia = ["anthropic>=0.40"]
 alerts = ["requests>=2.30"]  # for webhook notifications
 sms = ["twilio>=9.0"]  # for SMS notifications
