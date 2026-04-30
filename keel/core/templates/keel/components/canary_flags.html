@@ -1,0 +1,30 @@
+{% comment %}
+Inline canary flag chips. Pass `canary` = the dict returned by
+`keel.ops.canary.build_canary_payload(...)`.
+
+Renders one chip per flag (green when False, red when True), plus a
+small "raw JSON" link that opens the underlying endpoint in a new tab
+for debugging. Intended for staff-only sub-cards on dashboards.
+
+Usage:
+    {% include "keel/components/canary_flags.html" with canary=canary metrics_url="/api/v1/metrics/" %}
+{% endcomment %}
+{% load keel_tags %}
+<div class="d-flex flex-wrap gap-1 align-items-center">
+    {% for key, label in canary_flag_labels.items %}
+    {% with tripped=canary.flags|dict_get:key %}
+    <span class="pill {% if tripped %}pill-error{% else %}pill-success{% endif %}"
+          style="font-size:.65rem;"
+          title="{% if tripped %}TRIPPED — {{ label }}{% else %}OK — {{ label }}{% endif %}">
+        <i class="bi bi-{% if tripped %}exclamation-triangle-fill{% else %}check-circle-fill{% endif %} me-1"></i>{{ label }}
+    </span>
+    {% endwith %}
+    {% endfor %}
+    {% if metrics_url %}
+    <a href="{{ metrics_url }}" target="_blank" rel="noopener"
+       class="small text-muted text-decoration-none ms-auto"
+       title="Open raw JSON payload">
+        Raw <i class="bi bi-box-arrow-up-right"></i>
+    </a>
+    {% endif %}
+</div>

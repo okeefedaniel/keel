@@ -516,6 +516,58 @@ Suite-wide registry + run log + admin dashboard for scheduled management command
 
 **Why this exists:** Cron jobs were running in production with no visibility. The old pattern (Beacon's `compute_health_scores`, `generate_cadence_reminders`, `send_adoption_report`) had docstring comments saying "run daily via cron" but no record of whether they actually ran, no error capture, no place to find them all in one view. This module adds that observability without changing how scheduling itself works.
 
+## Ops canary (keel.ops)
+
+Suite-wide JSON metrics endpoint + flag chip partial for detecting silent regressions (audit pipeline stopped writing, cron stopped firing, notifications stopped delivering). Designed to be polled by an external monitor (GitHub Actions, BetterUptime, Pingdom, etc.) on a 15-minute cadence and to render inline on staff dashboards.
+
+**Three pieces:**
+
+1. **Payload builder** — `keel.ops.canary.build_canary_payload(extras_callable=None)` returns a dict of counters + four boolean `flags` + a top-level `healthy`. The four flags read entirely from keel-shipped tables:
+   - `audit_silent_24h` — no rows in `settings.KEEL_AUDIT_LOG_MODEL` in 24h.
+   - `cron_silent_24h` — no `keel_scheduling.CommandRun` rows in 24h.
+   - `cron_failures_24h` — at least one `CommandRun(status='error')` in 24h.
+   - `notifications_failing` — at least one `KEEL_NOTIFICATION_LOG_MODEL` row with `success=False` in 24h.
+   A `None` counter (model not installed, table missing, query error) disables its flag — better to surface "not measured" than to false-positive.
+
+2. **View** — `keel.ops.views.canary_view(extras_callable=None)` returns a Django view. Auth: staff session OR `Authorization: Bearer $KEEL_METRICS_TOKEN`. Without the token, no external monitor can reach the canary. The bundled URL include is the no-extras path; products with product-specific gauges build their own thin wrapper:
+
+   ```python
+   # product/api/metrics.py
+   from keel.ops.canary import _safe_count
+   from keel.ops.views import canary_view
+
+   def _product_extras(now, last_24h, last_1h, **_):
+       return {
+           'projects_active': _safe_count('myapp.Project', status='active'),
+           # ...
+       }
+
+   metrics = canary_view(extras_callable=_product_extras)
+   ```
+
+   ```python
+   # product/urls.py
+   path('api/v1/metrics/', metrics, name='metrics')
+   # OR — for products without extras:
+   path('api/v1/metrics/', include('keel.ops.urls')),
+   ```
+
+3. **Inline partial** — `keel/components/canary_flags.html` renders the four flags as colored chips (green = OK, red = tripped) plus a small "raw JSON" link. Staff-only sub-cards on dashboards include this so the same canary state visible to the external poller is visible at a glance in-product:
+
+   ```django
+   {% if user.is_staff and canary %}
+   {% include "keel/components/canary_flags.html" with canary=canary metrics_url="/api/v1/metrics/" %}
+   {% endif %}
+   ```
+
+   The view that renders the dashboard must put `canary` and `canary_flag_labels` (= `keel.ops.canary.FLAG_LABELS`) in the context for staff users — building the payload is cheap (4–6 keel queries + extras).
+
+**Settings:** `KEEL_METRICS_TOKEN` (bearer-auth secret for external pollers). Products can wire their existing env var name into this setting — helm uses `KEEL_METRICS_TOKEN = os.environ.get('HELM_METRICS_TOKEN', '')` so its existing GH Actions secret keeps working without rotation. Reads `KEEL_AUDIT_LOG_MODEL`, `KEEL_NOTIFICATION_MODEL`, `KEEL_NOTIFICATION_LOG_MODEL` (the same standard keel settings used everywhere else) to resolve the canary tables — no new model settings to wire.
+
+**Reference implementation:** Helm's [`api/metrics.py`](../helm/api/metrics.py) is the first consumer — it adds project lifecycle gauges, task-bucket counts, and FOIA queue depth as extras, and is polled by GitHub Actions every 15min via [`.github/workflows/canary.yml`](../helm/.github/workflows/canary.yml) which opens a de-duped `canary`-labeled GitHub issue on failure.
+
+**Why this exists:** Without an external poller hitting `flags.healthy`, a silent regression (audit pipeline broken, cron stopped firing) goes undetected for weeks — see [`incidents/2026-04-25-audit-gap.md`](../helm/incidents/2026-04-25-audit-gap.md), where the Helm audit log went 4 weeks with zero writes before anyone noticed. Centralizing the canary in keel means every product gets the same alert path for free by mounting one URL, and the in-dashboard chip rendering means staff don't need to leave their workflow to read the same state.
+
 ## Communications (keel.comms)
 
 - **Use `keel.comms` for all email communications** that are entity-routed (tied to a grant, request, case, etc.). Do not build product-specific email sending.
