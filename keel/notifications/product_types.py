@@ -11,7 +11,14 @@ from .registry import NotificationType, register
 
 
 def register_all_product_types():
-    """Register notification types for all DockLabs products."""
+    """Register notification types for all DockLabs products.
+
+    Called only on the Keel admin console (gated in apps.ready()) so the
+    Keel admin matrix can display routing across the suite. Product-side
+    deployments register their own runtime types in their own AppConfig.ready()
+    and pick up the cross-cutting Keel platform types via
+    register_keel_platform_types().
+    """
     _register_beacon_types()
     _register_admiralty_types()
     _register_harbor_types()
@@ -20,7 +27,6 @@ def register_all_product_types():
     _register_bounty_types()
     _register_yeoman_types()
     _register_purser_types()
-    _register_keel_types()
 
 
 # =========================================================================
@@ -694,8 +700,13 @@ def _register_purser_types():
 # =========================================================================
 # Keel Platform
 # =========================================================================
-def _register_keel_types():
-    """Keel platform — admin/system notification types."""
+def register_keel_platform_types():
+    """Keel platform — admin/system notification types.
+
+    Cross-cutting types that belong on every deployment (every product
+    mounts keel.requests.urls and emits security alerts). Called
+    unconditionally from KeelNotificationsConfig.ready().
+    """
 
     register(NotificationType(
         key='change_request_submitted',

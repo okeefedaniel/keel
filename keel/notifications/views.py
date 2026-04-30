@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .registry import get_all_types, get_types_by_category
+from .registry import get_types_by_category
 
 logger = logging.getLogger(__name__)
 
@@ -175,9 +175,13 @@ def _boswell_available(types_by_category):
 
 def _save_preferences(request, PrefModel, types_by_category):
     """Process the preferences form POST."""
-    all_types = get_all_types()
+    visible_types = {
+        ntype.key: ntype
+        for types in types_by_category.values()
+        for ntype in types
+    }
 
-    for key, ntype in all_types.items():
+    for key, ntype in visible_types.items():
         if not ntype.allow_mute:
             continue
 
