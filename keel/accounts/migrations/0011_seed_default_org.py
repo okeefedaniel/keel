@@ -130,6 +130,17 @@ def reverse_seed(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # On Postgres, the default `atomic = True` wraps RunPython +
+    # AddConstraint in one transaction. The RunPython's UPDATE on
+    # keel_user fires deferred FK triggers that the subsequent
+    # ALTER TABLE (AddConstraint) can't run alongside —
+    # `cannot ALTER TABLE because it has pending trigger events`.
+    # Splitting them across separate transactions (atomic=False) lets
+    # the data writes commit before the schema change. The RunPython
+    # is idempotent (get_or_create + idempotent_backfill) so a partial
+    # crash + retry is safe.
+    atomic = False
+
     dependencies = [
         ('keel_accounts', '0010_organization'),
     ]
