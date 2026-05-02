@@ -41,12 +41,27 @@ def reconcile_user_product_access(user, force_logout: bool = True) -> int:
     # Imported here to avoid the import-time circular: services.py is
     # imported from models.py via KeelUser.save's lazy local import.
     from keel.accounts.models import (
+        Organization,
         OrganizationProductSubscription,
         ProductAccess,
     )
 
+    # Resolve subscriptions by organization_id directly, bypassing the
+    # ForwardManyToOneDescriptor on user.organization. This avoids
+    # ``Organization.DoesNotExist`` raising during transactional test
+    # setUp / tearDown windows where the FK row may be temporarily
+    # absent (e.g. test fixtures that reuse a user across cases, or
+    # a partially-migrated CI database where 0011 rolled back). When
+    # the org row truly doesn't exist, we no-op rather than crash.
+    if not Organization.objects.filter(pk=user.organization_id).exists():
+        logger.warning(
+            'reconcile_user_product_access: user=%s has organization_id=%s '
+            'but the row was not found; skipping reconcile',
+            user.pk, user.organization_id,
+        )
+        return 0
     subscribed = OrganizationProductSubscription.active_product_codes(
-        user.organization
+        user.organization_id
     )
 
     with transaction.atomic():

@@ -264,6 +264,12 @@ class OrganizationProductSubscription(models.Model):
     def active_product_codes(cls, organization):
         """Return product codes this org actively subscribes to.
 
+        Accepts either an ``Organization`` instance or its primary key
+        (uuid / pk). Passing the pk avoids triggering an FK fetch on
+        an attached ``KeelUser`` instance, which can raise
+        ``Organization.DoesNotExist`` during transactional test
+        windows or partially-migrated CI databases.
+
         One source of truth used by the invitation matrix render path,
         the invitation POST validator, and the accept-time
         re-validation in ``Invitation.accept``. Pin lookups here so
