@@ -205,7 +205,16 @@ OAUTH2_PROVIDER = {
         'profile': 'User profile',
         'email': 'Email address',
         'product_access': 'DockLabs per-product role assignments',
+        # Organization claims (org slug + name) ride on a separate
+        # scope so products that don't need them aren't forced to
+        # accept org-level data in their tokens.
+        'organization': 'DockLabs customer organization',
     },
+    # DEFAULT_SCOPES intentionally does NOT include 'organization' —
+    # only products that have explicitly added it to their
+    # SOCIALACCOUNT_PROVIDERS APP scope list will receive the claim.
+    # Adding it here would force every existing product to accept the
+    # new claim on the next token refresh without a code change.
     'DEFAULT_SCOPES': ['openid', 'profile', 'email', 'product_access'],
     # 1 hour access tokens, 14 day refresh tokens
     'ACCESS_TOKEN_EXPIRE_SECONDS': 3600,

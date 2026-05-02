@@ -2,7 +2,10 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Agency, AuditLog, Invitation, KeelUser, ProductAccess
+from .models import (
+    Agency, AuditLog, Invitation, KeelUser, Organization,
+    OrganizationProductSubscription, ProductAccess,
+)
 
 
 class ProductAccessInline(admin.TabularInline):
@@ -15,14 +18,24 @@ class ProductAccessInline(admin.TabularInline):
 
 @admin.register(KeelUser)
 class KeelUserAdmin(UserAdmin):
-    list_display = ('username', 'email', 'first_name', 'last_name', 'agency', 'is_state_user', 'is_active')
-    list_filter = ('is_state_user', 'is_active', 'is_staff', 'agency')
+    list_display = ('username', 'email', 'organization', 'agency', 'is_state_user', 'is_active')
+    list_filter = ('is_state_user', 'is_active', 'is_staff', 'organization', 'agency')
     search_fields = ('username', 'email', 'first_name', 'last_name')
+    raw_id_fields = ('organization', 'agency')
     inlines = [ProductAccessInline]
 
     fieldsets = UserAdmin.fieldsets + (
         ('Keel Profile', {
-            'fields': ('title', 'phone', 'agency', 'is_state_user', 'accepted_terms', 'accepted_terms_at'),
+            'fields': (
+                'title', 'phone', 'organization', 'agency',
+                'is_state_user', 'accepted_terms', 'accepted_terms_at',
+            ),
+            'description': (
+                'Note: changing organization triggers immediate ProductAccess '
+                'reconciliation — the user is logged out of every product and '
+                'any access not covered by the new org\'s subscriptions is '
+                'revoked.'
+            ),
         }),
     )
 
@@ -77,6 +90,30 @@ class InvitationAdmin(admin.ModelAdmin):
     search_fields = ('email',)
     raw_id_fields = ('invited_by', 'accepted_by')
     readonly_fields = ('token',)
+
+
+class OrganizationProductSubscriptionInline(admin.TabularInline):
+    model = OrganizationProductSubscription
+    extra = 0
+    fields = ('product', 'is_active', 'started_at', 'ends_at')
+
+
+@admin.register(Organization)
+class OrganizationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'agency', 'is_active', 'created_at')
+    list_filter = ('is_active', 'agency')
+    search_fields = ('name', 'slug')
+    raw_id_fields = ('agency',)
+    inlines = [OrganizationProductSubscriptionInline]
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(OrganizationProductSubscription)
+class OrganizationProductSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('organization', 'product', 'is_active', 'started_at', 'ends_at')
+    list_filter = ('is_active', 'product')
+    search_fields = ('organization__name', 'organization__slug', 'product')
+    raw_id_fields = ('organization',)
 
 
 @admin.register(AuditLog)

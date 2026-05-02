@@ -272,6 +272,14 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                     'is_state_user': bool(claims.get('is_state_user')),
                     'agency_abbr': claims.get('agency_abbr') or '',
                     'sub': claims.get('sub') or '',
+                    # Organization claims — present only when the
+                    # product's openid_connect APP scope includes
+                    # 'organization'. Defaults to None when the scope
+                    # isn't requested OR when the user is a cross-org
+                    # superuser. Products consume via
+                    # ProductAccessMiddleware → request.organization_slug.
+                    'organization': claims.get('organization') or None,
+                    'organization_name': claims.get('organization_name') or None,
                 }
                 # Marker used by SessionFreshnessMiddleware to detect
                 # that the user has logged out at Keel since this

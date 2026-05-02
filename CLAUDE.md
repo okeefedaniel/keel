@@ -118,6 +118,19 @@ Before any feature ships that adds cross-product integration, verify:
 
 **Why:** Prevents the "orphan local user" footgun — a user created in Beacon's admin can only reach Beacon and can't SSO. Keeping all user creation in Keel keeps identity coherent across the fleet.
 
+### Organizations & per-org product subscriptions (Layer 2, keel ≥ 0.22)
+
+- **`keel_accounts.Organization` is the customer entity that buys DockLabs.** A state agency, vendor, or internal team. Every non-superuser `KeelUser` belongs to exactly one org via `KeelUser.organization` (FK, `on_delete=PROTECT`). Cross-org superusers (`dokadmin`) leave it null; a `CheckConstraint` enforces the invariant.
+- **`OrganizationProductSubscription` lists which products an org has bought.** Subscription gating happens at TWO places, NOT at the product boundary: (1) Keel's invitation matrix renders only subscribed products and `send_invitation` server-validates the POSTed list against the org's subs, (2) `KeelOIDCValidator` only emits `product_access` claims for products the org subscribes to. Products themselves remain ignorant of org-level subscriptions and continue to read per-user `ProductAccess` from the JWT or DB.
+- **`Agency` vs `Organization` precedence.** They are orthogonal. `KeelUser.agency` is the user's primary agency affiliation and remains the source of truth for the `agency_abbr` JWT claim. `Organization.agency` is the org's primary agency affiliation. They MAY differ for contractors who work across agencies. Do not collapse them.
+- **`KeelUser.organization` change cascades.** Reassigning a user's org runs `reconcile_user_product_access` (in `keel.accounts.services`): deactivates `ProductAccess` rows for products the new org doesn't subscribe to, AND bumps `KeelUser.last_logout_at` so `SessionFreshnessMiddleware` (suite-wide on keel ≥ 0.20.0) tears down stale per-product sessions on the next request. The save-time hook covers admin-edit; the daily `reconcile_org_product_access` management command (registered with `keel.scheduling`) catches anything that bypasses the hook.
+- **Reserved org slugs.** `RESERVED_ORG_SLUGS = {'docklabs-internal'}` is enforced by `Organization.clean()`. The data migration creates the seed default org via `apps.get_model` (which bypasses `clean`) but admin/ORM creation of a new row with a reserved slug is rejected.
+- **OIDC `organization` scope.** New JWT claims `organization` (slug) and `organization_name` ride on a separate `organization` scope. Products that want them must add `'organization'` to their `SOCIALACCOUNT_PROVIDERS['openid_connect']['APPS'][0]['scope']` list. Without it, the claim is scrubbed by `oidc_claim_scope` filtering — same trap as `product_access`. Products that do not request the scope continue to function unchanged (the claim is simply absent from their token; `request.organization_slug` resolves to None).
+- **Cross-org `dokadmin` invitation audit.** When a superuser invites someone to an org other than their own, `send_invitation` emits a `cross_org_invitation` `AuditLog` row (interim mitigation; a follow-up PR will add Django sudo-mode for the dropdown). Filter on `action='cross_org_invitation'` and route to a HIGH-priority alert channel.
+- **Accept-time subscription re-validation.** `Invitation.accept` re-checks the org's current subscription set; an invitation whose product has been unsubscribed since creation transitions to `EXPIRED` and refuses to grant access. Closes the stale-sub gap.
+
+**Why:** A DockLabs customer that buys only Bounty should not see the matrix offer Harbor, Beacon, etc. — and a user moved from a full-suite org to a vendor-only org should not retain Harbor access overnight. Pinning the org concept in Keel keeps products standalone-deployable and concentrates the per-customer-subscription policy in one place.
+
 ## Demo Mode
 
 ### Architecture

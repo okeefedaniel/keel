@@ -5,12 +5,55 @@
 
 {% block content %}
 <div class="container py-4">
-  <h2 class="mb-4">Invitations</h2>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Invitations</h2>
+    {% if request.user.is_superuser and available_orgs %}
+      {# Cross-org admin (dokadmin) can switch the active target org. #}
+      {# Form GETs ?org=<slug>, view persists selection in session. #}
+      <form method="get" class="d-flex align-items-center gap-2">
+        <label class="form-label small text-muted mb-0">Acting on behalf of:</label>
+        <select name="org" class="form-select form-select-sm" style="width: auto;"
+                onchange="this.form.submit()">
+          {% for org in available_orgs %}
+            <option value="{{ org.slug }}"
+                    {% if target_org and org.pk == target_org.pk %}selected{% endif %}>
+              {{ org.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if target_org_error %}
+    <div class="alert alert-warning">{{ target_org_error }}</div>
+  {% endif %}
+
+  {% if target_org %}
+    <p class="text-muted small mb-3">
+      Inviting users into <strong>{{ target_org.name }}</strong>.
+      {% if unsubscribed_products %}
+        Your organization is not subscribed to:
+        <em>{{ unsubscribed_products|join:", " }}</em>.
+        <a href="mailto:info@docklabs.ai?subject=Add product to {{ target_org.slug }}">Request access</a>.
+      {% endif %}
+    </p>
+  {% endif %}
 
   <!-- Send invitation form -->
   <div class="card mb-4">
     <div class="card-header"><strong>Send Invitation</strong></div>
     <div class="card-body">
+      {% if not products %}
+        <p class="text-muted mb-0">
+          {% if target_org %}
+            <strong>{{ target_org.name }}</strong> has no active product subscriptions.
+            No invitations can be sent until at least one is added.
+          {% else %}
+            No target organization selected.
+          {% endif %}
+        </p>
+      {% else %}
       <form method="post" action="{% url 'keel_accounts:send_invitation' %}">
         {% csrf_token %}
         <div class="mb-3">
@@ -60,6 +103,7 @@
           <i class="bi bi-envelope-plus me-1"></i>Send Invitations
         </button>
       </form>
+      {% endif %}
     </div>
   </div>
 

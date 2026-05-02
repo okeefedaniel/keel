@@ -5,15 +5,33 @@ ProductAccess model to control which products a user can reach and
 what role they hold in each.
 
 Invitations let admins invite users to products via email link.
+
+Organizations are the customer entity that buys DockLabs (a state
+agency, vendor, internal team). Each org has a set of subscriptions
+to specific products; users belong to exactly one org. Subscription
+gating happens at invite time and at OIDC claim issuance — products
+themselves remain ignorant of org-level subscriptions and continue
+to read per-user ``ProductAccess``. Organization is orthogonal to
+``Agency`` (the FOIA-side concept): one org may *represent* an agency
+via the optional ``Organization.agency`` FK, but ``user.agency`` is
+the user's primary agency affiliation and remains the source of truth
+for the ``agency_abbr`` JWT claim.
 """
 import secrets
 import uuid
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+
+# Slugs reserved for system-managed organizations. The default org
+# created by the data migration cannot be created (or duplicated) by
+# admins. Any future system-managed slug should be added here.
+RESERVED_ORG_SLUGS = frozenset({'docklabs-internal'})
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +137,146 @@ def get_product_choices():
     return choices
 
 
+# ---------------------------------------------------------------------------
+# Organization — the customer entity that buys DockLabs
+# ---------------------------------------------------------------------------
+class Organization(models.Model):
+    """A DockLabs customer (state agency, vendor, internal team).
+
+    Each org has a set of ``OrganizationProductSubscription`` rows
+    listing which DockLabs products it has bought. Users belong to
+    exactly one org via ``KeelUser.organization``; superusers
+    (cross-org admins like ``dokadmin``) leave it null.
+
+    Subscription gating is enforced at invite time and at OIDC claim
+    issuance only — products do not call back to Keel to check
+    subscription state. This keeps products standalone-deployable.
+
+    The optional ``agency`` FK lets an org be associated with a CT
+    government agency (e.g. DECD-the-org represents DECD-the-agency).
+    Unrelated to ``KeelUser.agency``: the user FK remains the source
+    of truth for the ``agency_abbr`` JWT claim and per-user FOIA
+    scoping. Org and user agency may differ for contractors.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(
+        unique=True, max_length=63,
+        help_text=_(
+            'Stable identifier used in JWT claims and URLs. '
+            'Lowercase letters, digits, hyphens only.'
+        ),
+    )
+    name = models.CharField(max_length=255)
+    agency = models.ForeignKey(
+        'keel_accounts.Agency', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='organizations',
+        help_text=_(
+            'Optional link to the FOIA agency this org represents. '
+            'Independent of KeelUser.agency.'
+        ),
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'keel_organization'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        super().clean()
+        # Reserved slugs cannot be created via admin/forms after the
+        # initial migration seeds them. ``_state.adding`` is True only
+        # on insert (new row) and False on update — so admins can
+        # still rename or deactivate the seeded default org via admin.
+        # The data migration uses ``apps.get_model`` which returns a
+        # historical model without this hook, so the seed itself is
+        # not blocked.
+        if self.slug in RESERVED_ORG_SLUGS and self._state.adding:
+            raise ValidationError({
+                'slug': _(
+                    f"Slug '{self.slug}' is reserved for system use."
+                ),
+            })
+
+    def save(self, *args, **kwargs):
+        # Run validation on save so direct ORM writes (not just admin
+        # forms) hit the reserved-slug guard. Cheap on a small model.
+        self.full_clean(validate_unique=False)
+        super().save(*args, **kwargs)
+
+    def active_subscription_codes(self):
+        """Return the list of product codes this org actively subscribes to."""
+        return OrganizationProductSubscription.active_product_codes(self)
+
+
+class OrganizationProductSubscription(models.Model):
+    """Which DockLabs products this org has bought access to.
+
+    The set of active rows determines which products the org's
+    members can be invited to and which `product_access` claims a
+    user from this org can carry in their JWT. Mutating this table
+    does NOT immediately revoke existing ``ProductAccess`` rows —
+    that's the job of ``reconcile_user_product_access`` (in
+    ``keel.accounts.services``).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE,
+        related_name='subscriptions',
+    )
+    product = models.CharField(
+        max_length=50,
+        choices=[],  # populated lazily; see _resolve_choices below
+        help_text=_('Product code (e.g. harbor, beacon).'),
+    )
+    is_active = models.BooleanField(default=True)
+    started_at = models.DateField(default=timezone.now)
+    ends_at = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'keel_org_product_subscription'
+        unique_together = [('organization', 'product')]
+        ordering = ['organization', 'product']
+
+    def __str__(self):
+        return f'{self.organization} → {self.product}'
+
+    def clean(self):
+        super().clean()
+        valid_codes = {code for code, _label in get_product_choices()}
+        if self.product not in valid_codes:
+            raise ValidationError({
+                'product': _(
+                    f"'{self.product}' is not a known product code. "
+                    f"Add it to KEEL_EXTRA_PRODUCTS if it's a new app."
+                ),
+            })
+
+    @classmethod
+    def active_product_codes(cls, organization):
+        """Return product codes this org actively subscribes to.
+
+        One source of truth used by the invitation matrix render path,
+        the invitation POST validator, and the accept-time
+        re-validation in ``Invitation.accept``. Pin lookups here so
+        future caching/optimization happens in one place.
+        """
+        if organization is None:
+            return []
+        return list(
+            cls.objects.filter(organization=organization, is_active=True)
+                .values_list('product', flat=True)
+        )
+
+
 def get_product_roles(product=None):
     """Return role choices for a product, or all roles keyed by product.
 
@@ -163,6 +321,21 @@ class KeelUser(AbstractUser):
         help_text=_('Designates whether this user belongs to a state agency.'),
     )
 
+    # The DockLabs customer entity this user belongs to. Nullable
+    # so cross-org superusers (dokadmin) can span all customers.
+    # The model-level invariant (in ``clean()``) enforces that any
+    # non-superuser must have an organization. The data migration
+    # backfills every existing user to a sentinel "DockLabs Internal"
+    # org so the rollout is invisible.
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='users',
+        help_text=_(
+            'DockLabs customer org this user belongs to. Required '
+            'for non-superusers; null only for cross-org admins.'
+        ),
+    )
+
     # Terms acceptance
     accepted_terms = models.BooleanField(default=False)
     accepted_terms_at = models.DateTimeField(null=True, blank=True)
@@ -172,19 +345,77 @@ class KeelUser(AbstractUser):
     updated_at = models.DateTimeField(auto_now=True)
 
     # Suite-wide logout epoch. Stamped by Keel's /suite/logout/ endpoint
-    # so consumer products can detect that a user logged out elsewhere
-    # and invalidate their per-product Django session on the next request.
+    # AND by reconcile_user_product_access when an org reassignment
+    # revokes ProductAccess rows. Reusing this column means existing
+    # SessionFreshnessMiddleware infrastructure (deployed across all
+    # 9 products in keel >= 0.20.0) automatically invalidates stale
+    # cross-product sessions on org change — no new column or
+    # middleware extension needed.
     last_logout_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         db_table = 'keel_user'
         verbose_name = _('user')
         verbose_name_plural = _('users')
+        constraints = [
+            # Non-superusers must have an organization. Superusers
+            # (dokadmin) may span all orgs and therefore have null.
+            # Defense-in-depth at the DB level, in addition to the
+            # clean() invariant below.
+            #
+            # Uses ``condition=`` (Django 5.1+) rather than the
+            # deprecated ``check=`` arg.
+            models.CheckConstraint(
+                condition=(
+                    models.Q(organization__isnull=False)
+                    | models.Q(is_superuser=True)
+                ),
+                name='keeluser_org_or_superuser',
+            ),
+        ]
 
     def __str__(self):
         if self.first_name and self.last_name:
             return f"{self.first_name} {self.last_name}"
         return self.username
+
+    def __init__(self, *args, **kwargs):
+        # Snapshot organization_id at instance load so save() can
+        # detect a change and trigger ProductAccess reconciliation.
+        super().__init__(*args, **kwargs)
+        self._original_organization_id = self.organization_id
+
+    def clean(self):
+        super().clean()
+        # Mirror of the DB CheckConstraint as a model-level invariant
+        # so admin forms surface a friendly error instead of relying
+        # on the IntegrityError to bubble up.
+        if not self.is_superuser and self.organization_id is None:
+            raise ValidationError({
+                'organization': _(
+                    'Non-superuser accounts must belong to an organization. '
+                    'Set is_superuser=True for cross-org admins.'
+                ),
+            })
+
+    def save(self, *args, **kwargs):
+        # Detect org change and queue a reconcile after commit. The
+        # reconcile deactivates ProductAccess rows for products the
+        # new org isn't subscribed to, and bumps last_logout_at to
+        # invalidate stale per-product sessions via
+        # SessionFreshnessMiddleware.
+        org_changed = (
+            self.pk is not None
+            and getattr(self, '_original_organization_id', None) != self.organization_id
+        )
+        super().save(*args, **kwargs)
+        if org_changed:
+            # Imported lazily to avoid model-import-time circular.
+            from keel.accounts.services import reconcile_user_product_access
+            reconcile_user_product_access(self, force_logout=True)
+        # Refresh the snapshot so a later save() in the same instance
+        # lifecycle doesn't double-fire.
+        self._original_organization_id = self.organization_id
 
     # ------------------------------------------------------------------
     # Product access helpers
@@ -325,7 +556,12 @@ class ProductAccess(models.Model):
         KeelUser, on_delete=models.CASCADE,
         related_name='product_access',
     )
-    product = models.CharField(max_length=50)
+    # Bundled fix from the eng review (D3): pin choices=get_product_choices()
+    # so typos like 'harbo' fail at form-clean time. choices is advisory
+    # in Django (no migration needed for the column shape) — adding it
+    # closes the typo class for both ProductAccess and the new
+    # OrganizationProductSubscription.
+    product = models.CharField(max_length=50, choices=Product.choices)
     role = models.CharField(
         max_length=50,
         help_text=_('Product-specific role (e.g., program_officer, admin).'),
@@ -405,6 +641,17 @@ class Invitation(models.Model):
         null=True, blank=True, related_name='accepted_invitations',
     )
 
+    # The org granting access. Populated server-side from the
+    # inviter's organization (or the dokadmin session-selected org
+    # for cross-org admins). Nullable so the data migration can
+    # backfill pending pre-rollout invitations to the default org
+    # without breaking acceptance.
+    organization = models.ForeignKey(
+        Organization, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='invitations',
+        help_text=_('DockLabs customer org that granted this invitation.'),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     accepted_at = models.DateTimeField(null=True, blank=True)
@@ -425,9 +672,46 @@ class Invitation(models.Model):
         return self.status == self.Status.PENDING and not self.is_expired
 
     def accept(self, user):
-        """Accept this invitation and grant product access."""
+        """Accept this invitation and grant product access.
+
+        Performs accept-time subscription re-validation (CSO failure
+        mode #4): if the inviter's org no longer subscribes to this
+        invitation's product, the invitation is marked EXPIRED and
+        no ProductAccess row is created. Closes the stale-sub gap
+        between create-time and accept-time.
+        """
         if not self.is_usable:
             raise ValueError('Invitation is no longer valid.')
+
+        # Accept-time subscription re-validation. Only enforced when
+        # the invitation carries an organization (post-rollout
+        # invitations always do; the data migration backfills
+        # pending pre-rollout invites to the default org).
+        if self.organization_id is not None:
+            subscribed = OrganizationProductSubscription.active_product_codes(
+                self.organization
+            )
+            if self.product not in subscribed:
+                self.status = self.Status.EXPIRED
+                self.save(update_fields=['status'])
+                raise ValueError(
+                    f'Your organization is no longer subscribed to '
+                    f'{self.product}. Contact your admin.'
+                )
+
+        # Assign user.organization from the invitation if the user
+        # doesn't already belong to an org. This is the new-user
+        # path: dokadmin invites a fresh email, the user signs up
+        # via the email link, and lands in the inviter's org.
+        # Existing users keep whatever org they already have (cross-
+        # org users are punted to a future M2M shape per the plan).
+        if (
+            self.organization_id is not None
+            and user.organization_id is None
+            and not user.is_superuser
+        ):
+            user.organization_id = self.organization_id
+            user.save(update_fields=['organization'])
 
         access, created = ProductAccess.objects.get_or_create(
             user=user,

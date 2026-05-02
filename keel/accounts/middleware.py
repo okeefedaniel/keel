@@ -57,6 +57,14 @@ class ProductAccessMiddleware:
     def __call__(self, request):
         user = getattr(request, 'user', None)
 
+        # Expose organization claims on every request so views can read
+        # ``request.organization_slug`` / ``request.organization_name``
+        # without re-parsing the session. Defaults to None for
+        # unauthenticated requests, OIDC sessions without the
+        # 'organization' scope, and cross-org superusers.
+        request.organization_slug = None
+        request.organization_name = None
+
         if user and user.is_authenticated and self.product:
             role = None
 
@@ -69,6 +77,16 @@ class ProductAccessMiddleware:
                 product_access = claims.get('product_access') or {}
                 if isinstance(product_access, dict):
                     role = product_access.get(self.product)
+                # Organization claims (post-Layer-2 rollout). Read-only
+                # passthrough — products may use this for analytics,
+                # filtering, or display, but enforcement of subscription
+                # gating lives at the Keel boundary, not here.
+                org_slug = claims.get('organization')
+                if org_slug:
+                    request.organization_slug = org_slug
+                org_name = claims.get('organization_name')
+                if org_name:
+                    request.organization_name = org_name
 
             # 2. Fall back to direct database lookup. This path keeps
             #    standalone deployments working (no Keel IdP) and is also

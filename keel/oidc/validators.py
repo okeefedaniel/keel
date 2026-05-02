@@ -48,6 +48,8 @@ def _build_validator_class():
             'product_access',
             'is_state_user',
             'agency_abbr',
+            'organization',
+            'organization_name',
         })
 
         # django-oauth-toolkit filters OIDC claims by this dict inside
@@ -64,6 +66,12 @@ def _build_validator_class():
             'product_access': 'product_access',
             'is_state_user': 'product_access',
             'agency_abbr': 'product_access',
+            # Organization claims are gated on a separate ``organization``
+            # scope so products that don't need them don't pull org-level
+            # data into their token. Products that DO consume them must
+            # add ``'organization'`` to their openid_connect APP scope.
+            'organization': 'organization',
+            'organization_name': 'organization',
         }
 
         @classmethod
@@ -141,6 +149,26 @@ def _build_validator_class():
                 # Table doesn't exist yet (initial migration) or any other
                 # error: omit the claim rather than failing token issuance.
                 claims['product_access'] = {}
+
+            # Organization claims — what customer this user belongs to.
+            # Wrapped in the same defensive try/except as product_access
+            # so token issuance survives the schema-then-data migration
+            # window where the organization column exists but the table
+            # may be empty (CSO finding A5).
+            try:
+                org = getattr(user, 'organization', None)
+                if org is not None:
+                    claims['organization'] = org.slug
+                    claims['organization_name'] = org.name
+                else:
+                    # Cross-org superusers (dokadmin) emit explicit None
+                    # so consumers can distinguish "user has no org" from
+                    # "claim was scrubbed by missing scope."
+                    claims['organization'] = None
+                    claims['organization_name'] = None
+            except Exception:
+                claims['organization'] = None
+                claims['organization_name'] = None
 
             return claims
 

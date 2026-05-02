@@ -27,9 +27,66 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import (
-    Agency, Invitation, KeelUser, ProductAccess,
-    get_product_choices, get_product_roles,
+    Agency, Invitation, KeelUser, Organization, OrganizationProductSubscription,
+    ProductAccess, get_product_choices, get_product_roles,
 )
+
+
+# Session key for the dokadmin (cross-org superuser) "currently editing
+# this org" selector. Reads/writes go through this constant so the view
+# layer and any future tests speak the same key.
+SUPERUSER_ORG_SESSION_KEY = 'keel_admin_target_org_id'
+
+
+def _resolve_inviter_org(request):
+    """Determine which Organization an admin's invitations should bind to.
+
+    **Implementation invariant (CSO finding S5):** the target org MUST
+    be derived server-side from ``request.user.organization`` for
+    non-superusers. The ``organization`` POST field is read ONLY when
+    ``request.user.is_superuser`` is True, and the value MUST be an
+    active org id resolved via the session (not a hidden form field).
+    For non-superusers, the field is ignored entirely — never trusted,
+    never echoed.
+
+    Returns ``(organization, error_message)``. ``organization=None``
+    only when the admin is a superuser who hasn't selected an org yet
+    AND no default could be inferred (in which case the caller should
+    surface ``error_message`` and not create any invitations).
+    """
+    if not request.user.is_superuser:
+        # Non-superuser: their org is the only legal target. Reading
+        # the POST field would open a tampered-form path; we just
+        # ignore anything sent.
+        org = request.user.organization
+        if org is None:
+            # Defensive — the model invariant blocks this state, but
+            # callers should still get a clean error if it ever happens.
+            return None, (
+                'Your account is not assigned to an organization. '
+                'Contact a DockLabs admin.'
+            )
+        return org, None
+
+    # Superuser path. The org is selected via the session (set on the
+    # invitation_list page via the dokadmin org dropdown). NEVER read
+    # from POST: a stolen dokadmin session shouldn't be able to
+    # silently switch orgs mid-invitation.
+    target_id = request.session.get(SUPERUSER_ORG_SESSION_KEY)
+    if target_id:
+        try:
+            return Organization.objects.get(pk=target_id, is_active=True), None
+        except Organization.DoesNotExist:
+            pass
+    # Fall back to the superuser's own organization (e.g. dokadmin's
+    # personal org, if one was assigned). If they don't have one, the
+    # admin has to pick one before sending invites.
+    if request.user.organization_id:
+        return request.user.organization, None
+    return None, (
+        'No target organization selected. Choose one from the org '
+        'switcher at the top of the invitations page.'
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -194,21 +251,74 @@ def revoke_access(request, access_id):
 # ---------------------------------------------------------------------------
 @admin_required
 def invitation_list(request):
-    """List all invitations with status filtering."""
+    """List all invitations with status filtering, scoped to the inviter's org.
+
+    The matrix on this page only renders products the inviter's org
+    actively subscribes to (CSO + eng-review intent). Products outside
+    the org's subscription set are not greyed out — they are not in
+    the form at all. Server-side validation in ``send_invitation``
+    enforces the same gate against POSTed values.
+    """
+    # Allow superusers to switch the active target org via ?org=<slug>
+    # so the matrix updates without rebuilding the form. Persists in
+    # the session so subsequent POSTs see the selection. Ignored
+    # entirely for non-superusers (their org is already pinned).
+    if request.user.is_superuser:
+        requested = request.GET.get('org', '').strip()
+        if requested:
+            try:
+                org = Organization.objects.get(slug=requested, is_active=True)
+                request.session[SUPERUSER_ORG_SESSION_KEY] = str(org.pk)
+            except Organization.DoesNotExist:
+                messages.warning(request, f"Organization '{requested}' not found.")
+
+    target_org, target_org_error = _resolve_inviter_org(request)
+    subscribed_codes = (
+        OrganizationProductSubscription.active_product_codes(target_org)
+        if target_org else []
+    )
+
     status = request.GET.get('status', '').strip()
-    invitations = Invitation.objects.select_related('invited_by', 'accepted_by')
+    invitations = Invitation.objects.select_related(
+        'invited_by', 'accepted_by', 'organization',
+    )
+
+    # Non-superusers see only their own org's invitations. dokadmin
+    # sees everything (with org column rendered in the table).
+    if not request.user.is_superuser and target_org is not None:
+        invitations = invitations.filter(organization=target_org)
 
     if status:
         invitations = invitations.filter(status=status)
 
     all_roles = get_product_roles()
     all_roles['all'] = get_product_roles('all')
+
+    # Render only subscribed products in the matrix. Products outside
+    # the subscription set are absent (not greyed out) so the admin's
+    # mental model is "what *we* can grant", not "what could exist."
+    all_products = list(get_product_choices())
+    matrix_products = [
+        (code, label) for code, label in all_products if code in subscribed_codes
+    ]
+    unsubscribed = [
+        label for code, label in all_products if code not in subscribed_codes
+    ]
+
     context = {
         'invitations': invitations.order_by('-created_at')[:100],
         'selected_status': status,
-        'products': get_product_choices(),
+        'products': matrix_products,
+        'unsubscribed_products': unsubscribed,
         'product_roles': all_roles,
         'product_roles_json': json.dumps(all_roles),
+        'target_org': target_org,
+        'target_org_error': target_org_error,
+        # For the dokadmin org-switcher dropdown.
+        'available_orgs': (
+            list(Organization.objects.filter(is_active=True).order_by('name'))
+            if request.user.is_superuser else []
+        ),
     }
     return render(request, 'accounts/invitation_list.html', context)
 
@@ -216,7 +326,23 @@ def invitation_list(request):
 @admin_required
 @require_POST
 def send_invitation(request):
-    """Create per-product invitations from the matrix form."""
+    """Create per-product invitations from the matrix form.
+
+    Subscription gating: the inviter's organization must actively
+    subscribe to every product in the POSTed ``products`` list. Out-
+    of-set products are dropped server-side; the user gets a clear
+    error rather than a silently-ignored selection.
+
+    Cross-org dokadmin invites (where the inviter is a superuser AND
+    the selected target org is NOT the inviter's own org) are flagged
+    in the audit log at HIGH priority as the interim mitigation for
+    CSO finding S3 (a follow-up PR will add Django sudo-mode here).
+    """
+    target_org, target_org_error = _resolve_inviter_org(request)
+    if target_org is None:
+        messages.error(request, target_org_error or 'No target organization.')
+        return redirect('keel_accounts:invitation_list')
+
     email = request.POST.get('email', '').strip().lower()
     if not email:
         messages.error(request, 'Email is required.')
@@ -226,6 +352,75 @@ def send_invitation(request):
     if not selected:
         messages.error(request, 'Select at least one product.')
         return redirect('keel_accounts:invitation_list')
+
+    # Server-side subscription validation (CSO finding S5). Filter the
+    # POSTed list against the org's active subscription set; record any
+    # tampered/stale entries as ``unsubscribed`` for a clean error.
+    subscribed_codes = OrganizationProductSubscription.active_product_codes(
+        target_org
+    )
+    unsubscribed_attempts = [p for p in selected if p not in subscribed_codes]
+    selected = [p for p in selected if p in subscribed_codes]
+
+    if unsubscribed_attempts:
+        messages.error(
+            request,
+            f'Your organization "{target_org.name}" is not subscribed to: '
+            f'{", ".join(unsubscribed_attempts)}. Those invitations were not '
+            f'created. Contact DockLabs to add the subscription.',
+        )
+
+    if not selected:
+        # All POSTed products were filtered out as unsubscribed. The
+        # error above already explains why; just bounce.
+        return redirect('keel_accounts:invitation_list')
+
+    # Cross-org dokadmin detection: log HIGH-priority audit row so a
+    # compromised superuser session is detectable in the audit stream.
+    is_cross_org = (
+        request.user.is_superuser
+        and request.user.organization_id is not None
+        and request.user.organization_id != target_org.id
+    )
+    if is_cross_org:
+        logger.warning(
+            'CROSS_ORG_INVITATION: superuser=%s home_org=%s target_org=%s '
+            'invited=%s products=%s — review for compromise',
+            request.user.username,
+            request.user.organization_id,
+            target_org.id,
+            email,
+            selected,
+        )
+        # Best-effort AuditLog row tagged "cross_org_invitation". The
+        # field set matches the standard audit pattern; downstream
+        # tooling can filter on action='cross_org_invitation' and
+        # alert on it.
+        try:
+            from django.apps import apps as django_apps
+            audit_path = getattr(
+                settings, 'KEEL_AUDIT_LOG_MODEL', 'keel_accounts.AuditLog',
+            )
+            AuditLog = django_apps.get_model(audit_path)
+            AuditLog.objects.create(
+                user=request.user,
+                action='cross_org_invitation',
+                entity_type='Organization',
+                entity_id=str(target_org.id),
+                description=(
+                    f'Superuser {request.user.username} invited {email} '
+                    f'to org {target_org.slug} (products: {", ".join(selected)})'
+                ),
+                changes={
+                    'target_org': target_org.slug,
+                    'home_org_id': str(request.user.organization_id),
+                    'invited_email': email,
+                    'products': selected,
+                },
+                ip_address=getattr(request, 'audit_ip', None),
+            )
+        except Exception:  # pragma: no cover — best-effort
+            logger.exception('Failed to write cross-org invitation audit row')
 
     days = getattr(settings, 'KEEL_INVITATION_EXPIRY_DAYS', 7)
     expires_at = timezone.now() + timedelta(days=days)
@@ -255,6 +450,7 @@ def send_invitation(request):
             is_beta_tester=is_beta,
             batch_id=batch_id,
             invited_by=request.user,
+            organization=target_org,
             expires_at=expires_at,
         ))
 
