@@ -399,6 +399,47 @@ class KeelUser(AbstractUser):
             })
 
     def save(self, *args, **kwargs):
+        # Auto-assign the seeded "docklabs-internal" org to non-superuser
+        # accounts that arrive without an organization set. Mirrors the
+        # behavior of the 0011_seed_default_org data migration (which
+        # backfilled every existing user) and keeps the
+        # ``keeluser_org_or_superuser`` CheckConstraint satisfied for:
+        #
+        #   - Test fixtures that create users via ``User.objects.create()``
+        #     without specifying organization (every product's test suite)
+        #   - First-time OIDC sign-ins where the adapter hasn't yet wired
+        #     ``user.organization`` from the JWT's ``organization`` claim
+        #   - Management commands / data scripts that don't know about the
+        #     new column
+        #
+        # Production code that DOES specify an organization (admin form,
+        # invitation accept, future SSO adapter wiring) is unaffected —
+        # the auto-default only fires when ``organization`` is genuinely
+        # unset. A log line surfaces the case so silent fallthroughs are
+        # observable.
+        if (
+            self.organization_id is None
+            and not self.is_superuser
+        ):
+            try:
+                from keel.accounts.models import Organization  # self-import OK
+                default_org = Organization.objects.filter(
+                    slug='docklabs-internal',
+                ).only('id').first()
+                if default_org is not None:
+                    self.organization_id = default_org.id
+                    import logging
+                    logging.getLogger(__name__).info(
+                        'KeelUser %s saved without organization; '
+                        'auto-assigned to docklabs-internal',
+                        self.username or self.email,
+                    )
+            except Exception:
+                # Migration may not have run yet (initial setup); let
+                # the CheckConstraint surface the real failure with a
+                # clean traceback rather than swallow it here.
+                pass
+
         # Detect org change and queue a reconcile after commit. The
         # reconcile deactivates ProductAccess rows for products the
         # new org isn't subscribed to, and bumps last_logout_at to
