@@ -232,7 +232,7 @@ class OrganizationProductSubscription(models.Model):
     )
     product = models.CharField(
         max_length=50,
-        choices=[],  # populated lazily; see _resolve_choices below
+        choices=Product.choices,
         help_text=_('Product code (e.g. harbor, beacon).'),
     )
     is_active = models.BooleanField(default=True)
