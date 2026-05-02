@@ -20,11 +20,18 @@ from django.test import RequestFactory, override_settings
 
 @pytest.fixture
 def auth_request(db):
+    """Authenticated request for a non-superuser. Assigns the seeded
+    'docklabs-internal' org so the new ``keeluser_org_or_superuser``
+    CheckConstraint (added in keel 0.22.0) doesn't reject the insert."""
+    from keel.accounts.models import Organization
+
     User = get_user_model()
+    org = Organization.objects.get(slug='docklabs-internal')
     user = User.objects.create_user(
         username='bell-test',
         email='bell-test@example.com',
         password='x',
+        organization=org,
     )
     req = RequestFactory().get('/')
     req.user = user

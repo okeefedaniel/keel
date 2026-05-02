@@ -23,9 +23,16 @@ ALLOWED_TAGS = {
     'hr',
 }
 
-# Attributes allowed per tag (all others stripped)
+# Attributes allowed per tag (all others stripped).
+#
+# Note: 'rel' is intentionally NOT listed for 'a' — newer nh3 versions
+# (>= 0.2.20) raise ValueError if 'rel' is in the attribute allowlist
+# AND ``link_rel`` is set on nh3.clean(). We use ``link_rel`` below to
+# add ``rel="noopener noreferrer"`` to every external link, so passing
+# 'rel' through directly would clash. nh3 manages the rel attribute
+# entirely from link_rel; any client-supplied rel is replaced.
 ALLOWED_ATTRS = {
-    'a': {'href', 'title', 'target', 'rel'},
+    'a': {'href', 'title', 'target'},
     'img': {'src', 'alt', 'width', 'height'},
     'td': {'colspan', 'rowspan'},
     'th': {'colspan', 'rowspan'},

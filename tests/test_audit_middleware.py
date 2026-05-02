@@ -26,10 +26,12 @@ def test_context_cleared_on_view_exception():
     with pytest.raises(RuntimeError):
         mw(request)
 
-    ctx = get_audit_context()
+    # ``get_audit_context()`` returns ``(user, ip)``; production callers
+    # consume it via tuple unpacking. Mirror that here.
+    user, ip = get_audit_context()
     # Context must be cleared even though get_response raised.
-    assert ctx.get('user') is None
-    assert ctx.get('ip_address') is None
+    assert user is None
+    assert ip is None
 
 
 def test_context_cleared_on_normal_response():
@@ -43,6 +45,6 @@ def test_context_cleared_on_normal_response():
     response = mw(request)
 
     assert response.status_code == 200
-    ctx = get_audit_context()
-    assert ctx.get('user') is None
-    assert ctx.get('ip_address') is None
+    user, ip = get_audit_context()
+    assert user is None
+    assert ip is None
