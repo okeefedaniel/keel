@@ -1,9 +1,14 @@
+{% block product_label %}{{ site_name|default:"DockLabs" }}{% endblock %}{% if priority == 'urgent' %} — URGENT{% elif priority == 'high' %} — High priority{% endif %}
+
 {{ title }}
 
 {{ message }}
 {% if absolute_link %}
-View details: {{ absolute_link }}
+{% block cta_label %}View Details{% endblock %}: {{ absolute_link }}
 {% endif %}
+
 ---
-This notification was sent by {{ site_name }}.
-You can manage your notification preferences in your account settings.
+{% block footer_extra %}Sent by {{ site_name|default:"DockLabs" }}{% if recipient.first_name %} to {{ recipient.first_name }}{% endif %}.{% endblock %}
+Manage your notification preferences at {{ site_name|default:"DockLabs" }} → Settings → Notifications.
+
+DockLabs · Civic Software for Government

@@ -1,42 +1,149 @@
-<!DOCTYPE html>
-<html>
+{% comment %}
+DockLabs notification email — shared template for the entire suite.
+
+Design notes:
+- Table-based layout (most email clients strip flexbox/grid + many strip
+  <style> tags, so we inline the critical CSS too).
+- Web-safe fallback fonts: Poppins is requested, Helvetica/Arial fall
+  back when the recipient's client refuses webfonts (Outlook, most
+  corporate inboxes).
+- Max width 600px — the de facto standard.
+- DockLabs design tokens: navy `#0A2B4E` (--ct-blue), warm paper
+  `#FAF7F2` (--bg-page), success teal for CTAs, brass for warnings.
+- Priority strip on the left edge (4px) — matches the v3 design system.
+- Footer holds the unsubscribe-equivalent link (notification preferences
+  page) — required for compliance + good UX.
+
+Customizing per product:
+- Override `{% block product_label %}` for the header strap (defaults
+  to KEEL_PRODUCT_NAME setting via `site_name` context).
+- Override `{% block cta_label %}` for the button text (defaults to
+  "View Details").
+- Override `{% block footer_extra %}` to add product-specific text
+  (e.g. "BCC'd via Beacon" for the inbound-email notification).
+{% endcomment %}<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
   <title>{{ title }}</title>
-  <style>
-    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; background-color: #f8f8f8; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; background: #fff; }
-    .header { background-color: #00214D; padding: 20px 30px; }
-    .header h1 { color: #fff; font-size: 20px; margin: 0; font-family: 'Poppins', Arial, sans-serif; }
-    .body { padding: 30px; }
-    .body h2 { color: #00214D; font-size: 18px; margin-top: 0; }
-    .body p { line-height: 1.6; color: #333; }
-    .cta { display: inline-block; background-color: #1F64E5; color: #fff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-    .footer { padding: 20px 30px; background-color: #f8f8f8; text-align: center; font-size: 12px; color: #999; }
-    .footer a { color: #1F64E5; text-decoration: none; }
-    .priority-high { border-left: 4px solid #E91C1F; }
-    .priority-urgent { border-left: 4px solid #E91C1F; background-color: #FFF5F5; }
+  <!--[if mso]>
+  <style type="text/css">
+    table { border-collapse: collapse; }
+    .mso-button { padding: 12px 24px !important; }
+  </style>
+  <![endif]-->
+  <style type="text/css">
+    /* Reset for clients that respect <style> */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; min-width: 100%; background-color: #FAF7F2; }
+    a { color: #0A2B4E; }
+    .priority-bar-high { border-left: 4px solid #C77400 !important; }
+    .priority-bar-urgent { border-left: 4px solid #B23A48 !important; }
+    @media only screen and (max-width: 620px) {
+      .container { width: 100% !important; max-width: 100% !important; }
+      .px-pad { padding-left: 24px !important; padding-right: 24px !important; }
+    }
   </style>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>{{ site_name }}</h1>
-    </div>
-    <div class="body {% if priority == 'high' %}priority-high{% elif priority == 'urgent' %}priority-urgent{% endif %}">
-      <h2>{{ title }}</h2>
-      <p>{{ message }}</p>
-      {% if absolute_link %}
-      <a href="{{ absolute_link }}" class="cta">View Details</a>
-      {% endif %}
-    </div>
-    <div class="footer">
-      <p>
-        This notification was sent by <a href="{{ absolute_link }}">{{ site_name }}</a>.<br>
-        You can manage your notification preferences in your account settings.
-      </p>
-    </div>
+<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1A1A1A;">
+  {# Preheader — shown in inbox preview, hidden in body #}
+  <div style="display:none;font-size:1px;color:#FAF7F2;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+    {{ message|truncatewords:20 }}
   </div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#FAF7F2;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        {# ── Main card ─────────────────────────────────────── #}
+        <table role="presentation" class="container" width="600" border="0" cellspacing="0" cellpadding="0"
+               style="max-width:600px;background-color:#FFFFFF;border:1px solid #E8E2D4;border-radius:8px;overflow:hidden;">
+
+          {# Header strap — product brand bar #}
+          <tr>
+            <td align="left" style="background-color:#0A2B4E;padding:18px 32px;color:#FFFFFF;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;">
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="font-size:14px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#FFFFFF;">
+                    {% block product_label %}{{ site_name|default:"DockLabs" }}{% endblock %}
+                  </td>
+                  <td align="right" style="font-size:11px;color:#A8B5C9;text-transform:uppercase;letter-spacing:0.06em;">
+                    {% if priority == 'urgent' %}Urgent{% elif priority == 'high' %}High Priority{% else %}Notification{% endif %}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          {# Body #}
+          <tr>
+            <td class="px-pad{% if priority == 'urgent' %} priority-bar-urgent{% elif priority == 'high' %} priority-bar-high{% endif %}"
+                style="padding:36px 36px 24px 36px;{% if priority == 'urgent' %}border-left:4px solid #B23A48;{% elif priority == 'high' %}border-left:4px solid #C77400;{% endif %}">
+              <h1 style="margin:0 0 16px 0;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:22px;line-height:1.3;font-weight:600;color:#0A2B4E;">
+                {{ title }}
+              </h1>
+              <div style="font-size:15px;line-height:1.6;color:#1A1A1A;">
+                {{ message|linebreaksbr }}
+              </div>
+
+              {% if absolute_link %}
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin:28px 0 8px 0;">
+                <tr>
+                  <td align="center" bgcolor="#0A2B4E" style="border-radius:6px;">
+                    <a href="{{ absolute_link }}"
+                       class="mso-button"
+                       style="display:inline-block;padding:12px 28px;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:6px;background-color:#0A2B4E;">
+                      {% block cta_label %}View Details{% endblock %} &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+            </td>
+          </tr>
+
+          {# Divider #}
+          <tr>
+            <td style="padding:0 36px;">
+              <hr style="border:none;border-top:1px solid #E8E2D4;margin:0;">
+            </td>
+          </tr>
+
+          {# Footer #}
+          <tr>
+            <td class="px-pad" style="padding:20px 36px 28px 36px;font-size:12px;line-height:1.6;color:#5B5348;">
+              <p style="margin:0 0 8px 0;">
+                {% block footer_extra %}
+                Sent by {{ site_name|default:"DockLabs" }}{% if recipient.first_name %} to {{ recipient.first_name }}{% endif %}.
+                {% endblock %}
+              </p>
+              <p style="margin:0;color:#8A8275;">
+                Manage how you receive emails from {{ site_name|default:"DockLabs" }} in your
+                <a href="{% if absolute_link %}{{ absolute_link|cut:request.path }}{% endif %}/settings/notifications/"
+                   style="color:#0A2B4E;text-decoration:underline;">notification preferences</a>.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+        {# ── DockLabs wordmark below the card ───────────── #}
+        <table role="presentation" width="600" border="0" cellspacing="0" cellpadding="0" style="max-width:600px;margin-top:24px;">
+          <tr>
+            <td align="center" style="font-size:11px;color:#8A8275;letter-spacing:0.08em;text-transform:uppercase;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;">
+              DockLabs &middot; Civic Software for Government
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
