@@ -1,0 +1,87 @@
+{% load keel_notifications %}
+
+{% if not prefs_enabled %}
+  <div class="alert alert-info mb-0">
+    <i class="bi bi-info-circle me-2"></i>
+    Notification preferences are not yet configured for this application.
+    All notifications are delivered using their default settings.
+  </div>
+{% else %}
+  <p class="text-muted mb-4">
+    Choose how you want to be notified for each event type.
+    Uncheck all channels or toggle "Mute" to stop receiving a notification entirely.
+  </p>
+
+  <form method="post" action="{% url 'keel_settings:panel' slug='notifications' %}">
+    {% csrf_token %}
+
+    {% for category, types in categories.items %}
+    <div class="card mb-3 border">
+      <div class="card-header bg-light">
+        <h6 class="mb-0">{{ category }}</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr class="small text-muted">
+              <th style="width: 40%">Notification</th>
+              <th class="text-center" style="width: 12%"><i class="bi bi-bell me-1"></i>In-App</th>
+              <th class="text-center" style="width: 12%"><i class="bi bi-envelope me-1"></i>Email</th>
+              {% if sms_available %}<th class="text-center" style="width: 12%"><i class="bi bi-phone me-1"></i>SMS</th>{% endif %}
+              {% if boswell_available %}<th class="text-center" style="width: 12%"><i class="bi bi-robot me-1"></i>OpenClaw</th>{% endif %}
+              <th class="text-center" style="width: 12%"><i class="bi bi-bell-slash me-1"></i>Mute</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ntype in types %}
+            <tr>
+              <td>
+                <strong>{{ ntype.label }}</strong>
+                {% if ntype.description %}<br><small class="text-muted">{{ ntype.description }}</small>{% endif %}
+              </td>
+              <td class="text-center">
+                <input class="form-check-input" type="checkbox" name="{{ ntype.key }}_in_app"
+                       {% if ntype.key in preferences and preferences|get_pref_attr:ntype.key|get_pref_attr:"channel_in_app" %}checked{% elif ntype.key not in preferences and "in_app" in ntype.default_channels %}checked{% endif %}>
+              </td>
+              <td class="text-center">
+                <input class="form-check-input" type="checkbox" name="{{ ntype.key }}_email"
+                       {% if ntype.key in preferences and preferences|get_pref_attr:ntype.key|get_pref_attr:"channel_email" %}checked{% elif ntype.key not in preferences and "email" in ntype.default_channels %}checked{% endif %}>
+              </td>
+              {% if sms_available %}
+              <td class="text-center">
+                <input class="form-check-input" type="checkbox" name="{{ ntype.key }}_sms"
+                       {% if not user_has_phone %}disabled{% endif %}
+                       {% if ntype.key in preferences and preferences|get_pref_attr:ntype.key|get_pref_attr:"channel_sms" %}checked{% endif %}>
+              </td>
+              {% endif %}
+              {% if boswell_available %}
+              <td class="text-center">
+                {% if "boswell" in ntype.default_channels %}
+                <input class="form-check-input" type="checkbox" name="{{ ntype.key }}_boswell"
+                       {% if ntype.key in preferences and preferences|get_pref_attr:ntype.key|get_pref_attr:"channel_boswell" %}checked{% elif ntype.key not in preferences %}checked{% endif %}>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              {% endif %}
+              <td class="text-center">
+                {% if ntype.allow_mute %}
+                <input class="form-check-input" type="checkbox" name="{{ ntype.key }}_muted"
+                       {% if ntype.key in preferences and preferences|get_pref_attr:ntype.key|get_pref_attr:"is_muted" %}checked{% endif %}>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex justify-content-end mt-3">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Preferences</button>
+    </div>
+  </form>
+{% endif %}

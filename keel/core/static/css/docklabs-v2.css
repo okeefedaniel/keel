@@ -928,6 +928,49 @@ code, kbd, samp, pre,
     border: 1.5px solid var(--bg-page);
 }
 
+/* Topbar user avatar — identity dropdown trigger.
+   Matches sidebar-avatar visually so the user's initials look the same
+   in both places. The button is the click target; the avatar span is
+   the visible circle. */
+.topbar-user { margin-left: 4px; }
+.topbar-avatar-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+}
+.topbar-avatar-btn:hover { box-shadow: 0 0 0 2px var(--bg-hover); }
+.topbar-avatar-btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
+.topbar-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-teal), var(--ct-blue));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* Logout form inside dropdown — make the button look like a dropdown-item */
+.dropdown-item-form { margin: 0; padding: 0; }
+.dropdown-item-form button.dropdown-item {
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
 .search-trigger {
     display: flex;
     align-items: center;

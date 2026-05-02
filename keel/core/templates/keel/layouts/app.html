@@ -77,24 +77,15 @@ Products extend this and override blocks:
         {% include "keel/components/fleet_switcher.html" %}
 
         {% if user.is_authenticated %}
-        <div class="sidebar-user" id="sidebar-user-menu" data-bs-toggle="dropdown" aria-expanded="false">
+        {# Sidebar user info — display only. Identity actions (Settings, #}
+        {# Logout) live in the top-right avatar dropdown in the topbar. #}
+        <div class="sidebar-user" aria-label="Signed in as {{ user.get_full_name|default:user.username }}">
           <div class="sidebar-avatar">{{ user.first_name|make_list|first|default:"?" }}{{ user.last_name|make_list|first|default:"" }}</div>
           <div class="sidebar-user-info">
             <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
             <div class="sidebar-user-role">{% block sidebar_user_role %}{{ user.get_role_display }}{% endblock %}</div>
           </div>
-          <span class="sb-item-action" style="opacity:1; color:var(--text-tertiary)">&ctdot;</span>
         </div>
-        <ul class="dropdown-menu" aria-labelledby="sidebar-user-menu">
-          {% block sidebar_user_menu_default %}
-          {% url 'keel_notifications:preferences' as notif_prefs_url %}
-          {% if notif_prefs_url %}
-          <li><a class="dropdown-item" href="{{ notif_prefs_url }}"><i class="bi bi-bell me-2"></i>Notification Preferences</a></li>
-          <li><hr class="dropdown-divider"></li>
-          {% endif %}
-          {% endblock %}
-          {% block sidebar_user_menu %}{% endblock %}
-        </ul>
         {% endif %}
       </div>
     </aside>
@@ -152,6 +143,51 @@ Products extend this and override blocks:
           {% block topbar_extra_actions %}{% endblock %}
 
           {% block topbar_primary_action %}{% endblock %}
+
+          {# ── User avatar dropdown — identity & account actions ── #}
+          {% block topbar_user_menu %}
+          <div class="dropdown topbar-user">
+            <button class="topbar-avatar-btn" id="topbar-user-menu" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false"
+                    title="{{ user.get_full_name|default:user.username }}">
+              <span class="topbar-avatar">{{ user.first_name|make_list|first|default:"?" }}{{ user.last_name|make_list|first|default:"" }}</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="topbar-user-menu">
+              <li class="dropdown-header">
+                <div class="fw-semibold">{{ user.get_full_name|default:user.username }}</div>
+                <div class="small text-muted">{{ user.email }}</div>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              {% block topbar_user_menu_default %}
+              {% url 'keel_settings:index' as settings_url %}
+              {% if settings_url %}
+              <li><a class="dropdown-item" href="{{ settings_url }}"><i class="bi bi-gear me-2"></i>Settings</a></li>
+              {% else %}
+              {# Backwards-compat fallback when keel.settings isn't mounted yet #}
+              {% url 'keel_notifications:preferences' as notif_prefs_url %}
+              {% if notif_prefs_url %}
+              <li><a class="dropdown-item" href="{{ notif_prefs_url }}"><i class="bi bi-bell me-2"></i>Notification Preferences</a></li>
+              {% endif %}
+              {% endif %}
+              {% endblock %}
+              {% block topbar_user_menu_extra %}{% endblock %}
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                {# Resolve logout URL: products with allauth expose      #}
+                {# 'account_logout'; Keel itself uses Django auth's      #}
+                {# 'logout'. Try allauth first, fall back to logout.     #}
+                {% url 'account_logout' as logout_url %}
+                {% if not logout_url %}{% url 'logout' as logout_url %}{% endif %}
+                <form method="post" action="{{ logout_url }}" class="dropdown-item-form">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item text-danger">
+                    <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+                  </button>
+                </form>
+              </li>
+            </ul>
+          </div>
+          {% endblock %}
         </div>
       </header>
 

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Settings | {{ SITE_NAME|default:"DockLabs" }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="text-center text-muted">
+    <i class="bi bi-exclamation-circle" style="font-size:3rem;opacity:0.4"></i>
+    <h1 class="h4 mt-3">Settings panel not found</h1>
+    <p>The page you're looking for isn't available on this deployment.</p>
+    <a href="{% url 'keel_settings:index' %}" class="btn btn-outline-primary mt-2">Back to Settings</a>
+  </div>
+</div>
+{% endblock %}

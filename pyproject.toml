@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keel"
-version = "0.22.0"
+version = "0.23.0"
 description = "Shared Django platform layer for DockLabs products"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,4 +32,5 @@ include = ["keel*"]
 "keel.requests" = ["templates/**/*", "templatetags/**/*"]
 "keel.notifications" = ["templates/**/*", "templatetags/**/*"]
 "keel.search" = ["static/**/*", "templates/**/*"]
+"keel.settings" = ["templates/**/*"]
 "keel.security" = ["ca_bundles/*.pem"]

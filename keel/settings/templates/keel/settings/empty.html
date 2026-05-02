@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Settings | {{ SITE_NAME|default:"DockLabs" }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="text-center text-muted">
+    <i class="bi bi-gear" style="font-size:3rem;opacity:0.4"></i>
+    <h1 class="h4 mt-3">No settings to manage yet</h1>
+    <p class="mb-0">This deployment doesn't have any user-configurable settings.<br>
+       Reach out to your administrator if you need to change something.</p>
+  </div>
+</div>
+{% endblock %}
