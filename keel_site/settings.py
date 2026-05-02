@@ -152,6 +152,7 @@ EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@docklabs.ai')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 EMAIL_TIMEOUT = 10  # seconds — prevent SMTP hangs from blocking notification threads
 PASSWORD_RESET_TIMEOUT = 259200  # 3 days in seconds
 
