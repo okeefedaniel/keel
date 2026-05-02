@@ -205,7 +205,12 @@ class WorkflowEngine:
             return True
 
         role = getattr(user, 'role', '')
-        if role == 'system_admin':
+        # Admin-tier roles satisfy any role gate. ``system_admin`` is the
+        # IT/platform admin (DockLabs operator); ``agency_admin`` is the
+        # customer-side admin who runs their own org. Both are "above"
+        # the operator-tier roles enumerated on each Transition, so they
+        # bypass per-transition role lists the same way superusers do.
+        if role in ('system_admin', 'agency_admin'):
             return True
 
         for r in required_roles:

@@ -92,11 +92,21 @@ logger = logging.getLogger(__name__)
 
 
 def _admin_check(user):
-    """Check if user is a Keel admin (superuser or admin role in any product)."""
+    """Check if user is a Keel admin.
+
+    Three role tiers grant admin-console access:
+      - ``system_admin`` / ``admin`` — IT-level platform admins (DockLabs).
+      - ``agency_admin`` — customer-side admin who manages their own org's
+        users. Cannot grant other admin-tier roles (enforced separately
+        in ``available_grantable_roles`` / ``send_invitation``).
+    Superusers always pass.
+    """
     if user.is_superuser:
         return True
     return ProductAccess.objects.filter(
-        user=user, role__in=('admin', 'system_admin'), is_active=True,
+        user=user,
+        role__in=('admin', 'system_admin', 'agency_admin'),
+        is_active=True,
     ).exists()
 
 
@@ -210,6 +220,50 @@ def grant_access(request, user_id):
         messages.error(request, 'Product and role are required.')
         return redirect('keel_accounts:user_detail', user_id=user_id)
 
+    # Mirror the invitation matrix gate: agency_admin cannot grant
+    # protected admin-tier roles via the direct-grant surface either.
+    from keel.accounts.services import available_grantable_roles
+    grantable = {slug for slug, _ in available_grantable_roles(request.user, product)}
+    if role not in grantable:
+        messages.error(
+            request,
+            f'You are not authorized to grant the "{role}" role for {product}. '
+            'Ask a system admin to grant admin-tier roles.',
+        )
+        logger.warning(
+            'ROLE_GRANT_DENIED: user=%s org=%s tried to grant role=%s product=%s '
+            'to user=%s via direct grant — admin-tier escalation blocked',
+            request.user.username,
+            request.user.organization_id,
+            role, product, target_user.username,
+        )
+        try:
+            from django.apps import apps as django_apps
+            audit_path = getattr(
+                settings, 'KEEL_AUDIT_LOG_MODEL', 'keel_accounts.AuditLog',
+            )
+            AuditLog = django_apps.get_model(audit_path)
+            AuditLog.objects.create(
+                user=request.user,
+                action='role_grant_denied',
+                entity_type='ProductAccess',
+                entity_id=str(target_user.pk),
+                description=(
+                    f'Actor {request.user.username} attempted to grant '
+                    f'{product}/{role} to {target_user.username}; blocked.'
+                ),
+                changes={
+                    'product': product,
+                    'role': role,
+                    'target_user_id': str(target_user.pk),
+                    'actor_org_id': str(request.user.organization_id),
+                },
+                ip_address=getattr(request, 'audit_ip', None),
+            )
+        except Exception:  # pragma: no cover
+            logger.exception('Failed to write role_grant_denied audit row')
+        return redirect('keel_accounts:user_detail', user_id=user_id)
+
     access, created = ProductAccess.objects.update_or_create(
         user=target_user,
         product=product,
@@ -291,8 +345,16 @@ def invitation_list(request):
     if status:
         invitations = invitations.filter(status=status)
 
-    all_roles = get_product_roles()
-    all_roles['all'] = get_product_roles('all')
+    # Filter the role choices the actor is allowed to grant. Agency
+    # admins see operator roles only — the protected admin tier is
+    # stripped from the matrix so the form can't even render an
+    # escalation option. System admins / superusers see everything.
+    from keel.accounts.services import available_grantable_roles
+    all_roles = {
+        product: available_grantable_roles(request.user, product)
+        for product in get_product_roles().keys()
+    }
+    all_roles['all'] = available_grantable_roles(request.user, 'all')
 
     # Render only subscribed products in the matrix. Products outside
     # the subscription set are absent (not greyed out) so the admin's
@@ -426,14 +488,27 @@ def send_invitation(request):
     expires_at = timezone.now() + timedelta(days=days)
     batch_id = uuid.uuid4()
 
+    # Per-actor allowlist of grantable roles. Agency admins cannot grant
+    # protected admin-tier roles; this is the load-bearing server-side
+    # check that mirrors the matrix render filter.
+    from keel.accounts.services import available_grantable_roles
+    grantable = {
+        prod: {slug for slug, _label in available_grantable_roles(request.user, prod)}
+        for prod in selected
+    }
+
     created_invitations = []
     skipped = []
     invalid = []
+    denied = []
     for prod in selected:
         role = request.POST.get(f'role__{prod}', '').strip()
         valid_roles = {r for r, _ in get_product_roles(prod) or []}
         if role not in valid_roles:
             invalid.append(prod)
+            continue
+        if role not in grantable.get(prod, set()):
+            denied.append((prod, role))
             continue
         is_beta = request.POST.get(f'beta__{prod}') == '1'
 
@@ -453,6 +528,49 @@ def send_invitation(request):
             organization=target_org,
             expires_at=expires_at,
         ))
+
+    if denied:
+        denied_summary = ', '.join(f'{prod} ({role})' for prod, role in denied)
+        messages.error(
+            request,
+            f'You are not authorized to grant admin-tier roles. Denied: '
+            f'{denied_summary}. Ask a system admin to grant these.',
+        )
+        logger.warning(
+            'ROLE_GRANT_DENIED: user=%s org=%s tried to grant protected role(s) '
+            '%s to %s — admin-tier role-grant escalation blocked',
+            request.user.username,
+            request.user.organization_id,
+            denied,
+            email,
+        )
+        try:
+            from django.apps import apps as django_apps
+            audit_path = getattr(
+                settings, 'KEEL_AUDIT_LOG_MODEL', 'keel_accounts.AuditLog',
+            )
+            AuditLog = django_apps.get_model(audit_path)
+            AuditLog.objects.create(
+                user=request.user,
+                action='role_grant_denied',
+                entity_type='Invitation',
+                entity_id=email,
+                description=(
+                    f'Actor {request.user.username} attempted to grant protected '
+                    f'admin-tier role(s) {denied_summary} to {email}; blocked '
+                    f'by available_grantable_roles gate.'
+                ),
+                changes={
+                    'denied_grants': [
+                        {'product': prod, 'role': role} for prod, role in denied
+                    ],
+                    'invited_email': email,
+                    'actor_org_id': str(request.user.organization_id),
+                },
+                ip_address=getattr(request, 'audit_ip', None),
+            )
+        except Exception:  # pragma: no cover — best-effort
+            logger.exception('Failed to write role_grant_denied audit row')
 
     if invalid:
         messages.error(

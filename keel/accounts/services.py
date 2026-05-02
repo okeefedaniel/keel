@@ -14,6 +14,65 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+# Roles a non-system_admin admin (e.g. agency_admin) cannot grant. Centralized
+# here so the invitation matrix renderer, the POST validator, and any future
+# role-grant surface (programmatic API, future bulk-import tools) read from
+# one allowlist. Adding a new admin-tier role to a product means adding it
+# here too.
+PROTECTED_ADMIN_ROLES = frozenset({
+    'system_admin',
+    'agency_admin',
+    'admin',
+    'helm_admin',
+    'yeoman_admin',
+    'purser_admin',
+})
+
+
+def can_grant_admin_roles(actor) -> bool:
+    """Return True when ``actor`` can grant protected admin-tier roles.
+
+    System admins (and superusers) can grant any role. Agency admins can
+    grant operator-tier roles within their org but NOT another admin-tier
+    role — that escalation path stays with system admins. The check is
+    intentionally permissive on superuser and on the legacy ``admin`` Keel
+    role so this rollout doesn't strip rights from existing dokadmin-style
+    accounts.
+    """
+    if getattr(actor, 'is_superuser', False):
+        return True
+    # Read role across ALL ProductAccess rows: an actor may hold
+    # system_admin in Keel itself even if they're not currently
+    # browsing a Keel-aware page. The invitation matrix is a Keel
+    # surface, so any system_admin role anywhere in the user's
+    # ProductAccess set is sufficient.
+    from keel.accounts.models import ProductAccess
+    return ProductAccess.objects.filter(
+        user=actor,
+        role__in=('system_admin', 'admin'),
+        is_active=True,
+    ).exists()
+
+
+def available_grantable_roles(actor, product_code: str) -> list[tuple[str, str]]:
+    """Return the role choices ``actor`` is allowed to grant for ``product_code``.
+
+    System admins / superusers see the full role list for the product.
+    Agency admins (and any other non-system admin) see the list minus
+    ``PROTECTED_ADMIN_ROLES`` — so an agency_admin cannot self-escalate
+    or peer-escalate via the invitation matrix.
+
+    Returns the same `(slug, label)` tuple shape as
+    ``get_product_roles(product_code)`` so it slots into existing
+    template / form choice rendering without further wrapping.
+    """
+    from keel.accounts.models import get_product_roles
+    full = list(get_product_roles(product_code) or [])
+    if can_grant_admin_roles(actor):
+        return full
+    return [(slug, label) for slug, label in full if slug not in PROTECTED_ADMIN_ROLES]
+
+
 def reconcile_user_product_access(user, force_logout: bool = True) -> int:
     """Deactivate ProductAccess rows the user's org no longer subscribes to.
 

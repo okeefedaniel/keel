@@ -101,6 +101,7 @@ ROLE_DISPLAY = {
     'yeoman_scheduler': {'label': 'Scheduler', 'icon': 'bi-calendar-check', 'color': 'primary'},
     'yeoman_viewer': {'label': 'Viewer', 'icon': 'bi-eye', 'color': 'info'},
     'yeoman_delegate': {'label': 'Delegate', 'icon': 'bi-person-check', 'color': 'success'},
+    'yeoman_principal': {'label': 'Principal', 'icon': 'bi-person-vcard', 'color': 'warning'},
     # Helm
     'helm_admin': {'label': 'Admin', 'icon': 'bi-shield-check', 'color': 'danger'},
     'helm_director': {'label': 'Director', 'icon': 'bi-compass', 'color': 'primary'},

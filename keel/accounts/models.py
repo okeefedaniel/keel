@@ -73,6 +73,7 @@ PRODUCT_ROLES = {
     ],
     'admiralty': [
         ('system_admin', 'System Administrator'),
+        ('agency_admin', 'Agency Administrator'),
         ('foia_manager', 'FOIA Manager'),
         ('foia_officer', 'FOIA Officer'),
         ('foia_attorney', 'FOIA Attorney'),
@@ -89,22 +90,26 @@ PRODUCT_ROLES = {
     ],
     'manifest': [
         ('admin', 'Admin'),
+        ('agency_admin', 'Agency Administrator'),
         ('staff', 'Staff'),
         ('signer', 'Signer'),
     ],
     'lookout': [
         ('admin', 'Admin'),
+        ('agency_admin', 'Agency Administrator'),
         ('legislative_aid', 'Legislative Aid'),
         ('stakeholder', 'Stakeholder'),
     ],
     'bounty': [
         ('admin', 'Admin'),
+        ('agency_admin', 'Agency Administrator'),
         ('coordinator', 'Federal Fund Coordinator'),
         ('analyst', 'Analyst'),
         ('viewer', 'Viewer'),
     ],
     'purser': [
         ('purser_admin', 'Purser Admin'),
+        ('agency_admin', 'Agency Administrator'),
         ('purser_submitter', 'Submitter'),
         ('purser_reviewer', 'Reviewer'),
         ('purser_compliance_officer', 'Compliance Officer'),
@@ -113,18 +118,22 @@ PRODUCT_ROLES = {
     ],
     'helm': [
         ('helm_admin', 'Admin'),
+        ('agency_admin', 'Agency Administrator'),
         ('helm_director', 'Director'),
         ('helm_viewer', 'Viewer'),
     ],
     'yeoman': [
         ('yeoman_admin', 'Administrator'),
+        ('agency_admin', 'Agency Administrator'),
         ('yeoman_scheduler', 'Scheduler'),
         ('yeoman_viewer', 'Viewer'),
         ('yeoman_delegate', 'Delegate'),
+        ('yeoman_principal', 'Principal'),
     ],
     'keel': [
-        ('admin', 'Admin'),
         ('system_admin', 'System Administrator'),
+        ('agency_admin', 'Agency Administrator'),
+        ('admin', 'Admin'),
     ],
 }
 
@@ -492,6 +501,7 @@ class KeelUser(AbstractUser):
     # products define them; unknown roles get title-cased automatically.
     ROLE_LABELS = {
         'system_admin': 'System Admin',
+        'agency_admin': 'Agency Admin',
         'admin': 'Administrator',
         'analyst': 'Analyst',
         'relationship_manager': 'Relationship Manager',
@@ -945,6 +955,7 @@ class AuditLog(models.Model):
         VIEW = 'view', _('View')
         LOGIN_FAILED = 'login_failed', _('Login Failed')
         SECURITY_EVENT = 'security_event', _('Security Event')
+        ROLE_GRANT_DENIED = 'role_grant_denied', _('Role Grant Denied')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(

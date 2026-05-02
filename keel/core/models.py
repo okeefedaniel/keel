@@ -70,6 +70,7 @@ class AbstractAuditLog(models.Model):
         SECURITY_EVENT = 'security_event', _('Security Event')
         ARCHIVE = 'archive', _('Archive')
         UNARCHIVE = 'unarchive', _('Unarchive')
+        ROLE_GRANT_DENIED = 'role_grant_denied', _('Role Grant Denied')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
