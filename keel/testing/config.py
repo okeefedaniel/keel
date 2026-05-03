@@ -371,13 +371,14 @@ PRODUCTS = {
         repo_dir='yeoman',
         settings_module='yeoman_project.settings',
         live_url='https://yeoman.docklabs.ai',
-        demo_roles=['yeoman_admin', 'yeoman_scheduler', 'yeoman_viewer', 'yeoman_delegate'],
+        demo_roles=['yeoman_admin', 'yeoman_scheduler', 'yeoman_viewer', 'yeoman_delegate', 'yeoman_principal'],
         public_urls=_YEOMAN_PUBLIC + ['/auth/login/'],
         auth_urls={
             'yeoman_admin': _YEOMAN_COMMON + _YEOMAN_STAFF,
             'yeoman_scheduler': _YEOMAN_COMMON + _YEOMAN_STAFF,
             'yeoman_viewer': _YEOMAN_COMMON,
             'yeoman_delegate': _YEOMAN_COMMON,
+            'yeoman_principal': _YEOMAN_COMMON,
         },
         workflows=[
             'test_invitation_workflow',
