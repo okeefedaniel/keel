@@ -1,0 +1,160 @@
+{% comment %}
+Invitation email — DockLabs-branded HTML.
+
+Mirrors the visual language of notifications/emails/generic.html but
+purpose-built for invites: lists the products being granted, has a
+prominent Accept CTA, and notes the expiry. Plain-text fallback is in
+the sibling .txt file.
+
+Context:
+  inviter_name        — display name of the person sending the invite
+  invitee_email       — email the invite was addressed to
+  batch_invitations   — queryset of Invitation rows in this batch
+  accept_url          — fully-qualified link to /invite/<token>/
+  expiry_days         — int, days until link stops working
+  site_name           — branding label (default DockLabs)
+{% endcomment %}<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>You're invited to DockLabs</title>
+  <!--[if mso]>
+  <style type="text/css">
+    table { border-collapse: collapse; }
+    .mso-button { padding: 14px 32px !important; }
+  </style>
+  <![endif]-->
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    body { margin: 0; padding: 0; width: 100% !important; min-width: 100%; background-color: #FAF7F2; }
+    @media only screen and (max-width: 620px) {
+      .container { width: 100% !important; max-width: 100% !important; }
+      .px-pad { padding-left: 24px !important; padding-right: 24px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1A1A1A;">
+  <div style="display:none;font-size:1px;color:#FAF7F2;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+    {{ inviter_name }} has invited you to DockLabs. Accept by {{ expiry_days }} days from now.
+  </div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#FAF7F2;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <table role="presentation" class="container" width="600" border="0" cellspacing="0" cellpadding="0"
+               style="max-width:600px;background-color:#FFFFFF;border:1px solid #E8E2D4;border-radius:8px;overflow:hidden;">
+
+          {# Header — DockLabs brand bar #}
+          <tr>
+            <td align="center" style="background-color:#0A2B4E;padding:28px 32px;">
+              <div style="font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:18px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#FFFFFF;">
+                DockLabs
+              </div>
+              <div style="font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:#A8B5C9;letter-spacing:0.04em;text-transform:uppercase;margin-top:6px;">
+                Civic Software for Government
+              </div>
+            </td>
+          </tr>
+
+          {# Body #}
+          <tr>
+            <td class="px-pad" style="padding:36px 36px 24px 36px;">
+              <h1 style="margin:0 0 16px 0;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:24px;line-height:1.3;font-weight:600;color:#0A2B4E;">
+                You've been invited to DockLabs
+              </h1>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#1A1A1A;">
+                <strong>{{ inviter_name }}</strong> has invited you to join the DockLabs suite{% if invitee_email %} as <strong>{{ invitee_email }}</strong>{% endif %}.
+              </p>
+
+              {% if batch_invitations|length > 1 %}
+              <p style="margin:24px 0 12px 0;font-size:13px;color:#5B5348;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">
+                You'll get access to:
+              </p>
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0"
+                     style="margin-bottom:8px;border:1px solid #E8E2D4;border-radius:6px;overflow:hidden;">
+                {% for inv in batch_invitations %}
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:{% if not forloop.last %}1px solid #E8E2D4{% else %}none{% endif %};">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="font-size:14px;font-weight:600;color:#0A2B4E;text-transform:capitalize;">
+                          {{ inv.product }}
+                        </td>
+                        <td align="right" style="font-size:12px;color:#5B5348;">
+                          <span style="background-color:#F1ECE2;padding:3px 10px;border-radius:4px;font-family:'SF Mono',Menlo,Monaco,Consolas,monospace;">{{ inv.role }}</span>
+                          {% if inv.is_beta_tester %}<span style="background-color:#0A2B4E;color:#FFFFFF;padding:3px 10px;border-radius:4px;margin-left:4px;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Beta</span>{% endif %}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                {% endfor %}
+              </table>
+              {% else %}
+              {% with inv=batch_invitations.0 %}
+              <p style="margin:16px 0;font-size:14px;color:#5B5348;">
+                Joining <strong style="color:#0A2B4E;text-transform:capitalize;">{{ inv.product }}</strong> as <code style="background-color:#F1ECE2;padding:2px 8px;border-radius:4px;font-size:13px;">{{ inv.role }}</code>{% if inv.is_beta_tester %} <span style="background-color:#0A2B4E;color:#FFFFFF;padding:3px 10px;border-radius:4px;font-size:11px;text-transform:uppercase;">Beta</span>{% endif %}.
+              </p>
+              {% endwith %}
+              {% endif %}
+
+              {# CTA #}
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin:28px 0 12px 0;">
+                <tr>
+                  <td align="center" bgcolor="#0A2B4E" style="border-radius:6px;">
+                    <a href="{{ accept_url }}"
+                       class="mso-button"
+                       style="display:inline-block;padding:14px 32px;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:6px;background-color:#0A2B4E;">
+                      Accept Invitation &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:8px 0 0 0;font-size:12px;color:#8A8275;">
+                This link expires in {{ expiry_days }} day{{ expiry_days|pluralize }}.
+              </p>
+            </td>
+          </tr>
+
+          {# Divider #}
+          <tr>
+            <td style="padding:0 36px;">
+              <hr style="border:none;border-top:1px solid #E8E2D4;margin:0;">
+            </td>
+          </tr>
+
+          {# Footer — what is DockLabs + safety note #}
+          <tr>
+            <td class="px-pad" style="padding:20px 36px 28px 36px;font-size:12px;line-height:1.6;color:#5B5348;">
+              <p style="margin:0 0 8px 0;">
+                DockLabs is a software suite built for state &amp; local government.
+                Once you accept, you'll land on your dashboard with everything ready to go.
+              </p>
+              <p style="margin:0;color:#8A8275;">
+                Didn't expect this invitation? You can safely ignore this email — no account is created until you accept.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+        <table role="presentation" width="600" border="0" cellspacing="0" cellpadding="0" style="max-width:600px;margin-top:24px;">
+          <tr>
+            <td align="center" style="font-size:11px;color:#8A8275;letter-spacing:0.08em;text-transform:uppercase;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;">
+              DockLabs &middot; Civic Software for Government
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

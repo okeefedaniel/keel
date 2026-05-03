@@ -1,0 +1,43 @@
+{% extends "keel/layouts/auth.html" %}
+
+{% block title %}Invitation Mismatch | DockLabs{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-5">
+    <div class="text-center mb-4">
+      <div style="font-family:'Poppins',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#0A2B4E;">
+        DockLabs
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius:10px;">
+      <div class="card-body p-4 p-md-5">
+        <div class="text-center mb-4">
+          <i class="bi bi-shield-exclamation" style="font-size:42px;color:#C77400;"></i>
+          <h1 class="h4 mt-3 mb-2" style="color:#0A2B4E;">This invitation is for someone else</h1>
+        </div>
+        <p class="text-muted mb-3">
+          This invitation was sent to <strong>{{ invitation.email }}</strong>, but you're signed in as <strong>{{ logged_in_email }}</strong>.
+        </p>
+        <p class="text-muted small mb-4">
+          To accept, sign out first and either log in as <strong>{{ invitation.email }}</strong> or create a new account when prompted. If you weren't expecting this invitation, you can safely close this page.
+        </p>
+
+        <form method="post" action="{% url 'account_logout' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <button type="submit" class="btn btn-primary w-100 py-2">
+            Sign out and accept as {{ invitation.email }}
+          </button>
+        </form>
+
+        <hr class="my-4">
+        <p class="text-center text-muted small mb-0">
+          <a href="/" style="color:#5B5348;">Cancel and go back</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

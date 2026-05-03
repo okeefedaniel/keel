@@ -1,0 +1,24 @@
+You've been invited to DockLabs
+================================
+
+{{ inviter_name }} has invited you to join the DockLabs suite{% if invitee_email %} as {{ invitee_email }}{% endif %}.
+
+{% if batch_invitations|length > 1 %}You'll get access to:
+{% for inv in batch_invitations %}
+  • {{ inv.product|capfirst }} — {{ inv.role }}{% if inv.is_beta_tester %} (Beta){% endif %}{% endfor %}
+{% else %}{% with inv=batch_invitations.0 %}Joining {{ inv.product|capfirst }} as {{ inv.role }}{% if inv.is_beta_tester %} (Beta){% endif %}.{% endwith %}
+{% endif %}
+
+Accept your invitation:
+{{ accept_url }}
+
+This link expires in {{ expiry_days }} day{{ expiry_days|pluralize }}.
+
+---
+DockLabs is a software suite built for state & local government.
+Once you accept, you'll land on your dashboard with everything ready to go.
+
+Didn't expect this invitation? You can safely ignore this email —
+no account is created until you accept.
+
+DockLabs · Civic Software for Government

@@ -140,6 +140,15 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
+# Where invitees land after accepting their invitation. keel.docklabs.ai
+# is the identity console — most invitees won't have admin rights here,
+# so we send them to Helm (the suite home dashboard) instead. Override
+# via env var if a deployment wants a different post-accept landing.
+KEEL_INVITATION_LANDING_URL = os.environ.get(
+    'KEEL_INVITATION_LANDING_URL',
+    'https://helm.docklabs.ai/dashboard/',
+)
+
 # Email — console in dev, SMTP in production
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',

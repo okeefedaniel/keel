@@ -19,8 +19,9 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.db.models import Count, Q
+from django.template.loader import render_to_string
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -596,27 +597,34 @@ def send_invitation(request):
             f'{inv.product} ({inv.role})' for inv in created_invitations
         )
 
-        # Send the actual invitation email.
+        # Send the actual invitation email — DockLabs-branded HTML + plaintext
+        # fallback. Bypasses the notification-channel email path because invites
+        # are pre-account: the recipient has no NotificationPreference yet.
         try:
-            inviter = request.user.get_full_name() or request.user.email
-            body = '\n'.join([
-                f'{inviter} has invited you to DockLabs.',
-                '',
-                'You have been granted access to:',
-                *product_lines,
-                '',
-                f'Click here to accept all access in one step: {accept_url}',
-                '',
-                f'This link expires in '
-                f'{getattr(settings, "KEEL_INVITATION_EXPIRY_DAYS", 7)} days.',
-            ])
-            send_mail(
-                subject=f'You have been invited to DockLabs ({len(created_invitations)} product{"s" if len(created_invitations) != 1 else ""})',
-                message=body,
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
-                recipient_list=[email],
-                fail_silently=False,
+            inviter_name = request.user.get_full_name() or request.user.email
+            expiry_days = getattr(settings, 'KEEL_INVITATION_EXPIRY_DAYS', 7)
+            ctx = {
+                'inviter_name': inviter_name,
+                'invitee_email': email,
+                'batch_invitations': created_invitations,
+                'accept_url': accept_url,
+                'expiry_days': expiry_days,
+                'site_name': 'DockLabs',
+            }
+            text_body = render_to_string('accounts/emails/invitation.txt', ctx)
+            html_body = render_to_string('accounts/emails/invitation.html', ctx)
+            subject = (
+                f'{inviter_name} invited you to DockLabs'
+                f' ({len(created_invitations)} product{"s" if len(created_invitations) != 1 else ""})'
             )
+            mail = EmailMultiAlternatives(
+                subject=subject,
+                body=text_body,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                to=[email],
+            )
+            mail.attach_alternative(html_body, 'text/html')
+            mail.send(fail_silently=False)
             email_sent = True
         except Exception as exc:  # noqa: BLE001 — best-effort; surface to admin
             logger.exception('Failed to send invitation email to %s: %s', email, exc)
@@ -663,6 +671,19 @@ def accept_invitation(request, token):
         return render(request, 'accounts/invitation_expired.html', {
             'invitation': invitation,
         })
+
+    # Email-mismatch guard: if a different user is logged in, refuse to
+    # silently accept this invite onto their account. The recipient must
+    # sign out and accept as themselves (or the invite must be reissued).
+    # Match case-insensitively because email is identity-grade.
+    if (
+        request.user.is_authenticated
+        and (request.user.email or '').lower() != (invitation.email or '').lower()
+    ):
+        return render(request, 'accounts/invitation_mismatch.html', {
+            'invitation': invitation,
+            'logged_in_email': request.user.email,
+        }, status=403)
 
     if request.method == 'POST':
         if request.user.is_authenticated:
@@ -753,8 +774,16 @@ def accept_invitation(request, token):
                 f'Welcome! You now have access to: {", ".join(accepted)}.',
             )
 
-        # Redirect to the product
-        redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/')
+        # Redirect to the suite landing page after acceptance. Defaults to
+        # the local dashboard, but deployments can point invitees to a
+        # different host — e.g. on keel.docklabs.ai (the identity console)
+        # we send them to helm.docklabs.ai (the suite home dashboard) so
+        # they don't land on an admin-only screen they can't navigate.
+        redirect_url = getattr(
+            settings,
+            'KEEL_INVITATION_LANDING_URL',
+            getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/'),
+        )
         return redirect(redirect_url)
 
     # GET: list all sibling invitations in the batch so the recipient sees

@@ -1,79 +1,117 @@
-{% extends base_template|default:"base.html" %}
+{% extends "keel/layouts/auth.html" %}
 
-{% block title %}Accept Invitation{% endblock %}
+{% block title %}Accept Invitation | DockLabs{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-  <div class="row justify-content-center">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header text-center">
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-5">
+
+    {# DockLabs wordmark above the card #}
+    <div class="text-center mb-4">
+      <div style="font-family:'Poppins',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#0A2B4E;">
+        DockLabs
+      </div>
+      <div style="font-size:11px;color:#8A8275;letter-spacing:0.04em;text-transform:uppercase;margin-top:2px;">
+        Civic Software for Government
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius:10px;">
+      <div class="card-body p-4 p-md-5">
+
+        <h1 class="h3 mb-2" style="font-family:'Poppins',Helvetica,Arial,sans-serif;font-weight:600;color:#0A2B4E;">
           {% if batch_invitations|length > 1 %}
-          <strong>You've been invited to DockLabs ({{ batch_invitations|length }} products)</strong>
+          You've been invited
           {% else %}
-          <strong>You've been invited to {{ invitation.product|title }}</strong>
+          Welcome to {{ invitation.product|title }}
           {% endif %}
-        </div>
-        <div class="card-body">
-          {% if batch_invitations|length > 1 %}
-          <p class="text-muted mb-3">You'll be granted access to:</p>
-          <ul class="list-group list-group-flush mb-4">
+        </h1>
+        <p class="text-muted mb-4" style="font-size:14px;">
+          Accept this invitation to access the DockLabs suite.
+        </p>
+
+        {# What's being granted #}
+        {% if batch_invitations|length > 1 %}
+        <div class="mb-4">
+          <div class="small text-uppercase fw-semibold text-muted mb-2" style="letter-spacing:0.06em;">
+            Your access
+          </div>
+          <ul class="list-group list-group-flush border rounded">
             {% for inv in batch_invitations %}
-            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-              <span class="text-capitalize">{{ inv.product }}</span>
-              <span><code class="small">{{ inv.role }}</code>{% if inv.is_beta_tester %} <span class="badge bg-info">Beta</span>{% endif %}</span>
+            <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+              <span class="text-capitalize fw-medium">{{ inv.product }}</span>
+              <span>
+                <code class="bg-light px-2 py-1 rounded small">{{ inv.role }}</code>
+                {% if inv.is_beta_tester %}<span class="badge bg-dark ms-1">Beta</span>{% endif %}
+              </span>
             </li>
             {% endfor %}
           </ul>
-          {% else %}
-          <p class="text-center text-muted mb-4">
-            You'll be joining as <code>{{ invitation.role }}</code>
-          </p>
-          {% endif %}
-
-          {% if user_exists %}
-          <!-- Already logged in — just accept -->
-          <form method="post">
-            {% csrf_token %}
-            <p class="text-center">
-              Signed in as <strong>{{ request.user.email }}</strong>
-            </p>
-            <button type="submit" class="btn btn-primary w-100">Accept Invitation</button>
-          </form>
-
-          {% else %}
-          <!-- New user — create account -->
-          <form method="post">
-            {% csrf_token %}
-            <div class="mb-3">
-              <label class="form-label">Email</label>
-              <input type="email" class="form-control" value="{{ invitation.email }}" disabled>
-            </div>
-            <div class="row mb-3">
-              <div class="col">
-                <label class="form-label">First Name</label>
-                <input type="text" name="first_name" class="form-control" required>
-              </div>
-              <div class="col">
-                <label class="form-label">Last Name</label>
-                <input type="text" name="last_name" class="form-control" required>
-              </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Password</label>
-              <input type="password" name="password" class="form-control" minlength="8" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Create Account & Join</button>
-          </form>
-
-          <hr>
-          <p class="text-center text-muted mb-0">
-            Already have an account? <a href="/accounts/login/?next=/invite/{{ invitation.token }}/">Sign in</a>
-          </p>
-          {% endif %}
         </div>
+        {% else %}
+        <div class="alert alert-light border mb-4" style="background:#FAF7F2;">
+          <span class="text-muted small">Joining as</span>
+          <code class="bg-white px-2 py-1 rounded small ms-1">{{ invitation.role }}</code>
+          {% if invitation.is_beta_tester %}<span class="badge bg-dark ms-1">Beta</span>{% endif %}
+        </div>
+        {% endif %}
+
+        {# Form — different shape for already-signed-in vs new user #}
+        {% if user_exists %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="alert alert-light border mb-3 small" style="background:#FAF7F2;">
+            <i class="bi bi-check-circle-fill text-success me-1"></i>
+            Signed in as <strong>{{ request.user.email }}</strong>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 py-2">
+            Accept Invitation
+          </button>
+        </form>
+
+        {% else %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label small fw-medium">Email</label>
+            <input type="email" class="form-control" value="{{ invitation.email }}" disabled>
+            <div class="form-text small">This invitation was sent to this address.</div>
+          </div>
+          <div class="row mb-3">
+            <div class="col">
+              <label class="form-label small fw-medium">First name</label>
+              <input type="text" name="first_name" class="form-control" required autofocus>
+            </div>
+            <div class="col">
+              <label class="form-label small fw-medium">Last name</label>
+              <input type="text" name="last_name" class="form-control" required>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label small fw-medium">Choose a password</label>
+            <input type="password" name="password" class="form-control" minlength="8" required>
+            <div class="form-text small">At least 8 characters.</div>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 py-2">
+            Create Account &amp; Accept
+          </button>
+        </form>
+
+        <hr class="my-4">
+        <p class="text-center text-muted small mb-0">
+          Already have a DockLabs account?
+          <a href="/accounts/login/?next=/invite/{{ invitation.token }}/">Sign in to accept</a>
+        </p>
+        {% endif %}
+
       </div>
     </div>
+
+    <p class="text-center text-muted small mt-3" style="font-size:11px;color:#8A8275;">
+      By accepting, you agree to the
+      <a href="https://docklabs.ai/terms/" style="color:#5B5348;">terms of service</a>
+      and <a href="https://docklabs.ai/privacy/" style="color:#5B5348;">privacy policy</a>.
+    </p>
   </div>
 </div>
 {% endblock %}
