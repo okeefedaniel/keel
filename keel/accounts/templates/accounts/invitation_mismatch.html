@@ -24,9 +24,11 @@
           To accept, sign out first and either log in as <strong>{{ invitation.email }}</strong> or create a new account when prompted. If you weren't expecting this invitation, you can safely close this page.
         </p>
 
-        <form method="post" action="{% url 'account_logout' %}">
+        {# /accounts/logout/ is mounted on both keel_site (named 'logout')   #}
+        {# and product sites (named 'account_logout' via allauth). Hardcode  #}
+        {# the path so the template is portable across both naming schemes. #}
+        <form method="post" action="/accounts/logout/?next={{ request.path }}">
           {% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.path }}">
           <button type="submit" class="btn btn-primary w-100 py-2">
             Sign out and accept as {{ invitation.email }}
           </button>
