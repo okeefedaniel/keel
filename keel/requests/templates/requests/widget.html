@@ -111,8 +111,11 @@
 
     var url, headers;
     if (LOCAL) {
-      // POST to the local keel_requests:submit_request endpoint
-      url = '/feedback/submit/';
+      // POST to the local keel_requests:submit_request endpoint.
+      // Resolved by Django {% url %} so it works whether the product
+      // mounts keel.requests at /feedback/ (bounty/lookout) or
+      // /keel/requests/ (admiralty/beacon/harbor/helm/manifest).
+      url = '{% url "keel_requests:submit_request" %}';
       headers = {'Content-Type': 'application/json', 'X-CSRFToken': CSRF};
     } else {
       // Cross-origin POST to central Keel API
