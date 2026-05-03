@@ -5,7 +5,7 @@ from django.shortcuts import redirect
 from django.urls import include, path
 
 from keel.accounts.forms import LoginForm
-from keel.accounts.views import accept_invitation
+from keel.accounts.views import accept_invitation, accept_invitation_signout
 from keel.core.demo import demo_login_view
 from keel.core.views import favicon_view, robots_txt, suite_logout_endpoint
 from keel.oidc.views import session_status as oidc_session_status
@@ -102,11 +102,12 @@ urlpatterns = [
     path('scheduling/', include('keel.scheduling.urls')),
 
     # Invitation acceptance (clean URL — emails point users here directly).
-    # Bind the view directly rather than re-include `keel.accounts.urls`
-    # so the URL stays at /invite/<token>/ instead of nesting under
+    # Bind the views directly rather than re-include `keel.accounts.urls`
+    # so the URLs stay at /invite/<token>/ instead of nesting under
     # /keel/accounts/. Earlier versions had `include([])` here which
     # silently 404'd every accept-invitation click from emails.
     path('invite/<str:token>/', accept_invitation, name='accept_invitation'),
+    path('invite/<str:token>/sign-out/', accept_invitation_signout, name='accept_invitation_signout'),
 
     # Notification flow & routing
     path('notifications/flow/', notifications_admin.notification_flow, name='notification_flow'),

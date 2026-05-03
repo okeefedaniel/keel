@@ -30,4 +30,5 @@ urlpatterns = [
 
     # Public invitation acceptance
     path('invite/<str:token>/', views.accept_invitation, name='accept_invitation'),
+    path('invite/<str:token>/sign-out/', views.accept_invitation_signout, name='accept_invitation_signout'),
 ]

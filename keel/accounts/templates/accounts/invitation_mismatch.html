@@ -21,22 +21,24 @@
           This invitation was sent to <strong>{{ invitation.email }}</strong>, but you're signed in as <strong>{{ logged_in_email }}</strong>.
         </p>
         <p class="text-muted small mb-4">
-          To accept, sign out first and either log in as <strong>{{ invitation.email }}</strong> or create a new account when prompted. If you weren't expecting this invitation, you can safely close this page.
+          To accept, you'll need to sign out and either log in as <strong>{{ invitation.email }}</strong> or create a new account when prompted.
         </p>
 
-        {# /accounts/logout/ is mounted on both keel_site (named 'logout')   #}
-        {# and product sites (named 'account_logout' via allauth). Hardcode  #}
-        {# the path so the template is portable across both naming schemes. #}
-        <form method="post" action="/accounts/logout/?next={{ request.path }}">
+        {# Atomic sign-out-and-bounce-back action. Can't rely on a plain  #}
+        {# /accounts/logout/?next=... here because LogoutView's success   #}
+        {# target depends on host config; the dedicated view does both    #}
+        {# steps server-side and lands the user on the invite page as     #}
+        {# anonymous (where they'll see the create-account form).          #}
+        <form method="post" action="/invite/{{ invitation.token }}/sign-out/">
           {% csrf_token %}
           <button type="submit" class="btn btn-primary w-100 py-2">
-            Sign out and accept as {{ invitation.email }}
+            Sign out and continue as {{ invitation.email }}
           </button>
         </form>
 
         <hr class="my-4">
         <p class="text-center text-muted small mb-0">
-          <a href="/" style="color:#5B5348;">Cancel and go back</a>
+          Wrong account? <a href="/" style="color:#5B5348;">Cancel and go back</a>
         </p>
       </div>
     </div>

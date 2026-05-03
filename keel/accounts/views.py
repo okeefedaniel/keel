@@ -15,7 +15,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -659,6 +659,30 @@ def revoke_invitation(request, invitation_id):
 # ---------------------------------------------------------------------------
 # Invitation acceptance (public-facing)
 # ---------------------------------------------------------------------------
+@require_POST
+def accept_invitation_signout(request, token):
+    """Sign out the current user and bounce back to /invite/<token>/.
+
+    The mismatch page (rendered when a logged-in user clicks an invite
+    addressed to someone else) submits to this view. We need this
+    instead of a plain `/accounts/logout/?next=...` round-trip because:
+    (a) Django's LogoutView in keel_site uses LOGOUT_REDIRECT_URL='/'
+        as the success target, ignoring `next=` in some configs; and
+    (b) we want a single atomic action — log out, return to invite —
+        without depending on which auth backend the host product uses
+        (allauth vs Django native), which differ on logout URL naming.
+
+    Validates the token exists before logging out so a bogus token
+    doesn't trigger session destruction.
+    """
+    # Cheap existence check — don't tear down the session if the token
+    # is bogus. We don't reveal status (expired, revoked, accepted) to
+    # avoid token-probing leaks.
+    get_object_or_404(Invitation, token=token)
+    logout(request)
+    return redirect(f'/invite/{token}/')
+
+
 def accept_invitation(request, token):
     """Public view for accepting an invitation via email link.
 
