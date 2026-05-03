@@ -9,6 +9,8 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from keel.security.scanning import FileSecurityValidator
+
 
 # ---------------------------------------------------------------------------
 # Agency (state agencies / partner organizations)
@@ -471,7 +473,10 @@ class AbstractAttachment(models.Model):
         SYSTEM = 'system', _('System-generated')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    file = models.FileField(upload_to='attachments/%Y/%m/')
+    file = models.FileField(
+        upload_to='attachments/%Y/%m/',
+        validators=[FileSecurityValidator()],
+    )
     filename = models.CharField(max_length=255, blank=True)
     content_type = models.CharField(max_length=100, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)
