@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keel"
-version = "0.24.8"
+version = "0.25.0"
 description = "Shared Django platform layer for DockLabs products"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,6 +22,7 @@ foia = ["anthropic>=0.40"]
 alerts = ["requests>=2.30"]  # for webhook notifications
 sms = ["twilio>=9.0"]  # for SMS notifications
 calendar = ["msal>=1.28"]  # for Microsoft Graph calendar integration
+encryption = ["cryptography>=42"]  # for keel.security.encryption (data-at-rest KEK)
 
 [tool.setuptools.packages.find]
 include = ["keel*"]
