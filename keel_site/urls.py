@@ -5,7 +5,11 @@ from django.shortcuts import redirect
 from django.urls import include, path
 
 from keel.accounts.forms import LoginForm
-from keel.accounts.views import accept_invitation, accept_invitation_signout
+from keel.accounts.views import (
+    accept_invitation,
+    accept_invitation_complete,
+    accept_invitation_signout,
+)
 from keel.core.demo import demo_login_view
 from keel.core.views import favicon_view, robots_txt, suite_logout_endpoint
 from keel.oidc.views import session_status as oidc_session_status
@@ -108,6 +112,7 @@ urlpatterns = [
     # silently 404'd every accept-invitation click from emails.
     path('invite/<str:token>/', accept_invitation, name='accept_invitation'),
     path('invite/<str:token>/sign-out/', accept_invitation_signout, name='accept_invitation_signout'),
+    path('invite/<str:token>/complete/', accept_invitation_complete, name='accept_invitation_complete'),
 
     # Notification flow & routing
     path('notifications/flow/', notifications_admin.notification_flow, name='notification_flow'),

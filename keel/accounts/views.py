@@ -661,16 +661,26 @@ def revoke_invitation(request, invitation_id):
 # ---------------------------------------------------------------------------
 @require_POST
 def accept_invitation_signout(request, token):
-    """Sign out the current user and bounce back to /invite/<token>/.
+    """Sign out the current user across the WHOLE suite, then bounce
+    back to /invite/<token>/.
 
-    The mismatch page (rendered when a logged-in user clicks an invite
-    addressed to someone else) submits to this view. We need this
-    instead of a plain `/accounts/logout/?next=...` round-trip because:
-    (a) Django's LogoutView in keel_site uses LOGOUT_REDIRECT_URL='/'
-        as the success target, ignoring `next=` in some configs; and
-    (b) we want a single atomic action — log out, return to invite —
-        without depending on which auth backend the host product uses
-        (allauth vs Django native), which differ on logout URL naming.
+    Critical UX subtlety: the mismatch page is rendered when a
+    logged-in user clicks an invite addressed to someone else. The
+    user has stale sessions across the suite (Helm, Beacon, Harbor,
+    etc.) — each product holds its own subdomain-scoped session
+    cookie. Just clearing keel's session would leave the user "still
+    signed in as dok@" on Helm and every other product, even after
+    they create the new account here.
+
+    Fix: stamp ``last_logout_at`` on the User row before calling
+    ``logout()``. Each product's ``SessionFreshnessMiddleware`` polls
+    Keel's ``/oauth/session-status/`` on the next request, compares
+    that timestamp against the session's ``keel_oidc_login_at``, and
+    tears down the stale per-product session when keel's logout is
+    newer. The user is bounced to login, AutoOIDCLoginMiddleware
+    starts an OIDC flow against keel (where they're now logged in as
+    the invitation's email after acceptance), and lands logged in as
+    the right person across every suite product.
 
     Validates the token exists before logging out so a bogus token
     doesn't trigger session destruction.
@@ -679,8 +689,67 @@ def accept_invitation_signout(request, token):
     # is bogus. We don't reveal status (expired, revoked, accepted) to
     # avoid token-probing leaks.
     get_object_or_404(Invitation, token=token)
+    # Stamp the suite-wide logout epoch BEFORE clearing the keel
+    # session — same pattern as keel.core.views.suite_logout_endpoint.
+    # .update() is atomic, skips signal noise, and avoids a needless
+    # full save() round-trip.
+    if request.user.is_authenticated:
+        KeelUser.objects.filter(pk=request.user.pk).update(
+            last_logout_at=timezone.now(),
+        )
     logout(request)
     return redirect(f'/invite/{token}/')
+
+
+def accept_invitation_complete(request, token):
+    """Post-acceptance interstitial that clears stale per-product
+    sessions before the final redirect to the suite landing page.
+
+    The flow this exists to fix: user A accepts an invitation while
+    user B (e.g. an admin) was previously signed in on the same browser
+    across other suite products (Helm, Beacon, etc.). Each product
+    holds its own subdomain-scoped session cookie. Even after the
+    user's keel session is replaced (because they accepted as user A),
+    each product's session middleware would still see user B until its
+    next freshness-cache miss — up to 60 seconds — by which point the
+    user has likely concluded "nothing happened."
+
+    Solution: render an interstitial page with hidden <img> beacons
+    pointing at each product's /accounts/logout/ URL. Browsers fire
+    same-site GETs (SameSite=Lax cookies for *.docklabs.ai products
+    flow on top-level navigations including image loads), each
+    product's SuiteLogoutView destroys its session cookie, and the
+    user's onward navigation hits a clean slate. After ~2.5s the
+    interstitial JS-redirects to KEEL_INVITATION_LANDING_URL where the
+    AutoOIDCLoginMiddleware will start a fresh OIDC sign-in as the
+    just-created identity.
+
+    Validates the token exists so this URL can't be used to spam
+    logout requests at every product.
+    """
+    invitation = get_object_or_404(Invitation, token=token)
+    landing_url = getattr(
+        settings,
+        'KEEL_INVITATION_LANDING_URL',
+        getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/'),
+    )
+    # Pull product list directly from KEEL_FLEET_PRODUCTS — same source
+    # of truth used by the fleet switcher, so nothing drifts.
+    fleet = getattr(settings, 'KEEL_FLEET_PRODUCTS', []) or []
+    # Strip the trailing /dashboard/ — we want the host root for the
+    # logout URL, not the product's dashboard.
+    logout_urls = []
+    for entry in fleet:
+        url = (entry.get('url') or '').rstrip('/')
+        if url.endswith('/dashboard'):
+            url = url[: -len('/dashboard')]
+        if url:
+            logout_urls.append(f'{url}/accounts/logout/')
+    return render(request, 'accounts/invitation_complete.html', {
+        'invitation': invitation,
+        'landing_url': landing_url,
+        'logout_urls': logout_urls,
+    })
 
 
 def accept_invitation(request, token):
@@ -798,17 +867,15 @@ def accept_invitation(request, token):
                 f'Welcome! You now have access to: {", ".join(accepted)}.',
             )
 
-        # Redirect to the suite landing page after acceptance. Defaults to
-        # the local dashboard, but deployments can point invitees to a
-        # different host — e.g. on keel.docklabs.ai (the identity console)
-        # we send them to helm.docklabs.ai (the suite home dashboard) so
-        # they don't land on an admin-only screen they can't navigate.
-        redirect_url = getattr(
-            settings,
-            'KEEL_INVITATION_LANDING_URL',
-            getattr(settings, 'LOGIN_REDIRECT_URL', '/dashboard/'),
-        )
-        return redirect(redirect_url)
+        # Bounce through the suite-clear interstitial before the final
+        # landing redirect. The interstitial fires hidden <img> beacons
+        # at every product's /accounts/logout/ to destroy any stale
+        # per-product sessions the just-accepted user (or anyone else
+        # logged in on this browser) might still be carrying. Without
+        # this, a user who arrived via the mismatch flow lands on Helm
+        # still showing the OLD identity for up to 60 seconds (the
+        # SessionFreshnessMiddleware cache TTL).
+        return redirect(f'/invite/{token}/complete/')
 
     # GET: list all sibling invitations in the batch so the recipient sees
     # the full set they're about to accept.

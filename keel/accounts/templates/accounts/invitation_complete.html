@@ -1,0 +1,66 @@
+{% extends "keel/layouts/auth.html" %}
+
+{% block title %}Welcome to DockLabs{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-5 text-center">
+
+    <div class="mb-4">
+      <div style="font-family:'Poppins',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#0A2B4E;">
+        DockLabs
+      </div>
+      <div style="font-size:11px;color:#8A8275;letter-spacing:0.04em;text-transform:uppercase;margin-top:2px;">
+        Civic Software for Government
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius:10px;">
+      <div class="card-body p-4 p-md-5">
+        <i class="bi bi-check-circle-fill" style="font-size:48px;color:#1F8A4E;"></i>
+        <h1 class="h4 mt-3 mb-2" style="color:#0A2B4E;">Welcome to DockLabs</h1>
+        <p class="text-muted mb-3">
+          Setting up your access across the suite&hellip;
+        </p>
+        <div class="spinner-border text-primary" role="status" style="width:1.5rem;height:1.5rem;">
+          <span class="visually-hidden">Loading…</span>
+        </div>
+        <p class="text-muted small mt-3 mb-0" id="manual-fallback" style="display:none;">
+          Taking longer than expected?
+          <a href="{{ landing_url }}">Continue manually &rarr;</a>
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# Hidden <img> beacons that fire GETs at each product's logout URL.    #}
+{# Each request carries SameSite=Lax cookies for *.docklabs.ai (same    #}
+{# eTLD+1) so each product's session is destroyed server-side. The       #}
+{# server returns HTML, browser fails to parse as image, but the        #}
+{# logout side-effect already happened — that's all we need.            #}
+<div aria-hidden="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">
+  {% for url in logout_urls %}
+  <img src="{{ url }}" alt="" width="1" height="1" loading="eager">
+  {% endfor %}
+</div>
+
+<script>
+  (function () {
+    // Show a manual continue link if the redirect hasn't fired in 5s
+    // (slow product responses, blocked network, etc.) so the user is
+    // never stuck looking at a spinner.
+    setTimeout(function () {
+      var fallback = document.getElementById('manual-fallback');
+      if (fallback) fallback.style.display = '';
+    }, 5000);
+    // Give the <img> beacons time to fire and the responses to come
+    // back. 2.5s is comfortable on broadband; products' logout URLs
+    // typically respond in under 200ms.
+    setTimeout(function () {
+      window.location.replace("{{ landing_url|escapejs }}");
+    }, 2500);
+  })();
+</script>
+{% endblock %}
