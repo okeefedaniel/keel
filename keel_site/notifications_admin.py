@@ -5,6 +5,7 @@ and allows adjusting the routing logic from the admin console.
 """
 import hmac
 import json
+import os
 
 from django.conf import settings as django_settings
 from django.contrib.auth.decorators import login_required
@@ -99,7 +100,10 @@ def notification_flow(request):
             role_coverage.setdefault(role, []).append(ntype.key)
 
     # Channel config status
-    sms_configured = bool(getattr(django_settings, 'KEEL_SMS_BACKEND', None))
+    sms_configured = bool(
+        getattr(django_settings, 'KEEL_SMS_BACKEND', None)
+        or os.environ.get('KEEL_SMS_BACKEND')
+    )
     email_backend = getattr(django_settings, 'EMAIL_BACKEND', '').split('.')[-1]
 
     # Build the routing matrix: rows = notification types, cols = roles

@@ -10,6 +10,7 @@ renders the same form. Eventually we can deprecate it in favor of
 `/settings/notifications/`.
 """
 import logging
+import os
 
 from django.conf import settings as django_settings
 
@@ -66,7 +67,10 @@ class NotificationsPanel(SettingsPanel):
             'categories': types_by_category,
             'preferences': user_prefs,
             'prefs_enabled': True,
-            'sms_available': bool(getattr(django_settings, 'KEEL_SMS_BACKEND', None)),
+            'sms_available': bool(
+                getattr(django_settings, 'KEEL_SMS_BACKEND', None)
+                or os.environ.get('KEEL_SMS_BACKEND')
+            ),
             'user_has_phone': bool(getattr(request.user, 'phone', None)),
             'boswell_available': _boswell_available(types_by_category),
         }

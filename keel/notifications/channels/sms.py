@@ -1,18 +1,38 @@
 """SMS notification channel via Twilio.
 
-Configuration:
+Configuration (settings OR environment variables — settings win):
     KEEL_SMS_BACKEND = 'twilio'  # or None to disable
     TWILIO_ACCOUNT_SID = 'ACxxxxx'
     TWILIO_AUTH_TOKEN = 'xxxxx'
     TWILIO_FROM_NUMBER = '+1xxxxxxxxxx'
 
+Each value is read first from Django settings; if unset, falls back to the
+process environment variable of the same name. This lets products opt into
+SMS by setting four env vars on their deploy without each product's
+settings.py having to mirror keel_site/settings.py.
+
 Users must have a `phone` field on their User model to receive SMS.
 """
 import logging
+import os
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _sms_setting(name, default=''):
+    """Read an SMS-related setting, falling back to the env var of the same name.
+
+    Settings take precedence: if a product explicitly sets `KEEL_SMS_BACKEND`
+    (or any TWILIO_* setting) in its Django settings.py, that wins. Otherwise
+    we fall back to the environment so a product that only sets env vars on
+    its deploy still gets SMS without a settings.py edit.
+    """
+    value = getattr(settings, name, None)
+    if value is None or value == '':
+        value = os.environ.get(name, default)
+    return value
 
 
 def send_sms(recipient, title, message, link='', priority='medium',
@@ -35,7 +55,7 @@ def send_sms(recipient, title, message, link='', priority='medium',
     Returns:
         (success: bool, error_message: str)
     """
-    backend = getattr(settings, 'KEEL_SMS_BACKEND', None)
+    backend = _sms_setting('KEEL_SMS_BACKEND', '') or None
     if not backend:
         return False, 'SMS backend not configured (KEEL_SMS_BACKEND not set)'
 
@@ -56,9 +76,9 @@ def send_sms(recipient, title, message, link='', priority='medium',
 
 def _send_twilio(phone, title, message, link):
     """Send via Twilio REST API."""
-    account_sid = getattr(settings, 'TWILIO_ACCOUNT_SID', '')
-    auth_token = getattr(settings, 'TWILIO_AUTH_TOKEN', '')
-    from_number = getattr(settings, 'TWILIO_FROM_NUMBER', '')
+    account_sid = _sms_setting('TWILIO_ACCOUNT_SID')
+    auth_token = _sms_setting('TWILIO_AUTH_TOKEN')
+    from_number = _sms_setting('TWILIO_FROM_NUMBER')
 
     if not all([account_sid, auth_token, from_number]):
         return False, 'Twilio credentials not configured'

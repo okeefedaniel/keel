@@ -10,6 +10,7 @@ This provides:
     /notifications/preferences/     — manage notification preferences
 """
 import logging
+import os
 
 from django.apps import apps
 from django.conf import settings
@@ -157,7 +158,10 @@ def preferences(request):
         'categories': types_by_category,
         'preferences': user_prefs,
         'prefs_enabled': True,
-        'sms_available': bool(getattr(settings, 'KEEL_SMS_BACKEND', None)),
+        'sms_available': bool(
+            getattr(settings, 'KEEL_SMS_BACKEND', None)
+            or os.environ.get('KEEL_SMS_BACKEND')
+        ),
         'user_has_phone': bool(getattr(request.user, 'phone', None)),
         'boswell_available': _boswell_available(types_by_category),
     }
