@@ -720,7 +720,24 @@ When one DockLabs product creates a record in another (e.g., Yeoman creates a Co
 - **Startup failures MUST be fatal.** `run_startup()` already exits with the failed command's return code, but several products (bounty, harbor, helm, yeoman as of 2026-04-22) ship their own `startup.py` with a local `run()` helper that defaults `fatal=False`. Every invocation of migrate / collectstatic / ensure_dokadmin in those scripts **must** pass `fatal=True`, or a failed migration becomes a log line that nobody sees while gunicorn happily starts on top of a broken schema. Observed symptom: a deploy "succeeds" (Railway status: SUCCESS, healthcheck responds) but the DB is partially migrated or entirely empty, and every page 500s with `UndefinedTable` until someone notices. Default to failing loud.
 - **Email:** Resend backend via Keel in production, console backend in development.
 - **Static files:** WhiteNoise compressed manifest storage.
-- **Database:** PostgreSQL in production, SQLite in development (except for search/comms features which require PostgreSQL). Use `dj-database-url`.
+- **Database:** PostgreSQL everywhere — production, CI, AND local development. Use `dj-database-url`. **The old "SQLite in dev" convention is decommissioned as of keel 0.24.3** — too many features require Postgres (search via `keel.search`, FTS via `keel.comms`, `tsvector` columns on `Bill.search_vector` and friends, raw `regexp_replace` in `lookout/bills/views.py`, etc.) and the carve-out kept growing. The previous setup also masked entire bug classes: tests passed on SQLite that would fail on Postgres, and tests failed on SQLite for code that worked fine on Postgres.
+
+  **Local setup, one-time per machine:**
+  ```bash
+  brew services start postgresql@16     # or whichever 14+ version is installed
+  createdb <product>_dev                # e.g. createdb beacon_dev
+  ```
+
+  **Per-product `.env` (or shell):**
+  ```bash
+  DATABASE_URL=postgres://$(whoami)@localhost:5432/<product>_dev
+  ```
+
+  Each product's `.env.example` MUST ship a working `DATABASE_URL=postgres://...` line (uncommented, with a sensible default), not an empty value or a commented-out placeholder — an unset `DATABASE_URL` silently falls back to SQLite via Django's default and reintroduces the divergence this convention closes.
+
+  **Test runner:** test commands inherit the same `DATABASE_URL`. Django's `manage.py test` will create + drop a `test_<product>_dev` database on each run; pytest-django does the same. CI services (`postgres:16` containers in `.github/workflows/ci.yml`) already match this, so local + CI + prod are all on the same engine.
+
+  **Why this is worth the 5-minute onboarding cost:** the Lookout `regexp_replace` test failure (2026-05-02) was the clearest symptom — production code that's been working fine for months suddenly looked broken because the test runner happened to default to SQLite. The fix isn't to refactor every Postgres-specific feature out (impossible — search, FTS, and JSONB are foundational), it's to stop pretending the dev environment is engine-agnostic.
 
 ### Keel version bumping — the pip cache trap
 
