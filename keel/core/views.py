@@ -224,11 +224,22 @@ class SuiteLogoutView(LogoutView):
     def get_success_url(self):
         # Django 5's LogoutView dispatches redirects through
         # get_success_url() (via RedirectURLMixin), not the old
-        # get_next_page() hook. Always chain through Keel's
-        # /suite/logout/ so the IdP session is torn down too — any
-        # same-host ?next= is intentionally ignored so products can't
-        # short-circuit the suite-wide logout chain. auth_logout() has
-        # already run by the time this is called.
+        # get_next_page() hook.
+        #
+        # Default behavior: chain through Keel's /suite/logout/ so the
+        # IdP session is torn down too. Any same-host ?next= is ignored
+        # so products can't short-circuit the suite-wide logout chain.
+        # auth_logout() has already run by the time this is called.
+        #
+        # Opt-out: ?local_only=1 returns to the product home WITHOUT
+        # chaining to keel. Used by the keel-side invitation-complete
+        # interstitial which fires <img> beacons at each product's
+        # logout URL — without this flag the chain would log the
+        # just-accepted user out of keel too. Local-only is safe
+        # because the only legitimate caller already controls the keel
+        # session (see keel.accounts.views.accept_invitation_complete).
+        if (self.request.GET.get('local_only') or self.request.POST.get('local_only')) == '1':
+            return self.request.build_absolute_uri('/')
         host = self.request.get_host().split(':', 1)[0]
         keel_host = 'demo-keel.docklabs.ai' if host.startswith('demo-') else 'keel.docklabs.ai'
         product_home = self.request.build_absolute_uri('/')

@@ -41,8 +41,13 @@
 {# server returns HTML, browser fails to parse as image, but the        #}
 {# logout side-effect already happened — that's all we need.            #}
 <div aria-hidden="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">
+  {# `?local_only=1` is honored by SuiteLogoutView in keel ≥ v0.24.7 — #}
+  {# without it, the per-product logout chains through keel's          #}
+  {# /suite/logout/ which would also kill the just-accepted keel      #}
+  {# session. Older keel versions ignore the query param and fall     #}
+  {# back to the chain, costing the user one extra password entry.    #}
   {% for url in logout_urls %}
-  <img src="{{ url }}" alt="" width="1" height="1" loading="eager">
+  <img src="{{ url }}?local_only=1" alt="" width="1" height="1" loading="eager">
   {% endfor %}
 </div>
 
