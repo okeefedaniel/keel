@@ -432,18 +432,27 @@ def set_avatar(user, uploaded_file, *, actor=None) -> str:
     # lazy-evaluates to '' when no file is attached.
     old_name = user.avatar.name if user.avatar else ''
 
-    # Save the new file. We bypass ``ImageFieldFile.save()`` (which calls
-    # ``Storage.save()`` and adds a random collision-avoidance suffix on
-    # FileSystemStorage) and write directly through ``storage._save`` so
-    # the key stays content-addressed-deterministic. S3Boto3Storage's
-    # ``_save`` overwrites by default; FileSystemStorage's overwrites
-    # only when given an exact path. The deterministic key means a
-    # re-upload of the same image is idempotent — we don't want a
-    # ``hash_xY9zA.webp`` variant cluttering the bucket.
+    # Write the file at exactly ``full_key`` without the random
+    # collision-avoidance suffix that ``Storage.save`` would add on
+    # FileSystemStorage. Strategy depends on the backend:
+    #
+    # - S3Storage runs with ``file_overwrite=True`` — ``save()`` writes
+    #   straight through, idempotent for repeated uploads of the same
+    #   image. We don't call ``storage.exists()`` because that requires
+    #   ``s3:GetObject`` / HeadObject permission, and the writer IAM
+    #   role is intentionally write-only (PutObject + DeleteObject).
+    #
+    # - FileSystemStorage doesn't honor ``file_overwrite``; ``save()``
+    #   would suffix the name. Delete-then-save reaches the same
+    #   deterministic key. ``delete()`` is a no-op on missing files
+    #   under FSS, so the try/except is just defensive.
     full_key = f'avatars/{new_relative}'
     storage = user.avatar.storage
-    if storage.exists(full_key):
-        storage.delete(full_key)
+    if not getattr(storage, 'file_overwrite', False):
+        try:
+            storage.delete(full_key)
+        except Exception:
+            pass
     saved_name = storage.save(full_key, ContentFile(body))
     user.avatar.name = saved_name
     KeelUser.objects.filter(pk=user.pk).update(avatar=saved_name)
