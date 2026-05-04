@@ -228,10 +228,21 @@ def helm_inbox_view(build_inbox_func):
 
         user = resolve_user_from_sub(user_sub)
         if user is None:
+            # Derive product_url from the inbound request so the helm
+            # aggregator's per-product card links to *this* product even
+            # when the sub doesn't resolve. Falls back to PRODUCT_URL /
+            # KEEL_PRODUCT_URL settings if the request can't supply a host
+            # (cache hits, tests). Empty string was the historical value
+            # and broke the helm dashboard's "Awaiting Me" links.
+            product_url = (
+                getattr(settings, 'KEEL_PRODUCT_URL', '')
+                or getattr(settings, 'PRODUCT_URL', '')
+                or request.build_absolute_uri('/').rstrip('/')
+            )
             payload = {
                 'product': getattr(settings, 'KEEL_PRODUCT_CODE', ''),
                 'product_label': getattr(settings, 'KEEL_PRODUCT_NAME', ''),
-                'product_url': getattr(settings, 'PRODUCT_URL', ''),
+                'product_url': product_url,
                 'user_sub': user_sub,
                 'items': [],
                 'unread_notifications': [],
