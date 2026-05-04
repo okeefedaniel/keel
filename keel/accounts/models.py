@@ -339,6 +339,10 @@ class KeelUser(AbstractUser):
         upload_to='avatars/',
         null=True, blank=True,
         storage=avatar_storage,
+        # Default Django ImageField max_length is 100, but our content-
+        # addressed key shape ``avatars/{user_uuid}/{sha256_hex}.webp``
+        # is 114 chars (8 + 36 + 1 + 64 + 5). 200 leaves headroom.
+        max_length=200,
     )
     # Mirrored avatar URL from the JWT ``picture`` claim — populated on
     # OIDC sign-in for suite-mode products that don't own the upload.
