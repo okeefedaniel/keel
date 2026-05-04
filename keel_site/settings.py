@@ -311,6 +311,22 @@ DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
 DEMO_ROLES = ['admin', 'system_admin']
 KEEL_AUDIT_LOG_MODEL = 'keel_accounts.AuditLog'
 
+# This service IS the IdP. Set on Keel only — products leave it unset
+# (or False). ``keel.core.utils.is_keel_idp()`` reads this to gate
+# identity-edit surfaces (username/email/password/avatar) so they only
+# render where the canonical row lives.
+KEEL_IS_IDP = os.environ.get('KEEL_IS_IDP', 'False').lower() in ('true', '1', 'yes')
+
+# Avatar storage (Phase 2 of suite-wide profile, keel >= 0.27.0).
+# When KEEL_AVATAR_BUCKET is set, ``keel.accounts.storage.avatar_storage()``
+# resolves to django-storages S3Boto3Storage (CloudFront via custom_domain).
+# Unset = local FileSystemStorage fallback (dev). The AWS credentials are
+# read directly from the environment by django-storages — no Django setting
+# needed for those.
+KEEL_AVATAR_BUCKET = os.environ.get('KEEL_AVATAR_BUCKET', '')
+KEEL_AVATAR_REGION = os.environ.get('KEEL_AVATAR_REGION', 'us-east-1')
+KEEL_AVATAR_CDN_BASE_URL = os.environ.get('KEEL_AVATAR_CDN_BASE_URL', '')
+
 # SMS via Twilio (set env vars on Railway to enable)
 KEEL_SMS_BACKEND = os.environ.get('KEEL_SMS_BACKEND', None)  # Set to 'twilio' to enable
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
