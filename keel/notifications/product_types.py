@@ -729,6 +729,23 @@ def register_keel_platform_types():
         allow_mute=False,
     ))
     register(NotificationType(
+        key='sms_opt_in_confirmation',
+        label='SMS Opt-in Confirmation',
+        description=(
+            'One-time confirmation message sent the first time a user '
+            'enables SMS for any notification type. Establishes the carrier '
+            "opt-in record for Twilio A2P 10DLC compliance — TCR's audit "
+            'process expects an explicit confirmation message after the user '
+            'completes the web opt-in flow. Not user-mutable; the user has '
+            'just opted in and the confirmation is the response to that act.'
+        ),
+        category='Keel — Platform',
+        default_channels=['sms'],
+        default_roles=[],  # Recipient passed explicitly by the post_save signal.
+        priority='low',
+        allow_mute=False,
+    ))
+    register(NotificationType(
         key='invitation_accepted',
         label='Invitation Accepted',
         description='A user has accepted a platform invitation.',

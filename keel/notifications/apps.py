@@ -30,3 +30,8 @@ class KeelNotificationsConfig(AppConfig):
 
         # Load admin overrides from the database on top of hardcoded defaults.
         apply_overrides()
+
+        # Connect the SMS opt-in confirmation hook. Safe no-op when
+        # KEEL_NOTIFICATION_PREFERENCE_MODEL is unset on this deployment.
+        from .signals import connect_notification_signals
+        connect_notification_signals()
