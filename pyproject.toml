@@ -25,7 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 sso = ["django-allauth>=65.16.1"]
 avatars-s3 = ["django-storages[s3]>=1.14"]  # S3 avatar storage; unset KEEL_AVATAR_BUCKET falls back to local FS
-foia = ["anthropic>=0.40"]
+foia = ["anthropic>=0.97.0"]
 alerts = ["requests>=2.34.2"]  # for webhook notifications
 sms = ["twilio>=9.0"]  # for SMS notifications
 calendar = ["msal>=1.28"]  # for Microsoft Graph calendar integration
