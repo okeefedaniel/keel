@@ -379,6 +379,25 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                 user.username = base
             if hasattr(user, 'is_state_user'):
                 user.is_state_user = bool(claims.get('is_state_user'))
+            # Mirror display preferences from Keel so the product's local
+            # user row reflects the same timezone/locale the user picked
+            # on Keel's profile panel. ``zoneinfo`` is the standard OIDC
+            # claim name; ``locale`` is also OIDC-standard.
+            zoneinfo_claim = claims.get('zoneinfo')
+            if zoneinfo_claim is not None and hasattr(user, 'timezone'):
+                user.timezone = zoneinfo_claim or ''
+            locale_claim = claims.get('locale')
+            if locale_claim is not None and hasattr(user, 'locale'):
+                user.locale = locale_claim or ''
+            # Mirror Keel's avatar URL into ``user.avatar_url`` so the
+            # product's templates can render the same image without
+            # uploading or storing the file locally. ``user.avatar`` (the
+            # uploaded ImageField) takes precedence in ``get_avatar_url``,
+            # but suite-mode products never have a local upload — only
+            # the mirror.
+            picture_claim = claims.get('picture')
+            if picture_claim is not None and hasattr(user, 'avatar_url'):
+                user.avatar_url = picture_claim or ''
             # Resolve role for the current product from the product_access claim
             product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
             product_access = claims.get('product_access') or {}

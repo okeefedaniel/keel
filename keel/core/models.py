@@ -73,6 +73,9 @@ class AbstractAuditLog(models.Model):
         ARCHIVE = 'archive', _('Archive')
         UNARCHIVE = 'unarchive', _('Unarchive')
         ROLE_GRANT_DENIED = 'role_grant_denied', _('Role Grant Denied')
+        USERNAME_CHANGE = 'username_change', _('Username Change')
+        EMAIL_CHANGE = 'email_change', _('Email Change')
+        AVATAR_CHANGE = 'avatar_change', _('Avatar Change')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(

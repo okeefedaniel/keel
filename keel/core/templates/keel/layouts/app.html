@@ -13,7 +13,7 @@ Products extend this and override blocks:
     {% block sidebar_tree %}...{% endblock %}
     {% block content %}...{% endblock %}
 {% endcomment %}
-{% load static %}
+{% load static keel_tags %}
 <!DOCTYPE html>
 <html lang="{% block html_lang %}en{% endblock %}" data-bs-theme="light">
 <head>
@@ -138,11 +138,12 @@ Products extend this and override blocks:
             <button class="topbar-avatar-btn" id="topbar-user-menu" type="button"
                     data-bs-toggle="dropdown" aria-expanded="false"
                     title="{{ user.get_full_name|default:user.username }}">
-              <span class="topbar-avatar">{{ user.first_name|make_list|first|default:"?" }}{{ user.last_name|make_list|first|default:"" }}</span>
+              <span class="topbar-avatar">{% user_avatar user 32 %}</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="topbar-user-menu">
               <li class="dropdown-header">
                 <div class="fw-semibold">{{ user.get_full_name|default:user.username }}</div>
+                <div class="small text-muted">{{ user.get_role_display }}</div>
                 <div class="small text-muted">{{ user.email }}</div>
               </li>
               <li><hr class="dropdown-divider"></li>

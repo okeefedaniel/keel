@@ -1,0 +1,155 @@
+{% load static keel_tags %}
+
+{% if not editable %}
+  {# Suite-mode mirror: identity lives on Keel; show read-only summary
+     and deep-link to the canonical edit surface. #}
+  <div class="alert alert-info d-flex align-items-start mb-4" role="status">
+    <i class="bi bi-info-circle me-2 mt-1"></i>
+    <div class="flex-grow-1">
+      <strong>Profile is managed on DockLabs.</strong>
+      <div class="small mb-0">
+        Your name, email, and other identity details are shared across
+        every DockLabs product. Changes propagate the next time you sign in.
+      </div>
+    </div>
+    {% if keel_profile_url %}
+    <a href="{{ keel_profile_url }}" class="btn btn-sm btn-primary ms-3">
+      Edit on DockLabs <i class="bi bi-box-arrow-up-right ms-1"></i>
+    </a>
+    {% endif %}
+  </div>
+
+  <dl class="row mb-0">
+    <dt class="col-sm-3 text-muted fw-normal">Name</dt>
+    <dd class="col-sm-9">{{ user.get_full_name|default:"—" }}</dd>
+
+    <dt class="col-sm-3 text-muted fw-normal">Username</dt>
+    <dd class="col-sm-9"><code>{{ user.username }}</code></dd>
+
+    <dt class="col-sm-3 text-muted fw-normal">Email</dt>
+    <dd class="col-sm-9">{{ user.email|default:"—" }}</dd>
+
+    {% if user.title %}
+    <dt class="col-sm-3 text-muted fw-normal">Title</dt>
+    <dd class="col-sm-9">{{ user.title }}</dd>
+    {% endif %}
+
+    {% if user.phone %}
+    <dt class="col-sm-3 text-muted fw-normal">Phone</dt>
+    <dd class="col-sm-9">{{ user.phone }}</dd>
+    {% endif %}
+
+    {% if user.timezone %}
+    <dt class="col-sm-3 text-muted fw-normal">Timezone</dt>
+    <dd class="col-sm-9">{{ user.timezone }}</dd>
+    {% endif %}
+  </dl>
+
+{% else %}
+  {# Standalone or Keel IdP: editable form. #}
+
+  {# ── Avatar ───────────────────────────────────────────────────── #}
+  <div class="card border mb-4">
+    <div class="card-header bg-light">
+      <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Profile photo</h6>
+    </div>
+    <div class="card-body">
+      <div class="row g-4 align-items-center">
+        <div class="col-auto">
+          {% user_avatar user 96 %}
+        </div>
+        <div class="col">
+          <p class="small text-muted mb-3">
+            Square image recommended. JPEG, PNG, or WebP up to {{ avatar_max_mb }} MB.
+            We'll resize and re-encode automatically.
+          </p>
+
+          {% if avatar_error %}
+            <div class="alert alert-danger py-2 small mb-3">{{ avatar_error }}</div>
+          {% endif %}
+
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <form method="post"
+                  action="{% url 'keel_settings:panel' slug='profile' %}"
+                  enctype="multipart/form-data"
+                  class="d-flex gap-2 align-items-center mb-0"
+                  novalidate>
+              {% csrf_token %}
+              <input type="hidden" name="_action" value="avatar_upload">
+              <input type="file"
+                     name="avatar"
+                     accept="image/jpeg,image/png,image/webp"
+                     class="form-control form-control-sm"
+                     style="max-width: 320px;"
+                     required>
+              <button type="submit" class="btn btn-sm btn-primary">
+                <i class="bi bi-upload me-1"></i> Upload
+              </button>
+            </form>
+
+            {% if user.avatar %}
+              <form method="post"
+                    action="{% url 'keel_settings:panel' slug='profile' %}"
+                    class="mb-0"
+                    onsubmit="return confirm('Remove your profile photo?');">
+                {% csrf_token %}
+                <input type="hidden" name="_action" value="avatar_clear">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash me-1"></i> Remove
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Profile fields ──────────────────────────────────────────── #}
+  <form method="post" action="{% url 'keel_settings:panel' slug='profile' %}" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label for="{{ form.first_name.id_for_label }}" class="form-label">First name</label>
+        {{ form.first_name }}
+        {% if form.first_name.errors %}<div class="invalid-feedback d-block">{{ form.first_name.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="col-md-6">
+        <label for="{{ form.last_name.id_for_label }}" class="form-label">Last name</label>
+        {{ form.last_name }}
+        {% if form.last_name.errors %}<div class="invalid-feedback d-block">{{ form.last_name.errors.0 }}</div>{% endif %}
+      </div>
+
+      <div class="col-md-8">
+        <label for="{{ form.title.id_for_label }}" class="form-label">Title</label>
+        {{ form.title }}
+        {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="col-md-4">
+        <label for="{{ form.phone.id_for_label }}" class="form-label">Phone</label>
+        {{ form.phone }}
+        {% if form.phone.errors %}<div class="invalid-feedback d-block">{{ form.phone.errors.0 }}</div>{% endif %}
+      </div>
+
+      <div class="col-md-8">
+        <label for="{{ form.timezone.id_for_label }}" class="form-label">Timezone</label>
+        {{ form.timezone }}
+      </div>
+      <div class="col-md-4">
+        <label for="{{ form.locale.id_for_label }}" class="form-label">Language</label>
+        {{ form.locale }}
+      </div>
+    </div>
+
+    <div class="mt-4 d-flex justify-content-end">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1"></i> Save profile
+      </button>
+    </div>
+  </form>
+{% endif %}

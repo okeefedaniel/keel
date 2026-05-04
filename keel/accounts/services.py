@@ -164,6 +164,609 @@ def reconcile_user_product_access(user, force_logout: bool = True) -> int:
     return deactivated
 
 
+def rename_user(user, new_username: str, *, actor=None) -> str:
+    """Rename ``user`` to ``new_username`` and re-key SSO linkage.
+
+    A username rename has four side effects that MUST happen atomically:
+
+    1. ``KeelUser.username`` is updated.
+    2. Every linked ``allauth.socialaccount.SocialAccount.uid`` for the
+       user is rewritten — allauth uses ``uid`` as the linking key for
+       OIDC roundtrips, and Keel's ``KeelSocialAccountAdapter.populate_user``
+       sets ``user.username = preferred_username`` from the JWT on every
+       login. If ``uid`` and ``KeelUser.username`` drift, the next sign-in
+       creates a duplicate user (``dan`` / ``dan2`` zombie pattern).
+    3. ``user.last_logout_at`` is bumped so ``SessionFreshnessMiddleware``
+       (deployed across all 9 products in keel ≥ 0.20.0) tears down per-
+       product sessions on the next request and the user re-handshakes
+       with the new ``preferred_username`` in the JWT.
+    4. An ``AuditLog`` row is written for the security trail (admins
+       reviewing access activity should see "username changed" alongside
+       password resets and email changes).
+
+    Parameters
+    ----------
+    user
+        The ``KeelUser`` being renamed. Required.
+    new_username
+        The candidate. MUST already have passed ``validate_username_format``
+        and a uniqueness check at the form layer — this function re-checks
+        uniqueness inside the transaction (race window between live-check
+        and submit) and raises ``ValueError`` on collision rather than
+        silently overwriting.
+    actor
+        The user performing the rename. Defaults to ``user`` for self-
+        service renames; admin-driven renames pass the admin as ``actor``
+        so the audit row identifies who made the change.
+
+    Returns
+    -------
+    str
+        The new username (lowercased, stripped) — useful for the calling
+        view to message the user with the canonical form.
+
+    Raises
+    ------
+    ValueError
+        On format failure, reservation, self-rename to current value, or
+        uniqueness collision detected inside the atomic block.
+    """
+    from django.db import transaction
+    from keel.accounts.forms import validate_username_format
+    from keel.accounts.models import KeelUser
+
+    candidate = (new_username or '').strip().lower()
+    err = validate_username_format(candidate)
+    if err is not None:
+        raise ValueError(f'username_validation: {err}')
+    if candidate == user.username:
+        raise ValueError('username_validation: unchanged')
+
+    old_username = user.username
+    actor = actor or user
+
+    with transaction.atomic():
+        # Lock the row to keep two simultaneous renames from racing.
+        # ``select_for_update`` on the user table is fine — KeelUser
+        # has a UUID PK so this is a single row lock.
+        locked = KeelUser.objects.select_for_update().filter(pk=user.pk).first()
+        if locked is None:
+            raise ValueError('username_validation: user_not_found')
+
+        # Re-check uniqueness inside the lock. ``__iexact`` matches the
+        # form-layer policy — `Dan` and `dan` are the same name.
+        if KeelUser.objects.filter(
+            username__iexact=candidate,
+        ).exclude(pk=user.pk).exists():
+            raise ValueError('username_validation: taken')
+
+        locked.username = candidate
+        locked.last_logout_at = timezone.now()
+        locked.save(update_fields=['username', 'last_logout_at'])
+
+        # Re-key SocialAccount.uid for every Keel-OIDC linkage. Allauth's
+        # OIDC provider stores ``preferred_username`` in ``uid`` so the
+        # next login matches the same row. Microsoft Entra accounts use
+        # the OID/sub as ``uid`` and aren't affected by username — we
+        # filter by provider to skip them.
+        try:
+            from allauth.socialaccount.models import SocialAccount
+            SocialAccount.objects.filter(
+                user_id=user.pk,
+                provider='keel',
+            ).update(uid=candidate)
+        except Exception:
+            # allauth not installed (Keel-only deployments where the IdP
+            # itself isn't an OIDC client of anything) — nothing to re-key.
+            logger.debug('rename_user: allauth not present; skipping uid update')
+
+        # Audit log. Wrapped in try/except so a missing or differently-
+        # configured AuditLog model doesn't block the rename — the rename
+        # itself is the operationally important part. Each product carries
+        # its own concrete AuditLog table; here we write into Keel's.
+        try:
+            from django.apps import apps
+            from django.conf import settings as django_settings
+            audit_label = getattr(
+                django_settings, 'KEEL_AUDIT_LOG_MODEL', None,
+            )
+            if audit_label:
+                AuditLog = apps.get_model(audit_label)
+                AuditLog.objects.create(
+                    user=actor,
+                    action='username_change',
+                    entity_type='KeelUser',
+                    entity_id=str(user.pk),
+                    changes={
+                        'old_username': old_username,
+                        'new_username': candidate,
+                        'self_service': actor.pk == user.pk,
+                    },
+                )
+        except Exception:
+            logger.exception(
+                'rename_user: audit log write failed for user=%s; rename succeeded',
+                user.pk,
+            )
+
+    # Mirror onto the in-memory object the caller passed in so subsequent
+    # template rendering reads the new value without a refetch.
+    user.username = candidate
+    user.last_logout_at = locked.last_logout_at
+
+    logger.info(
+        'rename_user: user=%s renamed %r → %r by actor=%s',
+        user.pk, old_username, candidate, actor.pk,
+    )
+    return candidate
+
+
+# ---------------------------------------------------------------------------
+# Avatar pipeline — used by ProfilePanel POST and admin tools
+# ---------------------------------------------------------------------------
+
+# Browser-uploaded constraints. Larger than the post-process size on
+# purpose: a 5 MB JPEG resizes down to ~30 KB WebP at 512×512 quality 85,
+# but rejecting before the resize lets us refuse abusive uploads early.
+AVATAR_MAX_BYTES = 5 * 1024 * 1024
+AVATAR_ALLOWED_CONTENT_TYPES = frozenset({
+    'image/jpeg', 'image/png', 'image/webp',
+})
+AVATAR_OUTPUT_SIZE = 512  # square WebP edge length
+AVATAR_OUTPUT_QUALITY = 85
+
+
+def _process_avatar_bytes(raw: bytes) -> tuple[bytes, str]:
+    """Validate, resize, strip EXIF, re-encode → ``(bytes, sha256_hex)``.
+
+    Pillow notes:
+
+    - ``ImageOps.exif_transpose`` honors EXIF orientation BEFORE we strip
+      metadata, so portrait phone photos render upright. Without this,
+      iPhone-shot avatars come out rotated 90° because the underlying
+      pixels are landscape and the orientation tag would have rotated
+      them.
+    - ``Image.convert('RGB')`` flattens any alpha channel, drops palette
+      modes (P, L), and gives WebP a consistent color space. WebP would
+      otherwise emit lossy-with-alpha which is bigger and looks worse on
+      the typical white-background avatar.
+    - ``ImageOps.fit`` is cover-crop (resize so the smallest dimension
+      equals 512, then center-crop the longer axis). Equivalent to
+      ``object-fit: cover`` in CSS.
+    - The default WebP encoder strips EXIF; we never pass ``exif=`` to
+      ``save()`` so metadata never makes it through.
+
+    Raises ``ValueError`` on any decode failure or unsupported format —
+    the calling view re-shapes that into a user-facing form error.
+    """
+    import hashlib
+    import io
+
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img.load()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ValueError(f'avatar_invalid: cannot decode image ({exc})')
+
+    # Pillow lowercases the format identifier. JPEG → 'JPEG', PNG → 'PNG',
+    # WebP → 'WEBP'. Reject anything outside our allowlist (animated GIF,
+    # TIFF, BMP, etc.) — even though browsers might accept them, our own
+    # AVATAR_ALLOWED_CONTENT_TYPES already gated this on the way in;
+    # this is defense-in-depth in case someone POSTed a renamed file.
+    fmt = (img.format or '').upper()
+    if fmt not in {'JPEG', 'PNG', 'WEBP'}:
+        raise ValueError(f'avatar_invalid: unsupported format {fmt!r}')
+
+    img = ImageOps.exif_transpose(img)
+    img = img.convert('RGB')
+    img = ImageOps.fit(
+        img,
+        (AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE),
+        method=Image.Resampling.LANCZOS,
+    )
+
+    out = io.BytesIO()
+    # ``method=6`` is Pillow's slowest/best-compression WebP setting —
+    # avatars are written once and read many times, so the extra ~10 ms
+    # of CPU at upload time is repaid in CDN egress savings forever.
+    img.save(out, format='WEBP', quality=AVATAR_OUTPUT_QUALITY, method=6)
+    body = out.getvalue()
+    digest = hashlib.sha256(body).hexdigest()
+    return body, digest
+
+
+def set_avatar(user, uploaded_file, *, actor=None) -> str:
+    """Validate + process + persist a new avatar for ``user``.
+
+    Returns the storage key (path within the bucket / FS) of the saved
+    file so callers can log it. Raises ``ValueError`` on validation
+    failure with one of these codes (suitable for direct form-error
+    display after stripping the prefix):
+
+    - ``avatar_invalid: too_large``
+    - ``avatar_invalid: bad_content_type``
+    - ``avatar_invalid: cannot decode image (...)``
+    - ``avatar_invalid: unsupported format ...``
+
+    The key shape is ``avatars/{user_id}/{sha256_hex}.webp``. Content-
+    addressing means re-uploading the same image is idempotent and the
+    URL changes whenever the image changes — CDN caching is automatic
+    and we never need explicit invalidation.
+
+    Side effects:
+    - Old avatar file (if any) is deleted from storage AFTER the new
+      one is saved, so a concurrent reader never sees a 404.
+    - ``user.avatar`` is updated and ``user.save(update_fields=['avatar'])``
+      is called.
+    - ``AuditLog`` entry written when ``KEEL_AUDIT_LOG_MODEL`` is set.
+    """
+    actor = actor or user
+
+    # Size check — read once. Django's UploadedFile.size is set from
+    # Content-Length / spooled tempfile size, no actual decode yet.
+    size = getattr(uploaded_file, 'size', None) or 0
+    if size > AVATAR_MAX_BYTES:
+        raise ValueError('avatar_invalid: too_large')
+
+    content_type = (
+        getattr(uploaded_file, 'content_type', '') or ''
+    ).split(';')[0].strip().lower()
+    if content_type not in AVATAR_ALLOWED_CONTENT_TYPES:
+        raise ValueError('avatar_invalid: bad_content_type')
+
+    raw = uploaded_file.read()
+    body, digest = _process_avatar_bytes(raw)
+
+    from django.core.files.base import ContentFile
+    from keel.accounts.models import KeelUser
+
+    # Field's ``upload_to='avatars/'`` adds the prefix; we pass just the
+    # per-user/per-content portion. Resulting key is
+    # ``avatars/{user_id}/{sha256_hex}.webp``.
+    new_relative = f'{user.pk}/{digest}.webp'
+
+    # Capture the previous file name (if any) so we can delete it
+    # after the new one is in place. Pulling .name from the FileField
+    # lazy-evaluates to '' when no file is attached.
+    old_name = user.avatar.name if user.avatar else ''
+
+    # Save the new file. We bypass ``ImageFieldFile.save()`` (which calls
+    # ``Storage.save()`` and adds a random collision-avoidance suffix on
+    # FileSystemStorage) and write directly through ``storage._save`` so
+    # the key stays content-addressed-deterministic. S3Boto3Storage's
+    # ``_save`` overwrites by default; FileSystemStorage's overwrites
+    # only when given an exact path. The deterministic key means a
+    # re-upload of the same image is idempotent — we don't want a
+    # ``hash_xY9zA.webp`` variant cluttering the bucket.
+    full_key = f'avatars/{new_relative}'
+    storage = user.avatar.storage
+    if storage.exists(full_key):
+        storage.delete(full_key)
+    saved_name = storage.save(full_key, ContentFile(body))
+    user.avatar.name = saved_name
+    KeelUser.objects.filter(pk=user.pk).update(avatar=saved_name)
+
+    # Delete the old file (best-effort). Do this AFTER the new file is
+    # committed so a CDN that's already cached the old URL gets a fresh
+    # 200 from the new path; the old URL goes 404 only after the cache
+    # expires, which is fine because nothing should still be linking to
+    # it. Skip when the old key happens to match the new one (idempotent
+    # re-upload of the same image).
+    if old_name and old_name != user.avatar.name:
+        try:
+            user.avatar.storage.delete(old_name)
+        except Exception:
+            logger.warning(
+                'set_avatar: failed to delete old avatar %r for user=%s',
+                old_name, user.pk, exc_info=True,
+            )
+
+    # Audit log — same defensive try/except as rename_user.
+    try:
+        from django.apps import apps
+        from django.conf import settings as django_settings
+        audit_label = getattr(
+            django_settings, 'KEEL_AUDIT_LOG_MODEL', None,
+        )
+        if audit_label:
+            AuditLog = apps.get_model(audit_label)
+            AuditLog.objects.create(
+                user=actor,
+                action='avatar_change',
+                entity_type='KeelUser',
+                entity_id=str(user.pk),
+                changes={
+                    'old_key': old_name or None,
+                    'new_key': user.avatar.name,
+                    'self_service': actor.pk == user.pk,
+                },
+            )
+    except Exception:
+        logger.exception(
+            'set_avatar: audit log write failed for user=%s; upload succeeded',
+            user.pk,
+        )
+
+    logger.info(
+        'set_avatar: user=%s key=%s size=%d',
+        user.pk, user.avatar.name, len(body),
+    )
+    return user.avatar.name
+
+
+def clear_avatar(user, *, actor=None) -> bool:
+    """Delete the user's uploaded avatar; revert to fallback rendering.
+
+    Returns ``True`` when there was something to delete, ``False`` when
+    the user had no avatar set. Always safe to call.
+    """
+    actor = actor or user
+    if not user.avatar:
+        return False
+
+    old_name = user.avatar.name
+    try:
+        user.avatar.storage.delete(old_name)
+    except Exception:
+        logger.warning(
+            'clear_avatar: storage delete failed for user=%s key=%s',
+            user.pk, old_name, exc_info=True,
+        )
+
+    user.avatar = None
+    user.save(update_fields=['avatar'])
+
+    try:
+        from django.apps import apps
+        from django.conf import settings as django_settings
+        audit_label = getattr(
+            django_settings, 'KEEL_AUDIT_LOG_MODEL', None,
+        )
+        if audit_label:
+            AuditLog = apps.get_model(audit_label)
+            AuditLog.objects.create(
+                user=actor,
+                action='avatar_change',
+                entity_type='KeelUser',
+                entity_id=str(user.pk),
+                changes={'old_key': old_name, 'new_key': None,
+                         'self_service': actor.pk == user.pk},
+            )
+    except Exception:
+        logger.exception('clear_avatar: audit log write failed user=%s', user.pk)
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Email change pipeline
+# ---------------------------------------------------------------------------
+def _allauth_available() -> bool:
+    """True when this deployment has django-allauth installed.
+
+    Products use allauth as their OIDC client; Keel itself does NOT
+    (Keel uses Django native auth). We dispatch the email change flow
+    on this so Keel-side requests land on our native PendingEmailChange
+    flow and product-side requests reuse allauth's existing
+    EmailAddress.add_email confirmation pipeline.
+    """
+    try:
+        import allauth.account.models  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def request_email_change(user, new_email: str, request=None) -> dict:
+    """Kick off an email-address change for *user*.
+
+    Dispatch:
+
+    - allauth installed → ``EmailAddress.objects.add_email(...)``: the
+      allauth machinery sends its own confirmation email and rotates
+      the address only when the user clicks. No keel-side row written.
+    - allauth absent → ``PendingEmailChange.issue(...)`` + a templated
+      email built from ``keel.accounts.email_change`` templates.
+
+    Returns a small dict so callers can log without re-reading state:
+
+    .. code-block:: python
+
+        {'mode': 'allauth' | 'native',
+         'pending': PendingEmailChange | None,
+         'new_email': str}
+
+    Raises ``ValueError`` (with structured prefixes) on validation
+    failure that the form layer didn't catch.
+    """
+    candidate = (new_email or '').strip().lower()
+    if not candidate:
+        raise ValueError('email_invalid: empty')
+    if candidate == (user.email or '').lower():
+        raise ValueError('email_invalid: unchanged')
+
+    if _allauth_available():
+        # The product side. Allauth's add_email handles confirmation
+        # email rendering, the click-to-confirm view, and rotating
+        # ``user.email`` once verified — all already deployed in every
+        # product.
+        from allauth.account.models import EmailAddress
+        EmailAddress.objects.add_email(
+            request, user, candidate, confirm=True,
+        )
+        logger.info(
+            'request_email_change: user=%s allauth handed off to %s',
+            user.pk, candidate,
+        )
+        return {'mode': 'allauth', 'pending': None, 'new_email': candidate}
+
+    # The Keel-IdP side. No allauth — write a PendingEmailChange row,
+    # render a token URL, send the mail through Keel's configured email
+    # backend.
+    from keel.accounts.models import PendingEmailChange
+
+    pending = PendingEmailChange.issue(user, candidate)
+    _send_email_change_confirmation(user, pending, request)
+    logger.info(
+        'request_email_change: user=%s native pending=%s → %s',
+        user.pk, pending.pk, candidate,
+    )
+    return {'mode': 'native', 'pending': pending, 'new_email': candidate}
+
+
+def _send_email_change_confirmation(user, pending, request) -> None:
+    """Build and send the keel-native confirmation email.
+
+    Uses Django's standard ``send_mail`` with templates rendered via
+    ``render_to_string`` so customers can override the look/voice by
+    shadowing ``accounts/email_change/{subject,body,body_html}.txt``
+    in their own template directory. The plain-text body is the canonical
+    one — HTML is a courtesy.
+    """
+    from django.conf import settings as django_settings
+    from django.core.mail import EmailMultiAlternatives
+    from django.template.loader import render_to_string
+    from django.urls import reverse
+
+    # Build the absolute URL. ``request`` may be None when we're called
+    # from a management command or shell; fall back to the configured
+    # issuer host so we can still produce a working link.
+    path = reverse('keel_accounts:confirm_email_change',
+                   kwargs={'token': pending.token})
+    if request is not None:
+        confirm_url = request.build_absolute_uri(path)
+    else:
+        host = (
+            getattr(django_settings, 'KEEL_OIDC_ISSUER', '')
+            or getattr(django_settings, 'SITE_URL', '')
+        ).rstrip('/')
+        confirm_url = f'{host}{path}' if host else path
+
+    ctx = {
+        'user': user,
+        'new_email': pending.new_email,
+        'confirm_url': confirm_url,
+        'expires_at': pending.expires_at,
+        'ttl_hours': int(
+            (pending.expires_at - pending.created_at).total_seconds() // 3600
+        ),
+        'site_name': getattr(django_settings, 'SITE_NAME', 'DockLabs'),
+    }
+
+    subject = render_to_string(
+        'accounts/email_change/subject.txt', ctx,
+    ).strip().replace('\n', ' ')
+    text_body = render_to_string('accounts/email_change/body.txt', ctx)
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=getattr(
+            django_settings, 'DEFAULT_FROM_EMAIL',
+            'DockLabs <info@docklabs.ai>',
+        ),
+        to=[pending.new_email],
+    )
+    try:
+        html_body = render_to_string('accounts/email_change/body.html', ctx)
+        msg.attach_alternative(html_body, 'text/html')
+    except Exception:
+        # HTML template is optional; keep the plain-text path working.
+        pass
+    msg.send(fail_silently=False)
+
+
+def confirm_email_change(token: str) -> dict:
+    """Apply a pending email change identified by *token*.
+
+    Returns:
+
+    .. code-block:: python
+
+        {'ok': bool, 'reason': str | None,
+         'user': KeelUser | None, 'old_email': str, 'new_email': str}
+
+    Reason codes when ``ok=False``: ``not_found``, ``expired``,
+    ``already_confirmed``, ``email_taken`` (someone else grabbed the
+    address between request and click).
+
+    Side effects on success:
+    - ``user.email`` is updated.
+    - ``user.last_logout_at`` is bumped so other-product sessions invalidate.
+    - The PendingEmailChange row is marked confirmed (kept for audit).
+    - An ``AuditLog`` row is written.
+    """
+    from django.db import transaction
+    from keel.accounts.models import KeelUser, PendingEmailChange
+
+    pending = PendingEmailChange.objects.filter(token=token).first()
+    if pending is None:
+        return {'ok': False, 'reason': 'not_found',
+                'user': None, 'old_email': '', 'new_email': ''}
+    if pending.is_consumed():
+        return {'ok': False, 'reason': 'already_confirmed',
+                'user': pending.user, 'old_email': pending.user.email,
+                'new_email': pending.new_email}
+    if pending.is_expired():
+        return {'ok': False, 'reason': 'expired',
+                'user': pending.user, 'old_email': pending.user.email,
+                'new_email': pending.new_email}
+
+    user = pending.user
+    old_email = user.email or ''
+    new_email = pending.new_email
+
+    with transaction.atomic():
+        # Re-check uniqueness inside the transaction. Race window:
+        # someone else could have grabbed the address in the time
+        # between request_email_change and confirm.
+        if KeelUser.objects.filter(
+            email__iexact=new_email,
+        ).exclude(pk=user.pk).exists():
+            return {'ok': False, 'reason': 'email_taken',
+                    'user': user, 'old_email': old_email,
+                    'new_email': new_email}
+
+        user.email = new_email
+        user.last_logout_at = timezone.now()
+        user.save(update_fields=['email', 'last_logout_at'])
+
+        pending.confirmed_at = timezone.now()
+        pending.save(update_fields=['confirmed_at'])
+
+    try:
+        from django.apps import apps
+        from django.conf import settings as django_settings
+        audit_label = getattr(django_settings, 'KEEL_AUDIT_LOG_MODEL', None)
+        if audit_label:
+            AuditLog = apps.get_model(audit_label)
+            AuditLog.objects.create(
+                user=user,
+                action='email_change',
+                entity_type='KeelUser',
+                entity_id=str(user.pk),
+                changes={
+                    'old_email': old_email,
+                    'new_email': new_email,
+                    'self_service': True,
+                },
+            )
+    except Exception:
+        logger.exception(
+            'confirm_email_change: audit write failed user=%s',
+            user.pk,
+        )
+
+    logger.info(
+        'confirm_email_change: user=%s %r → %r',
+        user.pk, old_email, new_email,
+    )
+    return {'ok': True, 'reason': None, 'user': user,
+            'old_email': old_email, 'new_email': new_email}
+
+
 def reconcile_all_users(*, force_logout: bool = False) -> dict:
     """Sweep every user, reconciling their ProductAccess.
 

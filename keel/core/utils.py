@@ -9,6 +9,18 @@ from django.http import HttpResponse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 
+def is_keel_idp():
+    """True only on the Keel IdP service itself.
+
+    Set ``KEEL_IS_IDP = True`` in Keel's own ``settings.py`` and leave
+    it unset (or False) on every product. Used to gate identity-edit
+    surfaces (username change, email change, password change) so they
+    only render where the canonical row lives — products in suite mode
+    mirror identity but never write it.
+    """
+    return bool(getattr(settings, 'KEEL_IS_IDP', False))
+
+
 def is_suite_mode():
     """True when this product is federated to Keel IdP (suite/partial-suite).
 

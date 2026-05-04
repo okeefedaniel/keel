@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Email change | {{ SITE_NAME|default:"DockLabs" }}{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 560px;">
+  <div class="card">
+    <div class="card-body p-4">
+      {% if result.ok %}
+        <h1 class="h4 mb-3"><i class="bi bi-check-circle text-success me-2"></i>Email confirmed</h1>
+        <p class="mb-3">
+          Your account email is now
+          <strong>{{ result.new_email }}</strong>.
+        </p>
+        <p class="text-muted small mb-4">
+          For your security, you've been signed out of every DockLabs
+          product. Sign back in with your usual credentials — your new
+          email will work everywhere.
+        </p>
+        <a href="/accounts/login/" class="btn btn-primary">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Sign in
+        </a>
+
+      {% elif result.reason == 'expired' %}
+        <h1 class="h4 mb-3"><i class="bi bi-clock-history text-warning me-2"></i>Link expired</h1>
+        <p>This confirmation link has expired. For security, email-change
+           links are only valid for 24 hours.</p>
+        <p class="text-muted small">Sign in and request the change again from your
+           account settings.</p>
+
+      {% elif result.reason == 'already_confirmed' %}
+        <h1 class="h4 mb-3"><i class="bi bi-info-circle text-muted me-2"></i>Already confirmed</h1>
+        <p>This link has already been used. Your account email is
+           <strong>{{ result.new_email }}</strong>.</p>
+
+      {% elif result.reason == 'email_taken' %}
+        <h1 class="h4 mb-3"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Email unavailable</h1>
+        <p>The address <strong>{{ result.new_email }}</strong> was claimed
+           by another account between when you requested this change and
+           now. Sign in and try a different address.</p>
+
+      {% else %}
+        <h1 class="h4 mb-3"><i class="bi bi-x-circle text-danger me-2"></i>Link not recognized</h1>
+        <p>This confirmation link doesn't match any pending request. It
+           may have been mistyped, or the request was already canceled.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -16,6 +16,16 @@ from . import views
 app_name = 'keel_accounts'
 
 urlpatterns = [
+    # Identity APIs (used by the shared profile panel; available
+    # wherever username editing is enabled — Keel itself, and
+    # standalone product deployments that own their own user table).
+    path('username-available/', views.username_available, name='username_available'),
+
+    # Email-change confirmation (keel-native flow, used on Keel IdP and
+    # any deployment without allauth). Public URL — no auth required;
+    # the token IS the auth.
+    path('confirm-email/<str:token>/', views.confirm_email_change, name='confirm_email_change'),
+
     # Admin console
     path('', views.dashboard, name='dashboard'),
     path('users/', views.user_list, name='user_list'),

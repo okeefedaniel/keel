@@ -1,0 +1,13 @@
+Hi {{ user.first_name|default:user.username }},
+
+You asked to change the email address on your {{ site_name }} account
+from {{ user.email }} to {{ new_email }}.
+
+To confirm, click this link within {{ ttl_hours }} hours:
+
+  {{ confirm_url }}
+
+If you didn't request this change, you can ignore this email — your
+current address stays in place.
+
+— {{ site_name }}

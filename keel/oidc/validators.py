@@ -117,14 +117,46 @@ def _build_validator_class():
             if user is None or not getattr(user, 'is_authenticated', False):
                 return {}
 
-            # Standard OIDC profile claims
+            # Standard OIDC profile claims. ``zoneinfo``, ``locale``, and
+            # ``picture`` are all standard OIDC claim names that pass
+            # through the base validator's existing ``oidc_claim_scope``
+            # mapping under the ``profile`` scope without further wiring.
             claims = {
                 'email': user.email or '',
                 'name': user.get_full_name() or user.username,
                 'given_name': user.first_name or '',
                 'family_name': user.last_name or '',
                 'preferred_username': user.username,
+                'zoneinfo': getattr(user, 'timezone', '') or '',
+                'locale': getattr(user, 'locale', '') or '',
             }
+
+            # Avatar URL (``picture`` claim). Absolutize when the storage
+            # returned a relative path (FileSystemStorage emits
+            # ``/media/avatars/...``) so products receiving the JWT can
+            # fetch the image without knowing where Keel lives. S3 storage
+            # already returns absolute URLs, so the prefix branch is a
+            # no-op there.
+            try:
+                from keel.core.avatars import get_avatar_url
+                picture = get_avatar_url(user)
+            except Exception:
+                picture = ''
+            if picture and not picture.startswith(('http://', 'https://')):
+                from django.conf import settings as django_settings
+                issuer = (
+                    getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or ''
+                ).rstrip('/')
+                if issuer:
+                    picture = f'{issuer}{picture}'
+                else:
+                    # No issuer configured (dev w/o KEEL_OIDC_ISSUER) and
+                    # the URL is relative — emitting it would mislead the
+                    # consumer. Drop the claim rather than send something
+                    # they can't resolve.
+                    picture = ''
+            if picture:
+                claims['picture'] = picture
 
             # DockLabs user attributes
             if hasattr(user, 'is_state_user'):

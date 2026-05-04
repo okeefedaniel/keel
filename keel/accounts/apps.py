@@ -8,6 +8,10 @@ class KeelAccountsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
 
     def ready(self):
+        # Wire signal handlers (avatar cleanup on user delete, etc.).
+        # Importing the module triggers ``@receiver`` registration.
+        from . import signals  # noqa: F401
+
         # Register Organization and OrganizationProductSubscription for
         # automatic audit logging. Every create/update/delete on these
         # models emits an AuditLog row via post_save / post_delete

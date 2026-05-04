@@ -23,6 +23,8 @@ import uuid
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+
+from .storage import avatar_storage
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -327,6 +329,21 @@ class KeelUser(AbstractUser):
     # Common profile fields (shared across products)
     title = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=20, blank=True)
+    timezone = models.CharField(max_length=64, blank=True)
+    locale = models.CharField(max_length=10, blank=True)
+    # Uploaded avatar — used on Keel itself and in standalone product
+    # deployments where the user owns the local row. Storage backend
+    # is selected at access time (S3 vs local FS) by ``avatar_storage()``;
+    # see ``keel.accounts.storage`` for the rules.
+    avatar = models.ImageField(
+        upload_to='avatars/',
+        null=True, blank=True,
+        storage=avatar_storage,
+    )
+    # Mirrored avatar URL from the JWT ``picture`` claim — populated on
+    # OIDC sign-in for suite-mode products that don't own the upload.
+    # When both ``avatar`` and ``avatar_url`` are set, ``avatar`` wins.
+    avatar_url = models.URLField(blank=True, max_length=500)
     agency = models.ForeignKey(
         'keel_accounts.Agency', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='users',
@@ -802,6 +819,73 @@ class Invitation(models.Model):
         if self.status == self.Status.PENDING:
             self.status = self.Status.REVOKED
             self.save(update_fields=['status'])
+
+
+# ---------------------------------------------------------------------------
+# PendingEmailChange — token-bound email update awaiting verification
+# ---------------------------------------------------------------------------
+class PendingEmailChange(models.Model):
+    """A user-initiated email change awaiting click-through confirmation.
+
+    Used on Keel itself (where allauth is not installed) and as the
+    canonical fallback path on standalone products that don't ship
+    allauth either. Products that DO have allauth route through
+    ``allauth.account.models.EmailAddress.add_email`` instead — see
+    ``keel.accounts.services.request_email_change`` for dispatch.
+
+    A single user may have multiple pending rows in flight (e.g. they
+    asked, didn't click, then asked again). The newest unexpired row
+    wins; older ones expire naturally and get pruned by the daily
+    ``cleanup_expired_email_changes`` management command.
+    """
+
+    DEFAULT_TTL_HOURS = 24
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        'keel_accounts.KeelUser', on_delete=models.CASCADE,
+        related_name='pending_email_changes',
+    )
+    new_email = models.EmailField()
+    # 64+ chars of urlsafe base64 = 48 bytes of entropy. Indexed because
+    # the confirmation view's only lookup is by token.
+    token = models.CharField(max_length=128, unique=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'keel_pending_email_change'
+        verbose_name = _('pending email change')
+        verbose_name_plural = _('pending email changes')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user_id} → {self.new_email} (expires {self.expires_at:%Y-%m-%d})'
+
+    def is_expired(self) -> bool:
+        from django.utils import timezone as _tz
+        return _tz.now() >= self.expires_at
+
+    def is_consumed(self) -> bool:
+        return self.confirmed_at is not None
+
+    @classmethod
+    def issue(cls, user, new_email: str, *, ttl_hours: int | None = None):
+        """Create a fresh row with a urlsafe token + TTL.
+
+        Does NOT send the email — the calling service handles that
+        so the email backend choice can be deployment-specific.
+        """
+        from datetime import timedelta
+        from django.utils import timezone as _tz
+        ttl = ttl_hours if ttl_hours is not None else cls.DEFAULT_TTL_HOURS
+        return cls.objects.create(
+            user=user,
+            new_email=new_email,
+            token=secrets.token_urlsafe(48),
+            expires_at=_tz.now() + timedelta(hours=ttl),
+        )
 
 
 # ---------------------------------------------------------------------------

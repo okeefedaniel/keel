@@ -22,10 +22,12 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Count, Q
 from django.template.loader import render_to_string
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
+
+from keel.core.utils import rate_limit
 
 from .models import (
     Agency, Invitation, KeelUser, Organization, OrganizationProductSubscription,
@@ -893,3 +895,75 @@ def accept_invitation(request, token):
         'batch_invitations': batch_invitations,
         'user_exists': request.user.is_authenticated,
     })
+
+# ---------------------------------------------------------------------------
+# Username availability — JSON API for the live profile-form check
+# ---------------------------------------------------------------------------
+@require_GET
+@login_required
+@rate_limit(max_requests=30, window=60)
+def username_available(request):
+    """Return whether ``?u=<candidate>`` is a free username.
+
+    Response shape (always 200, errors are encoded in the body so the JS
+    can render them inline):
+
+        {"available": bool, "reason": str | null, "normalized": str}
+
+    ``reason`` is one of: ``"taken"``, ``"reserved"``, ``"invalid_format"``,
+    ``"unchanged"``, or ``null`` on success. ``normalized`` is the
+    lowercased / trimmed candidate the server actually evaluated, so the
+    JS can mirror it back into the input if the user typed mixed case.
+
+    Rate-limited to 30 req/min/IP to discourage username enumeration —
+    the form-debounce keystroke rate is well below this in normal use.
+    """
+    from .forms import validate_username_format
+
+    candidate = (request.GET.get("u") or "").strip().lower()
+    payload = {"available": False, "reason": None, "normalized": candidate}
+
+    if not candidate:
+        payload["reason"] = "invalid_format"
+        return JsonResponse(payload)
+
+    err = validate_username_format(candidate)
+    if err is not None:
+        payload["reason"] = err
+        return JsonResponse(payload)
+
+    if candidate == request.user.username:
+        # Not "taken" by someone else, but not a meaningful change either.
+        # Treat as a distinct state so the JS can render a neutral hint
+        # rather than a green check.
+        payload["reason"] = "unchanged"
+        return JsonResponse(payload)
+
+    if KeelUser.objects.filter(username__iexact=candidate).exclude(pk=request.user.pk).exists():
+        payload["reason"] = "taken"
+        return JsonResponse(payload)
+
+    payload["available"] = True
+    return JsonResponse(payload)
+
+
+
+# ---------------------------------------------------------------------------
+# Email change confirmation — keel-native flow (Keel IdP without allauth)
+# ---------------------------------------------------------------------------
+@require_GET
+def confirm_email_change(request, token: str):
+    """Confirm a PendingEmailChange via the click-through link.
+
+    Renders an explanatory page on every outcome (success/expired/etc.)
+    rather than redirecting silently — users who clicked stale links
+    deserve a clear "this expired" message instead of a mystery redirect.
+    """
+    from .services import confirm_email_change as _confirm
+    result = _confirm(token)
+    return render(
+        request,
+        'accounts/email_change/confirm_result.html',
+        {'result': result},
+        status=200 if result['ok'] else 400,
+    )

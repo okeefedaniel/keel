@@ -112,3 +112,34 @@ def sortable_th(context, field, label, css_class=''):
         label=label,
         icon=mark_safe(icon),
     )
+
+
+@register.simple_tag
+def user_avatar(user, size=40):
+    """Render *user*'s avatar at *size* px (default 40).
+
+    Falls through ``avatar_html_for``: uploaded image → mirrored URL →
+    inline initials SVG. The result is marked safe so the SVG renders
+    inline; the helper escapes user-supplied strings (initials, label).
+
+    Usage:
+
+        {% load keel_tags %}
+        {% user_avatar request.user 32 %}
+        {% user_avatar collaborator 24 %}
+    """
+    if user is None or not getattr(user, 'is_authenticated', True):
+        # Tag accepts an unauthenticated/None user (e.g. a comment
+        # author whose KeelUser has been deactivated). Render a generic
+        # placeholder rather than crashing.
+        from types import SimpleNamespace
+        user = SimpleNamespace(
+            first_name='', last_name='', username='?', email='',
+            avatar=None, avatar_url='', get_full_name=lambda: 'User',
+        )
+    from keel.core.avatars import avatar_html_for
+    try:
+        size = int(size)
+    except (TypeError, ValueError):
+        size = 40
+    return mark_safe(avatar_html_for(user, size=size))

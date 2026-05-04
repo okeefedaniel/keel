@@ -1,0 +1,141 @@
+{% load static %}
+
+<p class="text-muted mb-4">
+  These settings control how you sign in. Changes here invalidate
+  active sessions on other DockLabs products on your next request.
+</p>
+
+{# ── Username ─────────────────────────────────────────────────────── #}
+<div class="card border mb-4">
+  <div class="card-header bg-light">
+    <h6 class="mb-0"><i class="bi bi-at me-2"></i>Username</h6>
+  </div>
+  <div class="card-body">
+    <p class="small text-muted mb-3">
+      Used to sign in and as the canonical identifier across the suite.
+      3–32 characters, lowercase letters, numbers, dash or underscore.
+    </p>
+
+    <form method="post" action="{% url 'keel_settings:panel' slug='account' %}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="_action" value="username">
+
+      <div class="mb-2">
+        <label class="form-label small text-muted">Current username</label>
+        <div><code>{{ user.username }}</code></div>
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ username_form.username.id_for_label }}" class="form-label">New username</label>
+        <div class="d-flex align-items-center">
+          {{ username_form.username }}
+        </div>
+        {% if username_form.username.errors %}
+          <div class="invalid-feedback d-block">{{ username_form.username.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary" disabled>
+          <i class="bi bi-check-lg me-1"></i> Change username
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Email ────────────────────────────────────────────────────────── #}
+<div class="card border mb-4">
+  <div class="card-header bg-light">
+    <h6 class="mb-0"><i class="bi bi-envelope me-2"></i>Email address</h6>
+  </div>
+  <div class="card-body">
+    <p class="small text-muted mb-3">
+      We send a confirmation link to the new address. Your email won't
+      change until you click the link.
+    </p>
+
+    <form method="post" action="{% url 'keel_settings:panel' slug='account' %}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="_action" value="email">
+
+      <div class="mb-2">
+        <label class="form-label small text-muted">Current email</label>
+        <div>{{ user.email|default:"—" }}</div>
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ email_form.email.id_for_label }}" class="form-label">New email</label>
+        {{ email_form.email }}
+        {% if email_form.email.errors %}
+          <div class="invalid-feedback d-block">{{ email_form.email.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-send me-1"></i> Send confirmation
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Password ─────────────────────────────────────────────────────── #}
+<div class="card border">
+  <div class="card-header bg-light">
+    <h6 class="mb-0"><i class="bi bi-key me-2"></i>Password</h6>
+  </div>
+  <div class="card-body">
+    <form method="post" action="{% url 'keel_settings:panel' slug='account' %}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="_action" value="password">
+
+      {% if password_form.non_field_errors %}
+        <div class="alert alert-danger">{{ password_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label for="{{ password_form.old_password.id_for_label }}" class="form-label">Current password</label>
+        <input type="password" name="old_password"
+               id="{{ password_form.old_password.id_for_label }}"
+               class="form-control" autocomplete="current-password" required>
+        {% if password_form.old_password.errors %}
+          <div class="invalid-feedback d-block">{{ password_form.old_password.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="{{ password_form.new_password1.id_for_label }}" class="form-label">New password</label>
+          <input type="password" name="new_password1"
+                 id="{{ password_form.new_password1.id_for_label }}"
+                 class="form-control" autocomplete="new-password" required>
+          {% if password_form.new_password1.errors %}
+            <div class="invalid-feedback d-block">{{ password_form.new_password1.errors.0 }}</div>
+          {% endif %}
+          {% if password_form.new_password1.help_text %}
+            <small class="form-text text-muted">{{ password_form.new_password1.help_text|safe }}</small>
+          {% endif %}
+        </div>
+        <div class="col-md-6">
+          <label for="{{ password_form.new_password2.id_for_label }}" class="form-label">Confirm new password</label>
+          <input type="password" name="new_password2"
+                 id="{{ password_form.new_password2.id_for_label }}"
+                 class="form-control" autocomplete="new-password" required>
+          {% if password_form.new_password2.errors %}
+            <div class="invalid-feedback d-block">{{ password_form.new_password2.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mt-4 d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i> Change password
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="{% static 'keel/accounts/js/username-check.js' %}" defer></script>
