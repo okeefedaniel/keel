@@ -130,10 +130,12 @@ def preferences(request):
             'prefs_enabled': False,
         })
 
-    # Filter to only the current product's notification types.
+    # Filter to only the current product's notification types AND only
+    # those the user is role-eligible to receive (suppresses admin-only
+    # types from non-admin preferences pages).
     product_name = getattr(settings, 'KEEL_PRODUCT_NAME', '')
     product_prefixes = getattr(settings, 'KEEL_NOTIFICATION_CATEGORIES', None)
-    types_by_category = get_types_by_category()
+    types_by_category = get_types_by_category(for_user=request.user)
     if product_prefixes:
         types_by_category = {
             cat: types for cat, types in types_by_category.items()

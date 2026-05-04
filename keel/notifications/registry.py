@@ -103,21 +103,114 @@ def get_all_types() -> dict[str, NotificationType]:
     return dict(_registry)
 
 
-def get_types_by_category(*, include_internal: bool = False) -> dict[str, list[NotificationType]]:
+def get_types_by_category(
+    *,
+    include_internal: bool = False,
+    for_user=None,
+    include_resolver_only: bool = False,
+) -> dict[str, list[NotificationType]]:
     """Return notification types grouped by category (for preferences UI).
 
-    By default, internal types (NotificationType.internal=True) are
-    excluded — they fire automatically in response to a user action and
-    should not appear as togglable rows in the preferences table. Pass
-    ``include_internal=True`` for admin / debug surfaces that need to
-    enumerate the full registry.
+    Filters applied (in order):
+
+    - Internal types (``NotificationType.internal=True``) are excluded by
+      default — they fire automatically in response to a user action and
+      should not appear as togglable rows in the preferences table. Pass
+      ``include_internal=True`` for admin / debug surfaces that need to
+      enumerate the full registry.
+    - When ``for_user`` is provided, types whose ``default_roles`` don't
+      overlap any active ``ProductAccess.role`` the user holds for the
+      current product (``KEEL_PRODUCT_CODE``) are excluded. This prevents
+      role leak in the user-facing preferences UI: a non-admin user
+      should not see admin-only notification types listed (they'd never
+      receive them, and toggling an SMS channel for one would be
+      misleading). Types with ``default_roles == ['all']`` always pass.
+      Django superusers see every type.
+    - When ``for_user`` is provided, types with empty ``default_roles``
+      AND a ``recipient_resolver`` are HIDDEN by default — they are
+      driven by explicit per-event context (e.g. "owner of this record")
+      and a non-eligible user would never receive them. Pass
+      ``include_resolver_only=True`` to include them anyway.
     """
+    user_roles: set[str] | None = None
+    is_superuser = False
+    if for_user is not None and getattr(for_user, 'is_authenticated', False):
+        is_superuser = bool(getattr(for_user, 'is_superuser', False))
+        if not is_superuser:
+            user_roles = _user_product_roles(for_user)
+
     by_cat: dict[str, list[NotificationType]] = {}
     for nt in _registry.values():
         if nt.internal and not include_internal:
             continue
+        if for_user is not None and not _user_eligible_for_type(
+            nt,
+            user_roles=user_roles,
+            is_superuser=is_superuser,
+            include_resolver_only=include_resolver_only,
+        ):
+            continue
         by_cat.setdefault(nt.category, []).append(nt)
     return by_cat
+
+
+def _user_product_roles(user) -> set[str]:
+    """Return the user's active ProductAccess roles for the current product.
+
+    Returns an empty set when the user has no access rows for this
+    product — they should see no role-gated types. Defensive against
+    missing settings or a user model without the expected reverse
+    relation.
+    """
+    from django.conf import settings
+
+    product = (getattr(settings, 'KEEL_PRODUCT_CODE', '') or '').lower()
+    try:
+        qs = user.product_access.filter(is_active=True)
+        if product:
+            qs = qs.filter(product=product)
+        return set(qs.values_list('role', flat=True))
+    except Exception:
+        logger.debug(
+            'Could not resolve product roles for user=%s', getattr(user, 'pk', None),
+            exc_info=True,
+        )
+        return set()
+
+
+def _user_eligible_for_type(
+    nt: 'NotificationType',
+    *,
+    user_roles: set[str] | None,
+    is_superuser: bool,
+    include_resolver_only: bool,
+) -> bool:
+    """Decide whether a single type should appear in a user's preferences UI.
+
+    Mirrors the spec used by ``dispatch._resolve_recipients`` at SEND
+    time so the preferences table only lists rows the user could
+    plausibly receive.
+    """
+    if is_superuser:
+        return True
+    # ``default_roles == ['all']`` is the explicit "anyone authenticated"
+    # opt-in — it bypasses role gating at send time and should bypass it
+    # in the preferences UI too.
+    if 'all' in nt.default_roles:
+        return True
+    if not nt.default_roles:
+        # Empty roles + resolver_only ⇒ explicit-context recipients
+        # (e.g. record owner). Hidden by default to avoid misleading
+        # users into toggling channels for events they'd never receive.
+        if nt.recipient_resolver is not None:
+            return include_resolver_only
+        # Empty roles AND no resolver ⇒ unreachable / misconfigured.
+        # Hide it from end users; admin surfaces use include_internal /
+        # the full registry to surface these for cleanup.
+        return False
+    if user_roles is None:
+        return False
+    return bool(user_roles & set(nt.default_roles))
 
 
 def apply_overrides():

@@ -47,7 +47,7 @@ class NotificationsPanel(SettingsPanel):
 
         PrefModel = _get_preference_model()
         product_prefixes = getattr(django_settings, 'KEEL_NOTIFICATION_CATEGORIES', None)
-        types_by_category = get_types_by_category()
+        types_by_category = get_types_by_category(for_user=request.user)
         if product_prefixes:
             types_by_category = {
                 cat: types for cat, types in types_by_category.items()
@@ -84,7 +84,7 @@ class NotificationsPanel(SettingsPanel):
             return None  # No-op success — nothing to save.
 
         product_prefixes = getattr(django_settings, 'KEEL_NOTIFICATION_CATEGORIES', None)
-        types_by_category = get_types_by_category()
+        types_by_category = get_types_by_category(for_user=request.user)
         if product_prefixes:
             types_by_category = {
                 cat: types for cat, types in types_by_category.items()
