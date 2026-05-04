@@ -140,6 +140,15 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
+# The shared LoginForm accepts either a username or an email — wire the
+# backend that honors that contract. Without this, Django's default
+# ModelBackend only matches the username column and email logins silently
+# fail with "Please enter a correct username and password".
+AUTHENTICATION_BACKENDS = [
+    'keel.accounts.backends.UsernameOrEmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Where invitees land after accepting their invitation. keel.docklabs.ai
 # is the identity console — most invitees won't have admin rights here,
 # so we send them to Helm (the suite home dashboard) instead. Override
