@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keel"
-version = "0.25.5"
+version = "0.25.6"
 description = "Shared Django platform layer for DockLabs products"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,10 +14,12 @@ dependencies = [
     "Django>=5.2",
     "django-oauth-toolkit>=2.4",
     "nh3>=0.2",  # parser-based HTML sanitizer (keel.comms)
+    "Pillow>=10.0",  # avatar image processing (resize, EXIF strip, WebP encode)
 ]
 
 [project.optional-dependencies]
 sso = ["django-allauth>=65.0"]
+avatars-s3 = ["django-storages[s3]>=1.14"]  # S3 avatar storage; unset KEEL_AVATAR_BUCKET falls back to local FS
 foia = ["anthropic>=0.40"]
 alerts = ["requests>=2.30"]  # for webhook notifications
 sms = ["twilio>=9.0"]  # for SMS notifications

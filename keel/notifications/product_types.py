@@ -744,6 +744,9 @@ def register_keel_platform_types():
         default_roles=[],  # Recipient passed explicitly by the post_save signal.
         priority='low',
         allow_mute=False,
+        internal=True,  # Hide from the user-facing preferences UI; fires
+                        # automatically in response to a user toggling SMS
+                        # on for any other notification type.
     ))
     register(NotificationType(
         key='invitation_accepted',

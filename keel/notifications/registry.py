@@ -52,6 +52,13 @@ class NotificationType:
             E.g., 'application.grant_program.agency' or 'award.agency'.
         allow_mute: Whether users can mute this notification type.
             Set False for critical system notifications.
+        internal: If True, hide this type from the user-facing
+            preferences UI. Use for system notifications the user does
+            not opt into directly — e.g. an opt-in CONFIRMATION SMS that
+            fires automatically when the user toggles SMS on for some
+            other type. The user opts in elsewhere; this row only exists
+            so the dispatch + log machinery has a notification key to
+            attach the confirmation to. Default False.
     """
     key: str
     label: str
@@ -67,6 +74,7 @@ class NotificationType:
     agency_scoped: bool = False
     agency_field: str = ''
     allow_mute: bool = True
+    internal: bool = False
 
 
 def register(notification_type: NotificationType):
@@ -95,10 +103,19 @@ def get_all_types() -> dict[str, NotificationType]:
     return dict(_registry)
 
 
-def get_types_by_category() -> dict[str, list[NotificationType]]:
-    """Return notification types grouped by category (for preferences UI)."""
+def get_types_by_category(*, include_internal: bool = False) -> dict[str, list[NotificationType]]:
+    """Return notification types grouped by category (for preferences UI).
+
+    By default, internal types (NotificationType.internal=True) are
+    excluded — they fire automatically in response to a user action and
+    should not appear as togglable rows in the preferences table. Pass
+    ``include_internal=True`` for admin / debug surfaces that need to
+    enumerate the full registry.
+    """
     by_cat: dict[str, list[NotificationType]] = {}
     for nt in _registry.values():
+        if nt.internal and not include_internal:
+            continue
         by_cat.setdefault(nt.category, []).append(nt)
     return by_cat
 
