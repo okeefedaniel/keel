@@ -18,6 +18,13 @@ resend>=2.0
 # OIDC identity provider — Keel as IdP for the DockLabs suite (Phase 2b)
 django-oauth-toolkit>=2.4
 
+# Avatar storage (Phase 2 of suite-wide profile, keel >= 0.27.0)
+# Pillow processes uploads; django-storages[s3] writes to docklabs-avatars
+# bucket via CloudFront. Without these, avatar features fall back to local
+# FS — fine for dev but lost on Railway redeploy.
+Pillow>=10.0
+django-storages[s3]>=1.14
+
 # Optional (uncomment as needed)
 # django-allauth>=65.0   # SSO via Microsoft Entra ID
 # anthropic>=0.40         # AI features
