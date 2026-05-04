@@ -35,20 +35,7 @@ Used by keel/layouts/app.html. Products override blocks to customize.
   <div class="sidebar-footer">
     {% include "keel/components/fleet_switcher.html" %}
 
-    {% if user.is_authenticated %}
-    <div class="sidebar-user" id="sidebar-user-menu" data-bs-toggle="dropdown" aria-expanded="false">
-      <div class="sidebar-avatar">{{ user.first_name|make_list|first|default:"?" }}{{ user.last_name|make_list|first|default:"" }}</div>
-      <div class="sidebar-user-info">
-        <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
-        <div class="sidebar-user-role">{% block sidebar_user_role %}{{ user.role|default:"User" }}{% endblock %}</div>
-      </div>
-      <span class="sb-item-action" style="opacity:1; color:var(--text-tertiary)">&ctdot;</span>
-    </div>
-    <ul class="dropdown-menu" aria-labelledby="sidebar-user-menu">
-      {% block sidebar_user_menu %}
-      {# Products MUST override this block with their own profile link and logout form. #}
-      {% endblock %}
-    </ul>
-    {% endif %}
+    {% block sidebar_user_role %}{% endblock %}
+    {% block sidebar_user_menu %}{% endblock %}
   </div>
 </aside>
