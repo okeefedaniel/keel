@@ -61,6 +61,37 @@ def _try_keel_notify(event, **kwargs):
         return None
 
 
+def _emit_activity(*, actor, verb, target, action=None, metadata=None,
+                   audit_action='status_change'):
+    """Emit a keel.activity Track B row if the consuming product has wired the layer.
+
+    No-ops silently when ``keel.activity`` isn't installed (ImportError) or when
+    the product hasn't set ``KEEL_ACTIVITY_MODEL`` (ImproperlyConfigured). Both
+    are expected pre-Phase-1A states for products that don't yet consume the
+    activity layer (e.g. Harbor in v0.28.0).
+
+    Failures during emission are logged and swallowed — a Track B emission must
+    never roll back the underlying signing transition that already succeeded.
+    The audit row is the durable record of truth; activity is a UX projection.
+    """
+    try:
+        from keel.activity.services import record_activity
+    except ImportError:
+        return None
+    try:
+        return record_activity(
+            actor=actor,
+            verb=verb,
+            target=target,
+            action=action,
+            metadata=metadata or {},
+            audit_action=audit_action,
+        )
+    except Exception:
+        logger.exception('record_activity failed for verb=%r target=%r', verb, target)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Packet lifecycle
 # ---------------------------------------------------------------------------
@@ -198,6 +229,23 @@ def complete_step(signing_step, signature_type, signature_data, ip_address=None)
         ip_address=ip_address,
     )
 
+    # Track B activity emission. signing.signed describes the past action by this
+    # signer; it fans to collaborators-of-target via standard subscriber resolution.
+    # The next-signer notification is a separate verb (signing.next_signer_active)
+    # emitted from advance_packet() below.
+    _emit_activity(
+        actor=signing_step.signer,
+        verb='signing.signed',
+        target=signing_step.packet,
+        action=signing_step,
+        metadata={
+            'step_order': signing_step.order,
+            'step_label': signing_step.flow_step.label,
+            'signature_type': signature_type,
+            'signer_id': str(signing_step.signer.pk),
+        },
+    )
+
     advance_packet(signing_step.packet)
 
 
@@ -217,6 +265,23 @@ def advance_packet(packet):
         next_step.status = SigningStep.Status.ACTIVE
         next_step.save(update_fields=['status', 'updated_at'])
         _notify_signer_active(next_step)
+        # Track B: next_signer_active routes notification to the new active signer
+        # (NOT collaborators-of-target). The verb's NotificationType in
+        # keel.notifications.product_types should register a recipient_resolver
+        # that returns [next_step.signer]; without it, dispatch falls through
+        # to standard collab+watcher resolution which is wrong for this verb.
+        _emit_activity(
+            actor=None,  # system event — packet advancing isn't user-initiated
+            verb='signing.next_signer_active',
+            target=packet,
+            action=next_step,
+            metadata={
+                'step_order': next_step.order,
+                'step_label': next_step.flow_step.label,
+                'signer_email': next_step.signer.email if next_step.signer else '',
+                'signer_id': str(next_step.signer.pk) if next_step.signer else '',
+            },
+        )
     else:
         # All steps complete — finalize packet
         _complete_packet(packet)
@@ -265,6 +330,18 @@ def _complete_packet(packet):
         },
     )
 
+    # Track B: packet completion. Notifies collaborators that all signatures are in.
+    _emit_activity(
+        actor=None,
+        verb='signing.packet_completed',
+        target=packet,
+        metadata={
+            'completed_at': packet.completed_at.isoformat(),
+            'signer_count': len(signature_summary),
+            'initiated_by_id': str(packet.initiated_by.pk) if packet.initiated_by else '',
+        },
+    )
+
 
 def decline_step(signing_step, reason, ip_address=None):
     """Mark a step as declined and the packet as declined."""
@@ -303,6 +380,20 @@ def decline_step(signing_step, reason, ip_address=None):
         ip_address=ip_address,
     )
 
+    # Track B: signing.declined. Fans to collaborators-of-target via standard resolution.
+    _emit_activity(
+        actor=signing_step.signer,
+        verb='signing.declined',
+        target=packet,
+        action=signing_step,
+        metadata={
+            'step_order': signing_step.order,
+            'step_label': signing_step.flow_step.label,
+            'reason': reason,
+            'signer_id': str(signing_step.signer.pk),
+        },
+    )
+
 
 def cancel_packet(packet, cancelled_by, reason='', ip_address=None):
     """Cancel all pending/active steps and mark the packet as cancelled."""
@@ -332,6 +423,18 @@ def cancel_packet(packet, cancelled_by, reason='', ip_address=None):
             'steps_skipped': skipped_count,
         },
         ip_address=ip_address,
+    )
+
+    # Track B: signing.packet_cancelled.
+    _emit_activity(
+        actor=cancelled_by,
+        verb='signing.packet_cancelled',
+        target=packet,
+        metadata={
+            'cancel_reason': reason,
+            'steps_skipped': skipped_count,
+            'cancelled_by_id': str(cancelled_by.pk) if cancelled_by else '',
+        },
     )
 
 
@@ -664,6 +767,21 @@ def send_reminder(signing_step):
                 'sign_url': absolute_url,
             },
         )
+
+    # Track B: signing.reminder_sent. Default-staff visibility kept off in v1
+    # since send_reminder is initiated by either staff or auto-cron — surfacing
+    # the row to collaborators is acceptable.
+    _emit_activity(
+        actor=None,
+        verb='signing.reminder_sent',
+        target=signing_step.packet,
+        action=signing_step,
+        metadata={
+            'step_order': signing_step.order,
+            'step_label': signing_step.flow_step.label,
+            'signer_id': str(signing_step.signer.pk) if signing_step.signer else '',
+        },
+    )
 
     signing_step.reminded_at = timezone.now()
     signing_step.save(update_fields=['reminded_at', 'updated_at'])
