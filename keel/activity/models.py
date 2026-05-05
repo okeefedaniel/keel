@@ -84,7 +84,14 @@ class AbstractActivity(models.Model):
         ContentType, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='+',
     )
-    target_id = models.PositiveIntegerField(null=True, blank=True)
+    # CharField instead of PositiveIntegerField so the GFK can target UUID-PK
+    # models (Beacon's Company/Contact/Interaction, Manifest's SigningPacket).
+    # Django's GenericForeignKey stringifies any PK type into the object_id
+    # field; CharField holds both stringified ints and UUID strings cleanly.
+    # PositiveIntegerField would overflow on UUIDs (their .int is 128-bit;
+    # SQLite INTEGER is 64-bit). Verified failure mode:
+    # OverflowError: Python int too large to convert to SQLite INTEGER.
+    target_id = models.CharField(max_length=64, null=True, blank=True)
     target = GenericForeignKey('target_ct', 'target_id')
 
     # Secondary object the activity acted on (e.g. for "collab.added", target=Project,
@@ -93,7 +100,7 @@ class AbstractActivity(models.Model):
         ContentType, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='+',
     )
-    action_id = models.PositiveIntegerField(null=True, blank=True)
+    action_id = models.CharField(max_length=64, null=True, blank=True)
     action = GenericForeignKey('action_ct', 'action_id')
 
     visibility = models.CharField(
@@ -264,8 +271,9 @@ class AbstractWatcher(models.Model):
         on_delete=models.CASCADE, related_name='+',
         help_text='Null = match any content type (rare; usually only for staff watchers).',
     )
-    target_id = models.PositiveIntegerField(
-        null=True, blank=True,
+    # CharField for UUID-PK compatibility (see AbstractActivity.target_id comment).
+    target_id = models.CharField(
+        max_length=64, null=True, blank=True,
         help_text='Null with target_ct set = "all records of this type". '
                   'Both null = global watcher (rare).',
     )
