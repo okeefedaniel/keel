@@ -1,0 +1,135 @@
+{% comment %}
+Shared chrome for invitation emails — DockLabs-branded HTML.
+
+Two consumers extend this base:
+  * invitation.html        — first-touch invite for new users
+  * invitation_update.html — "your access has been updated" for existing users
+
+Required blocks (children should override):
+  preheader      — preview text shown in inbox previews
+  hero_title     — the H1 inside the body
+  intro          — one paragraph after the H1
+  rows_table     — the table of products/changes
+  cta_label      — text inside the navy button
+  expiry_line    — defaults to "expires in N days"; children may override
+  footer_body    — the paragraph(s) above the brand line
+
+Common context required by both consumers:
+  inviter_name        — display name of the person sending the email
+  invitee_email       — recipient address (for greeting)
+  accept_url          — fully-qualified link to /invite/<token>/
+  expiry_days         — int, days until the link stops working
+  site_name           — branding label (default DockLabs)
+{% endcomment %}<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>{% block document_title %}DockLabs{% endblock %}</title>
+  <!--[if mso]>
+  <style type="text/css">
+    table { border-collapse: collapse; }
+    .mso-button { padding: 14px 32px !important; }
+  </style>
+  <![endif]-->
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    body { margin: 0; padding: 0; width: 100% !important; min-width: 100%; background-color: #FAF7F2; }
+    @media only screen and (max-width: 620px) {
+      .container { width: 100% !important; max-width: 100% !important; }
+      .px-pad { padding-left: 24px !important; padding-right: 24px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1A1A1A;">
+  <div style="display:none;font-size:1px;color:#FAF7F2;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+    {% block preheader %}{{ inviter_name }} sent you a DockLabs message.{% endblock %}
+  </div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#FAF7F2;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <table role="presentation" class="container" width="600" border="0" cellspacing="0" cellpadding="0"
+               style="max-width:600px;background-color:#FFFFFF;border:1px solid #E8E2D4;border-radius:8px;overflow:hidden;">
+
+          {# Header — DockLabs brand bar #}
+          <tr>
+            <td align="center" style="background-color:#0A2B4E;padding:28px 32px;">
+              <div style="font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:18px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#FFFFFF;">
+                DockLabs
+              </div>
+              <div style="font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:#A8B5C9;letter-spacing:0.04em;text-transform:uppercase;margin-top:6px;">
+                Civic Software for Government
+              </div>
+            </td>
+          </tr>
+
+          {# Body #}
+          <tr>
+            <td class="px-pad" style="padding:36px 36px 24px 36px;">
+              <h1 style="margin:0 0 16px 0;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:24px;line-height:1.3;font-weight:600;color:#0A2B4E;">
+                {% block hero_title %}You've been invited to DockLabs{% endblock %}
+              </h1>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#1A1A1A;">
+                {% block intro %}<strong>{{ inviter_name }}</strong> has invited you{% if invitee_email %} as <strong>{{ invitee_email }}</strong>{% endif %}.{% endblock %}
+              </p>
+
+              {% block rows_table %}{% endblock %}
+
+              {# CTA #}
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin:28px 0 12px 0;">
+                <tr>
+                  <td align="center" bgcolor="#0A2B4E" style="border-radius:6px;">
+                    <a href="{{ accept_url }}"
+                       class="mso-button"
+                       style="display:inline-block;padding:14px 32px;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:6px;background-color:#0A2B4E;">
+                      {% block cta_label %}Accept Invitation &rarr;{% endblock %}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:8px 0 0 0;font-size:12px;color:#8A8275;">
+                {% block expiry_line %}This link expires in {{ expiry_days }} day{{ expiry_days|pluralize }}.{% endblock %}
+              </p>
+            </td>
+          </tr>
+
+          {# Divider #}
+          <tr>
+            <td style="padding:0 36px;">
+              <hr style="border:none;border-top:1px solid #E8E2D4;margin:0;">
+            </td>
+          </tr>
+
+          {# Footer #}
+          <tr>
+            <td class="px-pad" style="padding:20px 36px 28px 36px;font-size:12px;line-height:1.6;color:#5B5348;">
+              {% block footer_body %}
+              <p style="margin:0 0 8px 0;">
+                DockLabs is a software suite built for state &amp; local government.
+              </p>
+              {% endblock %}
+            </td>
+          </tr>
+
+        </table>
+
+        <table role="presentation" width="600" border="0" cellspacing="0" cellpadding="0" style="max-width:600px;margin-top:24px;">
+          <tr>
+            <td align="center" style="font-size:11px;color:#8A8275;letter-spacing:0.08em;text-transform:uppercase;font-family:'Poppins','Helvetica Neue',Helvetica,Arial,sans-serif;">
+              DockLabs &middot; Civic Software for Government
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
