@@ -59,6 +59,38 @@ _DEFAULT_SKIP_FIELDS = {
     'updated_at', 'created_at', 'search_vector', 'password', 'last_login',
 }
 
+# Built-in exclusion list for the keel.activity layer. These models MUST NOT be
+# auto-audited or the audit → activity → notification chain becomes recursive
+# (writing a Notification triggers an audit row, which Track A may try to promote
+# to another Activity, which fires another Notification, ...). Products that add
+# auto-audit on these models should not — but the exclusion here is the defense.
+# Products extend the list via settings.KEEL_AUDIT_EXCLUDED_MODELS (extra entries).
+_BUILTIN_AUDIT_EXCLUDED_MODELS = frozenset({
+    # keel.activity layer — must never audit-promote
+    'keel_activity.activity',  # internal label, products override per-product
+    'keel_activity.watcher',
+    # keel.notifications — auditing notification deliveries creates a feedback loop
+    'keel_notifications.notification',
+    'keel_notifications.notificationlog',
+    'keel_notifications.notificationpreference',
+    # AuditLog itself — never audit the audit table (would infinite-recurse on save)
+    'core.auditlog',
+})
+
+
+def _is_audit_excluded(model_label: str) -> bool:
+    """Return True if the model is in the suite-wide audit exclusion list.
+
+    Checks the builtin list AND settings.KEEL_AUDIT_EXCLUDED_MODELS (product extension).
+    Both lists are case-insensitive on the model_label format ``app_label.modelname``.
+    """
+    from django.conf import settings
+    label = model_label.lower()
+    if label in _BUILTIN_AUDIT_EXCLUDED_MODELS:
+        return True
+    extra = getattr(settings, 'KEEL_AUDIT_EXCLUDED_MODELS', None) or ()
+    return label in {m.lower() for m in extra}
+
 
 def register_audited_model(model_label, display_name, skip_fields=None):
     """Register a model for automatic audit logging.
@@ -107,6 +139,9 @@ def _compute_changes(instance, skip_fields):
 
 def _on_save(sender, instance, created, **kwargs):
     model_label = f'{sender._meta.app_label}.{sender.__name__}'
+    if _is_audit_excluded(model_label.lower()):
+        # Suite-wide protection against audit ↔ activity ↔ notification recursion.
+        return
     entry = _registry.get(model_label)
     if not entry:
         return
@@ -132,6 +167,8 @@ def _on_save(sender, instance, created, **kwargs):
 
 def _on_delete(sender, instance, **kwargs):
     model_label = f'{sender._meta.app_label}.{sender.__name__}'
+    if _is_audit_excluded(model_label.lower()):
+        return
     entry = _registry.get(model_label)
     if not entry:
         return

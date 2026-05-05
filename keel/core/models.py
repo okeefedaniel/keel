@@ -86,7 +86,25 @@ class AbstractAuditLog(models.Model):
     entity_type = models.CharField(max_length=100)
     entity_id = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    changes = models.JSONField(default=dict, blank=True)
+    changes = models.JSONField(
+        default=dict, blank=True,
+        help_text='Snapshot of audited field values at save time (auto-signal pathway). '
+                  'Empty for explicit log_audit() / record_activity() calls — they use '
+                  'the metadata field for free-form context instead. changes retains '
+                  'diff/snapshot semantics that downstream tooling depends on.',
+    )
+    metadata = models.JSONField(
+        default=dict, blank=True,
+        help_text='Free-form context for explicit audit emission (record_activity, manual '
+                  'log_audit calls with structured info). Distinct from changes which '
+                  'auto-signal populates with field snapshots.',
+    )
+    deep_link_snapshot = models.CharField(
+        max_length=256, blank=True, default='',
+        help_text='Absolute URL of the audited target captured at audit-write time. Used '
+                  'by keel.activity promotion rules to avoid stale URLs when backfilling '
+                  'or replaying audit history through the activity layer.',
+    )
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
