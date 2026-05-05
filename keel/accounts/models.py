@@ -26,6 +26,7 @@ from django.core.exceptions import ValidationError
 
 from .storage import avatar_storage
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -407,6 +408,17 @@ class KeelUser(AbstractUser):
                     | models.Q(is_superuser=True)
                 ),
                 name='keeluser_org_or_superuser',
+            ),
+        ]
+        indexes = [
+            # Functional index on Lower(email) so the suite's
+            # ``email__iexact`` lookups (invitation existing-user check,
+            # accept-time duplicate guard, allauth socialaccount linkage,
+            # etc.) can use an index instead of a sequential scan.
+            # Postgres planner will use this whenever it sees
+            # ``LOWER(email) = ?``, which is what ``__iexact`` compiles to.
+            models.Index(
+                Lower('email'), name='keeluser_email_lower_idx',
             ),
         ]
 
