@@ -1,17 +1,21 @@
 {% extends "keel/layouts/auth.html" %}
 
-{% block title %}Accept Invitation | DockLabs{% endblock %}
+{% block title %}{% if is_update %}Review access changes{% else %}Accept Invitation{% endif %} | DockLabs{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-7 col-lg-5">
 
-    {# DockLabs wordmark above the card #}
+    {# DockLabs wordmark — uses the canonical .sidebar-brand classes from
+       docklabs-v2.css so this page matches the rest of the suite. The
+       tagline below is unique to the auth chrome and stays as a small-
+       caps eyebrow. #}
     <div class="text-center mb-4">
-      <div style="font-family:'Poppins',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#0A2B4E;">
-        DockLabs
-      </div>
-      <div style="font-size:11px;color:#8A8275;letter-spacing:0.04em;text-transform:uppercase;margin-top:2px;">
+      <a class="sidebar-brand sidebar-brand--inline justify-content-center" href="/">
+        <div class="sidebar-brand-icon"><i class="bi bi-shield-lock-fill"></i></div>
+        <div class="sidebar-brand-text">DockLabs</div>
+      </a>
+      <div class="section-label mt-1">
         Civic Software for Government
       </div>
     </div>
@@ -19,45 +23,56 @@
     <div class="card border-0 shadow-sm" style="border-radius:10px;">
       <div class="card-body p-4 p-md-5">
 
-        <h1 class="h3 mb-2" style="font-family:'Poppins',Helvetica,Arial,sans-serif;font-weight:600;color:#0A2B4E;">
-          {% if batch_invitations|length > 1 %}
-          You've been invited
-          {% else %}
-          Welcome to {{ invitation.product|title }}
-          {% endif %}
+        {% if is_update %}
+        {# ── Existing user: review changes, no signup form. ─────────── #}
+        <h1 class="h3 mb-2" style="color:#0A2B4E;">
+          Review your access changes
         </h1>
         <p class="text-muted mb-4" style="font-size:14px;">
-          Accept this invitation to access the DockLabs suite.
+          Your DockLabs account already exists. Accepting will apply
+          the changes below — no new account is created.
         </p>
 
-        {# What's being granted #}
-        {% if batch_invitations|length > 1 %}
         <div class="mb-4">
           <div class="small text-uppercase fw-semibold text-muted mb-2" style="letter-spacing:0.06em;">
-            Your access
+            What's changing
           </div>
           <ul class="list-group list-group-flush border rounded">
-            {% for inv in batch_invitations %}
+            {% for row in diff_rows %}
             <li class="list-group-item d-flex justify-content-between align-items-center py-3">
-              <span class="text-capitalize fw-medium">{{ inv.product }}</span>
-              <span>
-                <code class="bg-light px-2 py-1 rounded small">{{ inv.role }}</code>
-                {% if inv.is_beta_tester %}<span class="badge bg-dark ms-1">Beta</span>{% endif %}
+              <span class="text-capitalize fw-medium">{{ row.product }}</span>
+              <span class="text-end">
+                <code class="bg-light px-2 py-1 rounded small">{{ row.change_label }}</code>
+                {% if row.is_beta %}<span class="badge bg-dark ms-1">Beta</span>{% endif %}
               </span>
             </li>
             {% endfor %}
           </ul>
         </div>
-        {% else %}
-        <div class="alert alert-light border mb-4" style="background:#FAF7F2;">
-          <span class="text-muted small">Joining as</span>
-          <code class="bg-white px-2 py-1 rounded small ms-1">{{ invitation.role }}</code>
-          {% if invitation.is_beta_tester %}<span class="badge bg-dark ms-1">Beta</span>{% endif %}
-        </div>
-        {% endif %}
 
-        {# Form — different shape for already-signed-in vs new user #}
-        {% if user_exists %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="alert alert-light border mb-3 small" style="background:#FAF7F2;">
+            <i class="bi bi-check-circle-fill text-success me-1"></i>
+            Signed in as <strong>{{ request.user.email }}</strong>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 py-2">
+            Accept changes
+          </button>
+        </form>
+
+        {% elif user_exists %}
+        {# ── Already-signed-in path (no email match needed — guarded
+             upstream by the mismatch view). Single Accept button. ───── #}
+        <h1 class="h3 mb-2" style="color:#0A2B4E;">
+          {% if batch_invitations|length > 1 %}You've been invited{% else %}Welcome to {{ invitation.product|title }}{% endif %}
+        </h1>
+        <p class="text-muted mb-4" style="font-size:14px;">
+          Accept this invitation to access the DockLabs suite.
+        </p>
+
+        {% include "accounts/_invite_access_summary.html" %}
+
         <form method="post">
           {% csrf_token %}
           <div class="alert alert-light border mb-3 small" style="background:#FAF7F2;">
@@ -70,6 +85,16 @@
         </form>
 
         {% else %}
+        {# ── New user: signup form. ─────────────────────────────────── #}
+        <h1 class="h3 mb-2" style="color:#0A2B4E;">
+          {% if batch_invitations|length > 1 %}You've been invited{% else %}Welcome to {{ invitation.product|title }}{% endif %}
+        </h1>
+        <p class="text-muted mb-4" style="font-size:14px;">
+          Accept this invitation to access the DockLabs suite.
+        </p>
+
+        {% include "accounts/_invite_access_summary.html" %}
+
         <form method="post">
           {% csrf_token %}
           <div class="mb-3">

@@ -389,6 +389,14 @@ code, kbd, samp, pre,
     letter-spacing: -0.01em;
 }
 
+/* Modifier: render the brand wordmark as an inline-flex element so it
+   can be centered inside an auth card or other non-sidebar context.
+   Used on /accept-invitation and other public-chrome pages where the
+   brand sits above a card rather than inside the app sidebar. */
+.sidebar-brand--inline {
+    display: inline-flex;
+}
+
 .sidebar-collapse-btn {
     width: 26px;
     height: 26px;

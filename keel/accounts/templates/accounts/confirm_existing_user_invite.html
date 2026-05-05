@@ -1,0 +1,154 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Confirm access update | DockLabs{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+ <div class="row justify-content-center">
+  <div class="col-lg-9 col-xl-8">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <a href="{% url 'keel_accounts:invitation_list' %}"
+       class="btn btn-sm btn-outline-secondary"
+       title="Back to invitations" aria-label="Back to invitations">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h2 class="mb-0">Confirm access update</h2>
+  </div>
+
+  <div class="alert alert-warning d-flex align-items-start gap-2">
+    <i class="bi bi-info-circle-fill mt-1"></i>
+    <div>
+      <strong>{{ invitee_email }}</strong> already has a DockLabs account.
+      Sending this invitation will update their access — no new account
+      will be created. Review the changes below before sending.
+    </div>
+  </div>
+
+  {% if drift_warning %}
+  <div class="alert alert-danger d-flex align-items-start gap-2">
+    <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+    <div>
+      <strong>State changed since you last viewed this page.</strong>
+      Another change may have modified this user's access in the
+      meantime. The diff below reflects the current state — please
+      re-confirm before the update notice is sent.
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card mb-4">
+    <div class="card-header">
+      <strong>Existing user</strong>
+    </div>
+    <div class="card-body">
+      <dl class="row mb-0 small">
+        <dt class="col-sm-3 text-muted">Name</dt>
+        <dd class="col-sm-9">{{ existing_user.get_full_name|default:"—" }}</dd>
+
+        <dt class="col-sm-3 text-muted">Username</dt>
+        <dd class="col-sm-9"><code>{{ existing_user.username }}</code></dd>
+
+        <dt class="col-sm-3 text-muted">Email</dt>
+        <dd class="col-sm-9">{{ existing_user.email }}</dd>
+
+        {% if existing_user.organization %}
+        <dt class="col-sm-3 text-muted">Organization</dt>
+        <dd class="col-sm-9">{{ existing_user.organization.name }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header">
+      <strong>What will change</strong>
+    </div>
+    <div class="card-body p-0">
+      <table class="table mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Product</th>
+            <th>Currently</th>
+            <th>After accept</th>
+            <th class="text-end">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in diff_rows %}
+          <tr>
+            <td class="text-capitalize fw-medium">{{ row.product }}</td>
+            <td>
+              {% if row.current_role %}
+                <code>{{ row.current_role }}</code>
+                {% if not row.current_is_active %}
+                  <span class="badge bg-secondary ms-1">inactive</span>
+                {% endif %}
+                {% if row.current_is_beta %}
+                  <span class="badge bg-dark ms-1">Beta</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">No access</span>
+              {% endif %}
+            </td>
+            <td>
+              <code>{{ row.role }}</code>
+              {% if row.is_beta %}<span class="badge bg-dark ms-1">Beta</span>{% endif %}
+            </td>
+            <td class="text-end">
+              {% if row.kind == 'noop' %}
+                <span class="badge bg-light text-muted border">No change</span>
+              {% elif row.kind == 'role_change' %}
+                <span class="badge bg-warning text-dark">Role change</span>
+              {% elif row.kind == 'beta_change' %}
+                <span class="badge bg-info text-dark">Beta toggle</span>
+              {% elif row.kind == 'reactivate' %}
+                <span class="badge bg-success">Reactivating</span>
+              {% else %}
+                <span class="badge bg-primary">New access</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="text-muted small">
+    The user will receive an email titled
+    <em>"Your DockLabs access has been updated"</em> with the changes
+    above. They will sign in with their existing credentials and click
+    a single Accept button — no new account or password is created.
+    Unchanged products are skipped automatically.
+  </p>
+
+  <form method="post" action="{% url 'keel_accounts:send_invitation' %}">
+    {% csrf_token %}
+    <input type="hidden" name="acknowledge_existing" value="1">
+    <input type="hidden" name="email" value="{{ invitee_email }}">
+    {% for row in form_rows %}
+      <input type="hidden" name="products" value="{{ row.product }}">
+      <input type="hidden" name="role__{{ row.product }}" value="{{ row.role }}">
+      {% if row.is_beta %}
+        <input type="hidden" name="beta__{{ row.product }}" value="1">
+      {% endif %}
+    {% endfor %}
+    {# Signed fingerprint of (email, target_user_pk, rows). The view
+       re-derives this from the re-POSTed form fields and rejects the
+       acknowledgement if they don't match — defends against DOM
+       tampering on the hidden fields above and against drift if
+       another admin modified the target's access in the meantime. #}
+    <input type="hidden" name="signed_diff" value="{{ signed_diff }}">
+    <div class="d-flex justify-content-end gap-2">
+      <a href="{% url 'keel_accounts:invitation_list' %}" class="btn btn-outline-secondary">
+        Cancel
+      </a>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-envelope-check me-1"></i>Send update notice
+      </button>
+    </div>
+  </form>
+  </div>
+ </div>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+Your DockLabs access has been updated
+======================================
+
+{{ inviter_name }} has updated your DockLabs access.
+
+Here's what's changing:
+{% for row in change_summary %}
+  • {{ row.product|capfirst }} — {{ row.change_label }}{% if row.is_beta and row.change_label|lower|slice:"0:4" != "beta" %} (Beta){% endif %}{% endfor %}
+
+Review and accept:
+{{ accept_url }}
+
+This link expires in {{ expiry_days }} day{{ expiry_days|pluralize }}.
+
+These changes only apply once you click Accept. Until then, your
+existing DockLabs access is unchanged. Sign in with your existing
+credentials — no new account or password is required.
+
+---
+DockLabs · Civic Software for Government

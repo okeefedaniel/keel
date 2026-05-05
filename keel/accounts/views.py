@@ -18,6 +18,7 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Count, Q
@@ -388,6 +389,135 @@ def invitation_list(request):
     return render(request, 'accounts/invitation_list.html', context)
 
 
+# ``kind`` enum for _build_existing_user_diff entries. Module-level
+# constants so a typo in any one consumer (helper, template, test) is
+# grep-discoverable. Templates can't import these but they're a fixed
+# vocabulary documented here.
+KIND_NEW_ACCESS = 'new_access'
+KIND_REACTIVATE = 'reactivate'
+KIND_ROLE_CHANGE = 'role_change'
+KIND_BETA_CHANGE = 'beta_change'
+KIND_NOOP = 'noop'
+
+# Signed-payload defense for the existing-user interstitial → re-POST
+# round-trip. The signature ties an `acknowledge_existing=1` re-POST
+# to the exact (email, target_user, rows) tuple that was shown to the
+# admin in phase 1. If a second admin (or the same admin in another
+# tab) modifies the target user's role between the two phases, the
+# fingerprint won't match and we re-render the interstitial with the
+# CURRENT diff plus a warning, forcing a re-confirmation. Same defense
+# blocks DOM tampering (changing the hidden email/products fields):
+# the fingerprint baked at render time anchors the canonical payload.
+EXISTING_USER_DIFF_MAX_AGE = 10 * 60  # 10 minutes
+
+
+def _diff_fingerprint_payload(email, existing_user, valid_rows, diff_rows):
+    """Canonical signature payload for the interstitial → re-POST round-trip.
+
+    Stable shape: a sorted list of (product, role, is_beta, kind,
+    change_label) per row plus the recipient email and target user PK.
+    Including `kind` and `change_label` (which encode the user's CURRENT
+    state through the diff classifier) means drift in the target's
+    access between phase-1 and phase-2 changes the fingerprint and
+    triggers a re-render. Without them, the signature only binds
+    proposed changes and is blind to "their role got changed underneath."
+    Sorted so POST ordering doesn't alter the fingerprint. Stringified
+    PK so signing.dumps doesn't choke on UUIDs.
+    """
+    by_product = {r['product']: r for r in diff_rows}
+    return {
+        'email': email,
+        'user_pk': str(existing_user.pk),
+        'rows': sorted([
+            [p, r, b, by_product[p]['kind'], by_product[p]['change_label']]
+            for p, r, b in valid_rows
+        ]),
+    }
+
+
+def _get_existing_keel_user(email, scope_to_org=None):
+    """Return the KeelUser whose email matches case-insensitively, or None.
+
+    When ``scope_to_org`` is set, restrict the lookup to users in that
+    organization. This is the email-enumeration scoping for non-superusers:
+    an agency_admin in one org cannot probe whether an email belongs to a
+    user in another org. Superusers (dokadmin) pass ``scope_to_org=None``
+    so they keep their cross-org reach for legitimate suite admin.
+    """
+    qs = KeelUser.objects.filter(email__iexact=email)
+    if scope_to_org is not None:
+        qs = qs.filter(organization=scope_to_org)
+    return qs.first()
+
+
+def _build_existing_user_diff(existing_user, parsed_rows):
+    """Compare proposed product/role/beta rows against the user's current access.
+
+    ``parsed_rows`` is a list of ``(product, role, is_beta)`` tuples that
+    have already passed validation gates. Returns a list of dicts the
+    admin interstitial and update-email templates both consume:
+
+        {
+            'product': 'harbor',
+            'role': 'agency_admin',
+            'is_beta': False,
+            'kind': KIND_ROLE_CHANGE | KIND_BETA_CHANGE | KIND_REACTIVATE |
+                    KIND_NOOP | KIND_NEW_ACCESS,
+            'change_label': 'analyst → agency_admin' (or "..., +beta" if
+                            role and beta both change),
+            'current_role': 'analyst' | None,
+            'current_is_beta': bool | None,
+            'current_is_active': bool | None,
+        }
+
+    No-op entries (same role + beta on an active row) are included with
+    ``kind=KIND_NOOP`` so the interstitial can show them and the caller
+    can skip Invitation creation.
+    """
+    # Scope to the products in parsed_rows so users with many active
+    # accesses (system_admins, dokadmin) don't trigger a wider scan.
+    relevant_products = {p for p, _, _ in parsed_rows}
+    existing_access = {
+        a.product: a
+        for a in ProductAccess.objects.filter(
+            user=existing_user, product__in=relevant_products,
+        )
+    }
+    rows = []
+    for product, role, is_beta in parsed_rows:
+        access = existing_access.get(product)
+        entry = {
+            'product': product,
+            'role': role,
+            'is_beta': is_beta,
+            'current_role': access.role if access else None,
+            'current_is_beta': access.is_beta_tester if access else None,
+            'current_is_active': access.is_active if access else None,
+        }
+        if access is None:
+            entry['kind'] = KIND_NEW_ACCESS
+            entry['change_label'] = f'New access ({role})'
+        elif not access.is_active:
+            entry['kind'] = KIND_REACTIVATE
+            entry['change_label'] = f'Reactivating as {role}'
+        elif access.role != role:
+            entry['kind'] = KIND_ROLE_CHANGE
+            # If role AND beta both flip on, surface both in the label so
+            # the diff is honest. Otherwise role_change subsumes the entry.
+            if is_beta and not access.is_beta_tester:
+                entry['change_label'] = f'{access.role} → {role}, +beta'
+            else:
+                entry['change_label'] = f'{access.role} → {role}'
+        elif is_beta and not access.is_beta_tester:
+            entry['kind'] = KIND_BETA_CHANGE
+            entry['change_label'] = 'Beta tester: off → on'
+        else:
+            entry['kind'] = KIND_NOOP
+            entry['change_label'] = f'Already has this ({role})'
+        rows.append(entry)
+    return rows
+
+
 @admin_required
 @require_POST
 def send_invitation(request):
@@ -397,6 +527,14 @@ def send_invitation(request):
     subscribe to every product in the POSTed ``products`` list. Out-
     of-set products are dropped server-side; the user gets a clear
     error rather than a silently-ignored selection.
+
+    Existing-user flow: if the email already maps to a ``KeelUser``,
+    the first POST renders a confirmation interstitial showing what
+    the invitation will change; only when the form re-POSTs with
+    ``acknowledge_existing=1`` do we create Invitation rows and send
+    the (different) "your access has been updated" email. No-op
+    products are pre-skipped so accepting the email never produces
+    an empty action.
 
     Cross-org dokadmin invites (where the inviter is a superuser AND
     the selected target org is NOT the inviter's own org) are flagged
@@ -500,8 +638,10 @@ def send_invitation(request):
         for prod in selected
     }
 
-    created_invitations = []
-    skipped = []
+    # Phase 1 — parse + validate per-product rows. We collect the
+    # *valid grantable* rows up front so the existing-user diff can run
+    # against the same set the create loop would have used.
+    valid_rows = []  # list of (product, role, is_beta)
     invalid = []
     denied = []
     for prod in selected:
@@ -514,7 +654,97 @@ def send_invitation(request):
             denied.append((prod, role))
             continue
         is_beta = request.POST.get(f'beta__{prod}') == '1'
+        valid_rows.append((prod, role, is_beta))
 
+    # Phase 2 — existing-user interstitial. If the email already maps
+    # to a KeelUser, surface the diff and require an explicit ack
+    # before writing rows or sending email. We render this AFTER the
+    # role-grant gate so the interstitial only shows changes the
+    # actor is actually authorized to make.
+    #
+    # Email-enumeration defense: scope non-superusers to their target
+    # org. A vendor agency_admin shouldn't be able to probe whether a
+    # given email belongs to a user in a different org. Superusers
+    # (dokadmin) keep cross-org reach because that's their job.
+    enumeration_scope = None if request.user.is_superuser else target_org
+    existing_user = _get_existing_keel_user(email, scope_to_org=enumeration_scope)
+    acknowledge_existing = request.POST.get('acknowledge_existing') == '1'
+    ack_verified = False  # only flips True when a signed diff matches
+    diff_rows = []
+
+    if existing_user is not None and valid_rows:
+        diff_rows = _build_existing_user_diff(existing_user, valid_rows)
+        canonical_payload = _diff_fingerprint_payload(
+            email, existing_user, valid_rows, diff_rows,
+        )
+
+        # Tampering / drift detection. If the re-POST claims acknowledgement,
+        # the signed payload it carries MUST match what we'd compute from
+        # current DB state. A mismatch means either:
+        #   (a) admin DOM-tampered with the hidden form fields, or
+        #   (b) state changed between phase-1 render and phase-2 click
+        #       (e.g. another admin altered the target's role).
+        # Either way, we discard the ack and re-render the interstitial
+        # with the current diff so the admin re-confirms knowingly.
+        ack_verified = False
+        drift_warning = False
+        if acknowledge_existing:
+            submitted_signed = request.POST.get('signed_diff', '')
+            try:
+                unsigned = signing.loads(
+                    submitted_signed, max_age=EXISTING_USER_DIFF_MAX_AGE,
+                )
+            except signing.BadSignature:
+                unsigned = None
+            if unsigned == canonical_payload:
+                ack_verified = True
+            else:
+                drift_warning = True
+                logger.warning(
+                    'INVITE_DIFF_DRIFT: actor=%s target=%s — signed payload '
+                    'did not match current diff; re-rendering interstitial',
+                    request.user.username, email,
+                )
+
+        if not ack_verified:
+            return render(
+                request,
+                'accounts/confirm_existing_user_invite.html',
+                {
+                    'existing_user': existing_user,
+                    'invitee_email': email,
+                    'target_org': target_org,
+                    'diff_rows': diff_rows,
+                    'form_rows': [
+                        {'product': p, 'role': r, 'is_beta': b}
+                        for p, r, b in valid_rows
+                    ],
+                    'signed_diff': signing.dumps(canonical_payload),
+                    'drift_warning': drift_warning,
+                },
+            )
+
+        # Acknowledged: drop pure no-ops so accepting the email never
+        # yields an empty action.
+        skipped_noops = [r['product'] for r in diff_rows if r['kind'] == KIND_NOOP]
+        valid_rows = [
+            (p, r, b) for (p, r, b) in valid_rows if p not in skipped_noops
+        ]
+        if skipped_noops:
+            messages.info(
+                request,
+                f'Skipped {len(skipped_noops)} unchanged product'
+                f'{"s" if len(skipped_noops) != 1 else ""}: '
+                f'{", ".join(skipped_noops)}.',
+            )
+
+    is_update = existing_user is not None and ack_verified
+    diff_by_product = {r['product']: r for r in diff_rows}
+
+    # Phase 3 — create the invitation rows.
+    created_invitations = []
+    skipped = []
+    for prod, role, is_beta in valid_rows:
         if Invitation.objects.filter(
             email=email, product=prod, status='pending',
         ).exists():
@@ -605,6 +835,21 @@ def send_invitation(request):
         try:
             inviter_name = request.user.get_full_name() or request.user.email
             expiry_days = getattr(settings, 'KEEL_INVITATION_EXPIRY_DAYS', 7)
+            # For existing users we send the "your access has been
+            # updated" variant with per-product change labels instead
+            # of the generic onboarding template.
+            # When is_update is True, every created Invitation product was
+            # in valid_rows and therefore in diff_by_product. Direct access
+            # is loud-on-failure (KeyError) if that invariant ever breaks.
+            change_summary = [
+                {
+                    'product': inv.product,
+                    'role': inv.role,
+                    'is_beta': inv.is_beta_tester,
+                    'change_label': diff_by_product[inv.product]['change_label'],
+                }
+                for inv in created_invitations
+            ] if is_update else []
             ctx = {
                 'inviter_name': inviter_name,
                 'invitee_email': email,
@@ -612,13 +857,23 @@ def send_invitation(request):
                 'accept_url': accept_url,
                 'expiry_days': expiry_days,
                 'site_name': 'DockLabs',
+                'change_summary': change_summary,
+                'is_update': is_update,
             }
-            text_body = render_to_string('accounts/emails/invitation.txt', ctx)
-            html_body = render_to_string('accounts/emails/invitation.html', ctx)
-            subject = (
-                f'{inviter_name} invited you to DockLabs'
-                f' ({len(created_invitations)} product{"s" if len(created_invitations) != 1 else ""})'
-            )
+            if is_update:
+                text_body = render_to_string('accounts/emails/invitation_update.txt', ctx)
+                html_body = render_to_string('accounts/emails/invitation_update.html', ctx)
+                subject = (
+                    f'{inviter_name} updated your DockLabs access'
+                    f' ({len(created_invitations)} change{"s" if len(created_invitations) != 1 else ""})'
+                )
+            else:
+                text_body = render_to_string('accounts/emails/invitation.txt', ctx)
+                html_body = render_to_string('accounts/emails/invitation.html', ctx)
+                subject = (
+                    f'{inviter_name} invited you to DockLabs'
+                    f' ({len(created_invitations)} product{"s" if len(created_invitations) != 1 else ""})'
+                )
             mail = EmailMultiAlternatives(
                 subject=subject,
                 body=text_body,
@@ -890,10 +1145,49 @@ def accept_invitation(request, token):
     else:
         batch_invitations = [invitation]
 
+    # If the email already maps to a KeelUser, this is an "access
+    # update" rather than a fresh signup. Two branches:
+    #   - anonymous → bounce through login so the user can sign in
+    #     with their existing credentials before reviewing.
+    #   - authenticated (and email-matched, since the mismatch guard
+    #     above already 403'd a different identity) → render the
+    #     review-only variant with the per-product diff.
+    # Always do the DB lookup, even when authenticated. The mismatch
+    # guard above DOES establish that ``request.user.email`` equals the
+    # invitation email, so an `existing_user = request.user` shortcut
+    # would be safe TODAY. But that ties this branch's correctness to
+    # the upstream guard's exact behavior — if the guard is ever
+    # weakened (e.g. "skip for superusers" in a future quality-of-life
+    # patch for dokadmin testing flows), this branch would silently
+    # treat the wrong user as the existing-user. The DB lookup costs
+    # one indexed query (functional Lower(email) index, migration 0018)
+    # — cheap insurance for a load-bearing identity check.
+    existing_user = _get_existing_keel_user(invitation.email)
+
+    if existing_user is not None and not request.user.is_authenticated:
+        # Bounce through login so the user can authenticate with their
+        # existing credentials before reviewing changes. Use settings.LOGIN_URL
+        # rather than a hardcoded path so a future LOGIN_URL override
+        # (e.g. yeoman's /auth/login/) is respected.
+        login_url = getattr(settings, 'LOGIN_URL', '/accounts/login/')
+        return redirect(f'{login_url}?next=/invite/{token}/')
+
+    diff_rows = []
+    if existing_user is not None:
+        diff_rows = _build_existing_user_diff(
+            existing_user,
+            [
+                (inv.product, inv.role, inv.is_beta_tester)
+                for inv in batch_invitations
+            ],
+        )
+
     return render(request, 'accounts/accept_invitation.html', {
         'invitation': invitation,
         'batch_invitations': batch_invitations,
         'user_exists': request.user.is_authenticated,
+        'is_update': existing_user is not None,
+        'diff_rows': diff_rows,
     })
 
 # ---------------------------------------------------------------------------

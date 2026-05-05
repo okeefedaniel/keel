@@ -1,0 +1,61 @@
+{% extends "accounts/emails/_invitation_base.html" %}
+
+{% comment %}
+Invitation update email — sent when an admin sends an invitation to an
+email that already maps to a KeelUser. Mirrors invitation.html visually
+(via the shared base) but reframes the message as "your access has been
+updated" and renders per-product change labels.
+
+Context (from views.py / send_invitation):
+  inviter_name        — display name of the person sending the update
+  invitee_email       — email of the existing user
+  batch_invitations   — Invitation rows in this batch (no-ops are pre-skipped)
+  change_summary      — list of {product, role, is_beta, change_label}
+  accept_url          — fully-qualified link to /invite/<token>/
+  expiry_days         — int, days until the link stops working
+  site_name           — branding label (default DockLabs)
+{% endcomment %}
+
+{% block document_title %}Your DockLabs access has been updated{% endblock %}
+
+{% block preheader %}{{ inviter_name }} updated your DockLabs access. Review the changes inside.{% endblock %}
+
+{% block hero_title %}Your DockLabs access has been updated{% endblock %}
+
+{% block intro %}
+<strong>{{ inviter_name }}</strong> has updated your DockLabs access{% if invitee_email %} for <strong>{{ invitee_email }}</strong>{% endif %}. Here's what's changing:
+{% endblock %}
+
+{% block rows_table %}
+<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0"
+       style="margin:20px 0 8px 0;border:1px solid #E8E2D4;border-radius:6px;overflow:hidden;">
+  {% for row in change_summary %}
+  <tr>
+    <td style="padding:12px 16px;border-bottom:{% if not forloop.last %}1px solid #E8E2D4{% else %}none{% endif %};">
+      <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+          <td style="font-size:14px;font-weight:600;color:#0A2B4E;text-transform:capitalize;">
+            {{ row.product }}
+          </td>
+          <td align="right" style="font-size:12px;color:#5B5348;">
+            <span style="background-color:#F1ECE2;padding:3px 10px;border-radius:4px;font-family:'SF Mono',Menlo,Monaco,Consolas,monospace;">{{ row.change_label }}</span>
+            {% if row.is_beta %}<span style="background-color:#0A2B4E;color:#FFFFFF;padding:3px 10px;border-radius:4px;margin-left:4px;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Beta</span>{% endif %}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
+
+{% block cta_label %}Review &amp; accept changes &rarr;{% endblock %}
+
+{% block footer_body %}
+<p style="margin:0 0 8px 0;">
+  These changes will only apply once you click Accept. Until then, your existing DockLabs access is unchanged.
+</p>
+<p style="margin:0;color:#8A8275;">
+  Sign in with your existing credentials — no new account or password is required.
+</p>
+{% endblock %}
