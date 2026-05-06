@@ -1,22 +1,27 @@
-{% load activity_tags %}
-{# keel.activity panel partial.
+{% comment %}
+keel.activity panel partial.
 
-   Renders a chronological list of Activity rows for a target record.
-   Used by the {% activity_panel obj %} template tag (and includable
-   directly when the caller has already resolved a list of entries).
+Renders a chronological list of Activity rows for a target record.
+Used by the activity_panel template tag (and includable directly when
+the caller has already resolved a list of entries).
 
-   Each entry is the dict returned by Activity.render_for(user) -- handles
-   both normal-tier rows (with target/deep_link/source_label) and stub-tier
-   rows (actor + verb + date only, for Beacon's cross-zone case).
+Each entry is the dict returned by Activity.render_for(user) -- handles
+both normal-tier rows (with target/deep_link/source_label) and stub-tier
+rows (actor + verb + date only, for Beacon's cross-zone case).
 
-   Context variables expected:
-     activity_entries  -- iterable of dicts from Activity.render_for(user)
-     activity_title    -- card heading (default: "Recent Activity")
-     activity_more_url -- optional URL for a "view all" link in the header
+Context variables expected:
+  activity_entries  -- iterable of dicts from Activity.render_for(user)
+  activity_title    -- card heading (default: "Recent Activity")
+  activity_more_url -- optional URL for a "view all" link in the header
 
-   Don't extend this template; include it. Customize per-product chrome
-   by wrapping the include in product-specific markup if needed.
-#}
+Don't extend this template; include it. Customize per-product chrome
+by wrapping the include in product-specific markup if needed.
+
+NOTE: do NOT use {# ... #} for multi-line comments here -- that syntax
+is single-line only in Django, and any {% tag %} inside an attempted
+multi-line {# #} block gets parsed and executed. Always use
+{% comment %}{% endcomment %} for multi-line.
+{% endcomment %}
 <div class="card border-0 shadow-sm mt-3 keel-activity-panel">
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
         <h6 class="mb-0">
