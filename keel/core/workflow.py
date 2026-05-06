@@ -138,6 +138,12 @@ class WorkflowEngine:
         # Auto-create status history record if configured
         self._record_history(obj, old_status, target_status, user, comment)
 
+        # Emit a Track B `workflow.transitioned` activity row so every
+        # WorkflowEngine-based product gets status-change visibility in the
+        # activity panel for free. Best-effort: never blocks the transition
+        # if keel.activity isn't installed or record_activity raises.
+        self._record_activity(obj, old_status, target_status, user, comment, transition)
+
         if transition.on_complete:
             transition.on_complete(obj, user, comment)
 
@@ -177,6 +183,55 @@ class WorkflowEngine:
             )
         except Exception:
             logger.exception('Failed to create status history record')
+
+    def _record_activity(self, obj, old_status, new_status, user, comment, transition):
+        """Emit a `workflow.transitioned` activity row for the transition.
+
+        Best-effort: never blocks the transition. No-ops cleanly when
+        keel.activity isn't configured (KEEL_ACTIVITY_MODEL unset) or when
+        record_activity itself raises.
+
+        The source_label uses the transition's human label when available
+        (e.g. "Submit", "Approve"), falling back to "transitioned to <state>".
+        Metadata carries from_status / to_status / comment for downstream
+        consumers (Helm aggregator, notification fan-out, etc).
+        """
+        from django.conf import settings
+        if not getattr(settings, 'KEEL_ACTIVITY_MODEL', ''):
+            return
+        try:
+            from keel.activity.services import record_activity
+        except ImportError:
+            return
+        try:
+            label = transition.label.strip() if transition.label else ''
+            if label:
+                # Lowercase first letter so it reads naturally after the actor
+                # name in the activity panel: "Demo Admin marked approved" not
+                # "Demo Admin Marked Approved".
+                source_label = label[0].lower() + label[1:] if len(label) > 1 else label.lower()
+            else:
+                source_label = f'transitioned to {new_status}'
+            record_activity(
+                actor=user,
+                verb='workflow.transitioned',
+                target=obj,
+                audit_action='status_change',
+                visibility='collaborators',
+                source_label=source_label,
+                metadata={
+                    'from_status': old_status,
+                    'to_status': new_status,
+                    'comment': comment or '',
+                    'transition_label': transition.label or '',
+                },
+            )
+        except Exception:
+            logger.exception(
+                'workflow.transitioned activity emission failed for '
+                '%s %s -> %s (non-fatal)',
+                obj.__class__.__name__, old_status, new_status,
+            )
 
     def _rebuild_index(self):
         self._index = {}
