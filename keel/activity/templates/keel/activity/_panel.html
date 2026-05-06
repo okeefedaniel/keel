@@ -1,0 +1,65 @@
+{% load activity_tags %}
+{# keel.activity panel partial.
+
+   Renders a chronological list of Activity rows for a target record.
+   Used by the {% activity_panel obj %} template tag (and includable
+   directly when the caller has already resolved a list of entries).
+
+   Each entry is the dict returned by Activity.render_for(user) -- handles
+   both normal-tier rows (with target/deep_link/source_label) and stub-tier
+   rows (actor + verb + date only, for Beacon's cross-zone case).
+
+   Context variables expected:
+     activity_entries  -- iterable of dicts from Activity.render_for(user)
+     activity_title    -- card heading (default: "Recent Activity")
+     activity_more_url -- optional URL for a "view all" link in the header
+
+   Don't extend this template; include it. Customize per-product chrome
+   by wrapping the include in product-specific markup if needed.
+#}
+<div class="card border-0 shadow-sm mt-3 keel-activity-panel">
+    <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">
+            <i class="bi bi-clock-history me-2"></i>{{ activity_title|default:"Recent Activity" }}
+        </h6>
+        {% if activity_more_url %}
+            <a href="{{ activity_more_url }}" class="small text-decoration-none">View all</a>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+            {% for entry in activity_entries %}
+                <div class="list-group-item py-2">
+                    {% if entry.is_stub %}
+                        {# Stub-tier — Beacon zone-bridge. Actor + verb + date only. #}
+                        <small class="text-muted fst-italic">
+                            <strong>{{ entry.actor_name }}</strong>
+                            logged activity
+                            <span class="ms-1">{{ entry.created_at|timesince }} ago</span>
+                        </small>
+                    {% else %}
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <small class="flex-grow-1">
+                                <strong>{{ entry.actor_name }}</strong>
+                                {% if entry.deep_link %}
+                                    <a href="{{ entry.deep_link }}" class="text-decoration-none">
+                                        {{ entry.source_label }}
+                                    </a>
+                                {% else %}
+                                    {{ entry.source_label }}
+                                {% endif %}
+                            </small>
+                            <small class="text-muted text-nowrap" title="{{ entry.created_at|date:'Y-m-d H:i' }}">
+                                {{ entry.created_at|timesince }} ago
+                            </small>
+                        </div>
+                    {% endif %}
+                </div>
+            {% empty %}
+                <div class="list-group-item text-center text-muted py-3">
+                    <small>No recent activity.</small>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
