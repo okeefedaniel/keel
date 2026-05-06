@@ -16,11 +16,6 @@ Context variables expected:
 
 Don't extend this template; include it. Customize per-product chrome
 by wrapping the include in product-specific markup if needed.
-
-NOTE: do NOT use {# ... #} for multi-line comments here -- that syntax
-is single-line only in Django, and any {% tag %} inside an attempted
-multi-line {# #} block gets parsed and executed. Always use
-{% comment %}{% endcomment %} for multi-line.
 {% endcomment %}
 <div class="card border-0 shadow-sm mt-3 keel-activity-panel">
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
