@@ -269,3 +269,179 @@ def helm_inbox_view(build_inbox_func):
         return JsonResponse(payload)
 
     return wrapper
+
+
+# ---------------------------------------------------------------------------
+# Cross-product activity stream — companion to helm_feed_view + helm_inbox_view
+#
+# helm_feed_view: aggregate metrics + action items per product
+# helm_inbox_view: per-user "awaiting me" items + unread notifications
+# helm_activity_view: chronological keel.activity rows for the suite-wide
+#                     "Across the suite" stream tab in Helm dashboard
+#
+# The endpoint returns the most recent N rows (default 50, max 200) optionally
+# filtered by ``?since=<iso8601>`` for delta polls. Helm aggregates these
+# across all peers, merges by created_at, and renders one chronological wall.
+#
+# Visibility: rows respect the per-product Activity.visible_to ACL implicitly
+# because the endpoint is staff-token-only -- only the helm aggregator hits
+# it, and helm renders the stream to staff users. For per-user filtering on
+# the helm side (e.g. "show me activity I have access to across the suite"),
+# Phase 2 will add a user_sub gate. v1 is staff-only.
+# ---------------------------------------------------------------------------
+
+ACTIVITY_CACHE_TTL_SECONDS = 60
+ACTIVITY_DEFAULT_LIMIT = 50
+ACTIVITY_MAX_LIMIT = 200
+
+
+def _serialize_activity(activity) -> dict:
+    """Render an Activity row to the cross-product wire shape.
+
+    Mirrors AbstractActivity.render_for(user) but for cross-product transport,
+    so includes target_type / target_id (string) for client-side grouping
+    plus the wire-canonical metadata. Returns None for stub-tier rows; the
+    caller filters those out (cross-product stub stripping is more conservative
+    than per-record).
+    """
+    if activity.visibility == 'stub':
+        return None
+    return {
+        'id': str(activity.pk),
+        'verb': activity.verb,
+        'actor_name': str(activity.actor) if activity.actor else 'system',
+        'actor_id': str(activity.actor_id) if activity.actor_id else None,
+        'source_label': activity.source_label or '',
+        'deep_link': activity.deep_link or '',
+        'target_type': activity.target_ct.model if activity.target_ct_id else '',
+        'target_id': str(activity.target_id) if activity.target_id else '',
+        'visibility': activity.visibility,
+        'source_product': activity.source_product or '',
+        'metadata': activity.metadata or {},
+        'created_at': activity.created_at.isoformat(),
+    }
+
+
+def helm_activity_view(*, default_limit: int = ACTIVITY_DEFAULT_LIMIT):
+    """Decorator factory for /api/v1/helm-feed/activity/ endpoints.
+
+    Unlike helm_feed_view / helm_inbox_view, this decorator doesn't take a
+    user-supplied builder -- the implementation is generic over any product's
+    concrete Activity model. The wrapped factory call returns a ready-to-mount
+    Django view.
+
+    Usage:
+        # product/api/helm_activity.py
+        from keel.feed.views import helm_activity_view
+        helm_activity = helm_activity_view()
+
+        # product/urls.py
+        path('api/v1/helm-feed/activity/', helm_activity, name='helm-feed-activity'),
+
+    Query params:
+        since=<iso8601>   -- only rows with created_at > since (delta polling)
+        limit=<int>       -- override default_limit, capped at ACTIVITY_MAX_LIMIT
+
+    Returns shape:
+        {
+            "product": "lookout",
+            "product_label": "Lookout",
+            "product_url": "https://lookout.docklabs.ai",
+            "activities": [<serialized rows, newest first>],
+            "fetched_at": "<iso>",
+            "next_since": "<iso of newest row, for cursor-style polling>"
+        }
+    """
+    from datetime import datetime as _datetime
+
+    @csrf_exempt
+    @require_GET
+    def view(request):
+        if not _accepted_keys(demo_mode=getattr(settings, 'DEMO_MODE', False)):
+            return JsonResponse(
+                {'error': 'Helm feed not configured (HELM_FEED_API_KEY missing).'},
+                status=503,
+            )
+
+        matched = _authenticate_helm_bearer(request)
+        if matched is None:
+            return JsonResponse({'error': 'Invalid API key.'}, status=401)
+
+        if _rate_limited(matched):
+            return JsonResponse({'error': 'Rate limit exceeded.'}, status=429)
+
+        # Parse since + limit
+        since_str = (request.GET.get('since') or '').strip()
+        since = None
+        if since_str:
+            try:
+                since = _datetime.fromisoformat(since_str.replace('Z', '+00:00'))
+            except ValueError:
+                return JsonResponse(
+                    {'error': 'Invalid `since` (use ISO 8601).'}, status=400,
+                )
+
+        try:
+            limit = int(request.GET.get('limit') or default_limit)
+        except (TypeError, ValueError):
+            limit = default_limit
+        limit = max(1, min(limit, ACTIVITY_MAX_LIMIT))
+
+        # Cache key includes since + limit so deltas don't collide with full pulls
+        cache_key = f'keel:helm_activity:{request.path}:{since_str}:{limit}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return JsonResponse(cached)
+
+        # Resolve concrete Activity model
+        from django.apps import apps as _apps
+        activity_model_path = getattr(settings, 'KEEL_ACTIVITY_MODEL', '')
+        if not activity_model_path:
+            return JsonResponse(
+                {'error': 'KEEL_ACTIVITY_MODEL not configured.'}, status=503,
+            )
+        try:
+            Activity = _apps.get_model(activity_model_path)
+        except LookupError:
+            return JsonResponse(
+                {'error': f'KEEL_ACTIVITY_MODEL={activity_model_path} not resolvable.'},
+                status=503,
+            )
+
+        try:
+            qs = (
+                Activity.objects
+                .select_related('actor', 'target_ct')
+                .order_by('-created_at')
+            )
+            if since is not None:
+                qs = qs.filter(created_at__gt=since)
+            qs = qs[:limit]
+            rows = [_serialize_activity(a) for a in qs]
+            rows = [r for r in rows if r is not None]
+        except Exception:
+            logger.exception('Error building helm activity feed for %s', request.path)
+            return JsonResponse(
+                {'error': 'Internal error building activity feed.'}, status=500,
+            )
+
+        # Derive product metadata
+        product_url = (
+            getattr(settings, 'KEEL_PRODUCT_BASE_URL', '')
+            or getattr(settings, 'KEEL_PRODUCT_URL', '')
+            or request.build_absolute_uri('/').rstrip('/')
+        )
+
+        payload = {
+            'product': getattr(settings, 'KEEL_PRODUCT_CODE', ''),
+            'product_label': getattr(settings, 'KEEL_PRODUCT_NAME', ''),
+            'product_url': product_url,
+            'activities': rows,
+            'fetched_at': timezone.now().isoformat(),
+            'next_since': rows[0]['created_at'] if rows else (since_str or ''),
+        }
+
+        cache.set(cache_key, payload, timeout=ACTIVITY_CACHE_TTL_SECONDS)
+        return JsonResponse(payload)
+
+    return view
