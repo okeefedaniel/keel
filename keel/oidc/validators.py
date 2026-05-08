@@ -50,6 +50,9 @@ def _build_validator_class():
             'agency_abbr',
             'organization',
             'organization_name',
+            # AI gating claims — see the ``ai`` scope mapping below.
+            'ai_enabled_products',
+            'ai_key_present',
         })
 
         # django-oauth-toolkit filters OIDC claims by this dict inside
@@ -72,6 +75,12 @@ def _build_validator_class():
             # add ``'organization'`` to their openid_connect APP scope.
             'organization': 'organization',
             'organization_name': 'organization',
+            # AI claims gated on a separate ``ai`` scope — same trap as
+            # ``product_access``: products that want them must add
+            # ``'ai'`` to the openid_connect APP scope, otherwise dot
+            # claims are silently scrubbed from every token.
+            'ai_enabled_products': 'ai',
+            'ai_key_present': 'ai',
         }
 
         @classmethod
@@ -89,9 +98,17 @@ def _build_validator_class():
             Call this at app boot (see ``keel.oidc.apps.ready``) so
             drift is caught at startup rather than at token-issue time.
             Raises ``ImproperlyConfigured`` naming every unscoped claim.
+
+            Also runs the inverse check: every claim that
+            ``get_additional_claims`` actually emits must be either a
+            standard OIDC claim already in the base validator's
+            ``oidc_claim_scope`` OR registered in
+            ``DOCKLABS_CUSTOM_CLAIMS``. Adding a new custom claim without
+            both entries silently scrubs it from every token.
             """
             from django.core.exceptions import ImproperlyConfigured
 
+            # Forward check: declared claims must be scoped.
             missing = sorted(
                 claim for claim in cls.DOCKLABS_CUSTOM_CLAIMS
                 if claim not in cls.oidc_claim_scope
@@ -103,8 +120,27 @@ def _build_validator_class():
                     "DOCKLABS_CUSTOM_CLAIMS but missing from "
                     f"oidc_claim_scope and will be silently stripped "
                     f"from every issued ID token: {missing}. Add each "
-                    "claim to oidc_claim_scope with the gating scope "
-                    "(typically 'product_access')."
+                    "claim to oidc_claim_scope with the gating scope."
+                )
+
+            # Inverse check: every custom (non-OIDC-standard) claim in
+            # ``oidc_claim_scope`` must also appear in
+            # ``DOCKLABS_CUSTOM_CLAIMS``. This catches the symmetric
+            # mistake — adding a scope mapping but forgetting the
+            # registry entry, which means the runtime emit path
+            # in ``get_additional_claims`` never knows about the claim.
+            base_claims = set(OAuth2Validator.oidc_claim_scope.keys())
+            registered = set(cls.DOCKLABS_CUSTOM_CLAIMS)
+            scoped_custom = set(cls.oidc_claim_scope.keys()) - base_claims
+            unregistered = sorted(scoped_custom - registered)
+            if unregistered:
+                raise ImproperlyConfigured(
+                    "KeelOIDCValidator registry drift: the following "
+                    "claims have entries in oidc_claim_scope but are "
+                    f"NOT in DOCKLABS_CUSTOM_CLAIMS: {unregistered}. "
+                    "Either add each to DOCKLABS_CUSTOM_CLAIMS (and "
+                    "ensure get_additional_claims emits them), or "
+                    "remove the oidc_claim_scope entry."
                 )
 
         def get_additional_claims(self, request):
@@ -201,6 +237,24 @@ def _build_validator_class():
             except Exception:
                 claims['organization'] = None
                 claims['organization_name'] = None
+
+            # AI gating claims (``ai`` scope). ``ai_enabled_products``
+            # is the intersection of org-sub.ai_enabled and per-user
+            # ProductAccess.ai_enabled — the set of products where this
+            # user can see AI surfaces. ``ai_key_present`` is whether
+            # the user has set an Anthropic key on Keel; products use
+            # it to decide whether to render AI surfaces in active
+            # state or in the "needs key" prompt state without having
+            # to make a separate Keel API call.
+            try:
+                from keel.core.ai_access import ai_enabled_products_for_user
+                claims['ai_enabled_products'] = ai_enabled_products_for_user(user)
+            except Exception:
+                claims['ai_enabled_products'] = []
+            try:
+                claims['ai_key_present'] = bool(user.has_anthropic_key())
+            except Exception:
+                claims['ai_key_present'] = False
 
             return claims
 

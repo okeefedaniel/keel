@@ -1,0 +1,109 @@
+{% load keel_tags %}
+
+{% if not editable %}
+  {# Suite-mode mirror: AI key lives on Keel (the IdP). #}
+  <div class="alert alert-info d-flex align-items-start mb-4" role="status">
+    <i class="bi bi-info-circle me-2 mt-1"></i>
+    <div class="flex-grow-1">
+      <strong>Your Anthropic API key is managed on DockLabs.</strong>
+      <div class="small mb-0">
+        DockLabs stores one key per user, used by every product in the suite that has AI features.
+        Changes propagate the next time you sign in.
+      </div>
+    </div>
+    {% if keel_settings_url %}
+    <a href="{{ keel_settings_url }}" class="btn btn-sm btn-primary ms-3">
+      Manage on DockLabs <i class="bi bi-box-arrow-up-right ms-1"></i>
+    </a>
+    {% endif %}
+  </div>
+
+  <dl class="row mb-0">
+    <dt class="col-sm-4 text-muted fw-normal">API key</dt>
+    <dd class="col-sm-8">
+      {% if has_key %}
+        <code>{{ key_hint }}</code> <span class="text-success small ms-2"><i class="bi bi-check-circle"></i> set</span>
+      {% else %}
+        <span class="text-muted">Not set</span>
+      {% endif %}
+    </dd>
+    {% if ai_enabled_products %}
+    <dt class="col-sm-4 text-muted fw-normal">AI enabled on</dt>
+    <dd class="col-sm-8">
+      {% for code in ai_enabled_products %}<span class="badge bg-light text-dark me-1">{{ code|title }}</span>{% endfor %}
+    </dd>
+    {% endif %}
+  </dl>
+
+{% else %}
+  {# Standalone or Keel IdP: editable form. #}
+
+  <p class="text-muted small mb-3">
+    DockLabs uses your own Anthropic API key for every AI feature you have access to. Usage is billed
+    to your Anthropic account, not DockLabs.
+    {% if anthropic_console_url %}
+    <a href="{{ anthropic_console_url }}" target="_blank" rel="noopener noreferrer">
+      Get an API key from Anthropic <i class="bi bi-box-arrow-up-right small"></i>
+    </a>
+    {% endif %}
+  </p>
+
+  {% if ai_enabled_products %}
+  <div class="alert alert-light border mb-3 p-2">
+    <small class="text-muted d-block mb-1">AI features are enabled for you on:</small>
+    {% for code in ai_enabled_products %}<span class="badge bg-primary-subtle text-primary me-1">{{ code|title }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if has_key %}
+  <div class="card border mb-3">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-center">
+        <div class="flex-grow-1">
+          <strong class="d-block">API key configured</strong>
+          <code class="small text-muted">{{ key_hint }}</code>
+        </div>
+        <form method="post" class="ms-3 mb-0">
+          {% csrf_token %}
+          <input type="hidden" name="panel" value="ai">
+          <input type="hidden" name="_action" value="remove">
+          <button type="submit" class="btn btn-sm btn-outline-danger"
+                  onclick="return confirm('Remove your Anthropic API key? AI features will stop working until you set a new key.')">
+            <i class="bi bi-trash"></i> Remove
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" class="mb-0">
+    {% csrf_token %}
+    <input type="hidden" name="panel" value="ai">
+    <input type="hidden" name="_action" value="set">
+
+    <label for="ai-key-input" class="form-label">
+      {% if has_key %}Replace API key{% else %}Anthropic API key{% endif %}
+    </label>
+    <div class="input-group">
+      <input type="password" class="form-control font-monospace" id="ai-key-input"
+             name="anthropic_api_key" autocomplete="off" spellcheck="false"
+             placeholder="sk-ant-..." aria-describedby="ai-key-help">
+      <button type="submit" class="btn btn-primary">
+        {% if has_key %}Replace{% else %}Save{% endif %}
+      </button>
+    </div>
+    <div id="ai-key-help" class="form-text">
+      Stored encrypted at rest. Only used to call Anthropic on your behalf for AI features.
+      {% if anthropic_console_url %}
+      <a href="{{ anthropic_console_url }}" target="_blank" rel="noopener noreferrer" class="ms-1">
+        Get a key →
+      </a>
+      {% endif %}
+    </div>
+  </form>
+{% endif %}

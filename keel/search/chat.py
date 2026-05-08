@@ -18,7 +18,7 @@ import re
 
 from django.conf import settings as django_settings
 
-from keel.core.ai import get_client, parse_json_response
+from keel.core.ai import get_client, get_client_for_user, parse_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class SearchChat:
     greeting_prompt = ''
     max_results = 20
 
-    def handle_stream(self, user_message, filters=None):
+    def handle_stream(self, user_message, filters=None, *, user=None, request=None, product_code=None):
         """Yields JSON string chunks for SSE streaming.
 
         Chunk types:
@@ -53,10 +53,21 @@ class SearchChat:
             {"type": "done"}
             {"type": "greeting", "content": "..."}
             {"type": "error", "content": "..."}
+
+        When ``user`` is provided, the call is gated through the
+        three-layer AI access check and billed to the user's own
+        Anthropic key. Without a user, falls back to the deployment-
+        wide ``ANTHROPIC_API_KEY`` (legacy / dev path).
         """
-        client = get_client()
+        if user is not None:
+            client = get_client_for_user(user, product_code, request=request)
+        else:
+            client = get_client()
         if not client:
-            yield json.dumps({'type': 'error', 'content': 'AI features require an API key.'})
+            yield json.dumps({
+                'type': 'error',
+                'content': 'AI features need your Anthropic API key. Add one in your DockLabs settings.',
+            })
             return
 
         # Step 1: Extract search keywords via Claude

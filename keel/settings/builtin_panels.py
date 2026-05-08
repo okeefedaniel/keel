@@ -281,6 +281,118 @@ class AccountPanel(SettingsPanel):
         return None
 
 
+# ---------------------------------------------------------------------------
+# AI panel — Anthropic API key for AI features
+# ---------------------------------------------------------------------------
+class AIPanel(SettingsPanel):
+    """Manage the Anthropic API key that powers AI features.
+
+    Visible only when the user has at least one product with AI enabled
+    at the org+user level (layers 1+2 of the three-layer gate). When
+    the user has no AI-eligible products, the panel is hidden — adding
+    a key would be pointless.
+
+    On suite-mode products: the panel redirects to Keel
+    (``KEEL_OIDC_ISSUER/settings/ai/``) — the key lives on the IdP.
+    On Keel itself or on standalone products: the panel is editable.
+    """
+
+    slug = 'ai'
+    label = 'AI'
+    icon = 'bi-stars'
+    order = 30  # Between Account (20) and Notifications (50).
+    description = 'Your Anthropic API key for AI features'
+
+    # Where users go to get a key. Linked from the help text.
+    ANTHROPIC_CONSOLE_URL = 'https://console.anthropic.com/settings/keys'
+
+    def is_visible(self, user) -> bool:
+        if not super().is_visible(user):
+            return False
+        # Hide entirely when the user has no AI-eligible products.
+        # Showing a key field that would never be read is confusing.
+        try:
+            from keel.core.ai_access import ai_enabled_products_for_user
+            return bool(ai_enabled_products_for_user(user))
+        except Exception:
+            # Defensive: if the ai_access module fails to import (e.g.
+            # in a test environment without keel.accounts migrations),
+            # show the panel so the user can still set a key. Failing
+            # closed here would hide a real settings surface.
+            return True
+
+    def get_context(self, request, *, error: str | None = None):
+        from keel.core.ai_access import ai_enabled_products_for_user
+
+        editable = _identity_is_editable()
+        user = request.user
+        return {
+            'editable': editable,
+            'keel_settings_url': _keel_ai_url(),
+            'user': user,
+            'has_key': bool(user.has_anthropic_key()) if hasattr(user, 'has_anthropic_key') else False,
+            'key_hint': (
+                user.anthropic_key_hint()
+                if hasattr(user, 'anthropic_key_hint') else ''
+            ),
+            'ai_enabled_products': ai_enabled_products_for_user(user),
+            'anthropic_console_url': self.ANTHROPIC_CONSOLE_URL,
+            'error': error,
+        }
+
+    def post(self, request):
+        if not _identity_is_editable():
+            messages.error(
+                request,
+                'AI key edits live on DockLabs. Use the link to update.',
+            )
+            return self.get_context(request)
+
+        action = (request.POST.get('_action') or 'set').strip()
+        user = request.user
+
+        if action == 'remove':
+            if hasattr(user, 'anthropic_api_key'):
+                user.anthropic_api_key = ''
+                user.save(update_fields=['anthropic_api_key_encrypted'])
+                messages.success(request, 'Anthropic API key removed.')
+            return None
+
+        # Default action: set/replace the key.
+        new_key = (request.POST.get('anthropic_api_key') or '').strip()
+        if not new_key:
+            return self.get_context(
+                request,
+                error='Paste your Anthropic API key, or click Remove to clear it.',
+            )
+        # Light validation — Anthropic keys start with ``sk-ant-`` but
+        # we don't want to hard-fail on a valid key with a future
+        # prefix change. Warn-then-store: refuse only obvious junk.
+        if len(new_key) < 20:
+            return self.get_context(
+                request,
+                error="That doesn't look like an Anthropic key. Keys are typically 100+ characters and start with 'sk-ant-'.",
+            )
+
+        if hasattr(user, 'anthropic_api_key'):
+            user.anthropic_api_key = new_key
+            user.save(update_fields=['anthropic_api_key_encrypted'])
+            messages.success(request, 'Anthropic API key saved.')
+        else:
+            return self.get_context(
+                request,
+                error='This deployment does not store the Anthropic key locally. Set it on DockLabs.',
+            )
+        return None
+
+
+def _keel_ai_url() -> str:
+    """Build the URL the AI-panel mirror links to in suite mode."""
+    issuer = getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or ''
+    issuer = issuer.rstrip('/')
+    return f'{issuer}/settings/ai/' if issuer else ''
+
+
 class NotificationsPanel(SettingsPanel):
     """Per-user notification channel preferences.
 

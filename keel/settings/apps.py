@@ -15,8 +15,9 @@ class KeelSettingsConfig(AppConfig):
         # see ``builtin_panels.py`` docstrings for the rules.
         from .registry import register_panel
         from .builtin_panels import (
-            AccountPanel, NotificationsPanel, ProfilePanel,
+            AccountPanel, AIPanel, NotificationsPanel, ProfilePanel,
         )
         register_panel(ProfilePanel())
         register_panel(AccountPanel())
+        register_panel(AIPanel())
         register_panel(NotificationsPanel())

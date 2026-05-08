@@ -71,6 +71,12 @@
               <th>Product</th>
               <th>Role</th>
               <th style="width: 8rem;" class="text-center">Beta Tester</th>
+              {% if any_ai_enabled %}
+              <th style="width: 5rem;" class="text-center"
+                  title="Grant AI features access — only available on products your organization has AI enabled for.">
+                AI
+              </th>
+              {% endif %}
             </tr>
           </thead>
           <tbody>
@@ -93,6 +99,17 @@
                   <input type="checkbox" name="beta__{{ value }}" value="1"
                          class="form-check-input">
                 </td>
+                {% if any_ai_enabled %}
+                <td class="text-center">
+                  {% if value in ai_enabled_product_codes %}
+                  <input type="checkbox" name="ai_enabled__{{ value }}" value="1"
+                         class="form-check-input" checked
+                         title="Enable AI features on {{ label }} for this user.">
+                  {% else %}
+                  <span class="text-muted small" title="Your organization does not have AI enabled on {{ label }}.">—</span>
+                  {% endif %}
+                </td>
+                {% endif %}
               </tr>
               {% endif %}
             {% endfor %}

@@ -143,3 +143,92 @@ def user_avatar(user, size=40):
     except (TypeError, ValueError):
         size = 40
     return mark_safe(avatar_html_for(user, size=size))
+
+
+# =========================================================================
+# AI feature gating
+# =========================================================================
+
+@register.simple_tag(takes_context=True)
+def ai_state(context, product_code=None):
+    """Return ``'off'``, ``'needs_key'``, or ``'ready'`` for the user.
+
+    Usage::
+
+        {% load keel_tags %}
+        {% ai_state as state %}
+        {% if state == 'ready' %}
+          ...working AI surface...
+        {% elif state == 'needs_key' %}
+          {% include "keel/components/ai_key_prompt.html" %}
+        {% endif %}
+
+    Defaults the product code to ``settings.KEEL_PRODUCT_CODE``.
+    Returns ``'off'`` when the user is anonymous.
+    """
+    from keel.core.ai_access import user_ai_state
+    user = getattr(context.get('request'), 'user', None) or context.get('user')
+    return user_ai_state(user, product_code)
+
+
+@register.simple_tag(takes_context=True)
+def can_use_ai(context, product_code=None):
+    """Boolean variant of ``ai_state == 'ready'``.
+
+    Usage::
+
+        {% can_use_ai as ai_ready %}
+        {% if ai_ready %}<button>Summarize</button>{% endif %}
+    """
+    from keel.core.ai_access import user_can_use_ai
+    user = getattr(context.get('request'), 'user', None) or context.get('user')
+    return user_can_use_ai(user, product_code)
+
+
+@register.inclusion_tag(
+    'keel/components/ai_key_prompt.html', takes_context=True,
+)
+def ai_key_prompt(context, product_code=None):
+    """Render the "you have not yet put in your API key" prompt.
+
+    No-op (renders nothing) unless the user is in ``'needs_key'`` state
+    on this product. Templates can include this unconditionally and let
+    the tag self-suppress when the prompt isn't applicable.
+
+    Usage::
+
+        {% load keel_tags %}
+        {% ai_key_prompt %}
+    """
+    from keel.core.ai_access import user_ai_state
+    request = context.get('request')
+    user = getattr(request, 'user', None) or context.get('user')
+    state = user_ai_state(user, product_code)
+    return {
+        'show': state == 'needs_key',
+        'state': state,
+        'settings_url': _ai_settings_url(),
+        'request': request,
+    }
+
+
+def _ai_settings_url():
+    """Where the user goes to set their API key.
+
+    In suite mode this is Keel's ``/settings/?panel=ai``. In standalone
+    mode this is the local ``/settings/?panel=ai``. Falls back to a
+    blank string when the settings URL isn't wired (the prompt then
+    renders the message without a link).
+    """
+    from django.conf import settings as django_settings
+    from django.urls import NoReverseMatch, reverse
+    from keel.core.utils import is_suite_mode
+
+    if is_suite_mode():
+        issuer = (getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or '').rstrip('/')
+        if issuer:
+            return f'{issuer}/settings/?panel=ai'
+    try:
+        return reverse('keel_settings:index') + '?panel=ai'
+    except NoReverseMatch:
+        return ''

@@ -334,6 +334,10 @@ def invitation_list(request):
         OrganizationProductSubscription.active_product_codes(target_org)
         if target_org else []
     )
+    ai_enabled_codes = (
+        OrganizationProductSubscription.ai_enabled_product_codes(target_org)
+        if target_org else []
+    )
 
     status = request.GET.get('status', '').strip()
     invitations = Invitation.objects.select_related(
@@ -379,6 +383,12 @@ def invitation_list(request):
         'product_roles_json': json.dumps(all_roles),
         'target_org': target_org,
         'target_org_error': target_org_error,
+        # Subset of subscribed product codes that have AI on for this
+        # org. Drives whether the per-row "AI" checkbox renders. Empty
+        # list when the org has AI disabled across the board, in
+        # which case the AI column is hidden entirely.
+        'ai_enabled_product_codes': ai_enabled_codes,
+        'any_ai_enabled': bool(ai_enabled_codes),
         # For the dokadmin org-switcher dropdown.
         'available_orgs': (
             list(Organization.objects.filter(is_active=True).order_by('name'))
@@ -426,6 +436,17 @@ def send_invitation(request):
     )
     unsubscribed_attempts = [p for p in selected if p not in subscribed_codes]
     selected = [p for p in selected if p in subscribed_codes]
+
+    # AI-flag tampering filter: same shape as the subscription check.
+    # A POSTed ``ai_enabled__<product>`` is honored only when the org
+    # has ``ai_enabled=True`` on that product's subscription. Tampered
+    # values (or AI requested for a product the org doesn't have AI
+    # on) are silently dropped — the resulting Invitation row gets
+    # ``ai_enabled=False`` and the user can be re-invited later if
+    # the org buys AI on that product.
+    ai_enabled_org_codes = set(
+        OrganizationProductSubscription.ai_enabled_product_codes(target_org)
+    )
 
     if unsubscribed_attempts:
         messages.error(
@@ -514,6 +535,13 @@ def send_invitation(request):
             denied.append((prod, role))
             continue
         is_beta = request.POST.get(f'beta__{prod}') == '1'
+        # AI checkbox: only honored when the org has AI on this product.
+        # Default to False (not True) for products where the org's AI
+        # subscription is off — the checkbox doesn't render in the
+        # template either, so a tampered POST that flips it on still
+        # gets dropped here.
+        ai_requested = request.POST.get(f'ai_enabled__{prod}') == '1'
+        ai_enabled = ai_requested and prod in ai_enabled_org_codes
 
         if Invitation.objects.filter(
             email=email, product=prod, status='pending',
@@ -526,6 +554,7 @@ def send_invitation(request):
             product=prod,
             role=role,
             is_beta_tester=is_beta,
+            ai_enabled=ai_enabled,
             batch_id=batch_id,
             invited_by=request.user,
             organization=target_org,
