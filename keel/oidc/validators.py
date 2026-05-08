@@ -50,6 +50,9 @@ def _build_validator_class():
             'agency_abbr',
             'organization',
             'organization_name',
+            # AI gating claims — see the ``ai`` scope mapping below.
+            'ai_enabled_products',
+            'ai_key_present',
         })
 
         # django-oauth-toolkit filters OIDC claims by this dict inside
@@ -72,6 +75,12 @@ def _build_validator_class():
             # add ``'organization'`` to their openid_connect APP scope.
             'organization': 'organization',
             'organization_name': 'organization',
+            # AI claims gated on a separate ``ai`` scope — same trap as
+            # ``product_access``: products that want them must add
+            # ``'ai'`` to the openid_connect APP scope, otherwise dot
+            # claims are silently scrubbed from every token.
+            'ai_enabled_products': 'ai',
+            'ai_key_present': 'ai',
         }
 
         @classmethod
@@ -201,6 +210,24 @@ def _build_validator_class():
             except Exception:
                 claims['organization'] = None
                 claims['organization_name'] = None
+
+            # AI gating claims (``ai`` scope). ``ai_enabled_products``
+            # is the intersection of org-sub.ai_enabled and per-user
+            # ProductAccess.ai_enabled — the set of products where this
+            # user can see AI surfaces. ``ai_key_present`` is whether
+            # the user has set an Anthropic key on Keel; products use
+            # it to decide whether to render AI surfaces in active
+            # state or in the "needs key" prompt state without having
+            # to make a separate Keel API call.
+            try:
+                from keel.core.ai_access import ai_enabled_products_for_user
+                claims['ai_enabled_products'] = ai_enabled_products_for_user(user)
+            except Exception:
+                claims['ai_enabled_products'] = []
+            try:
+                claims['ai_key_present'] = bool(user.has_anthropic_key())
+            except Exception:
+                claims['ai_key_present'] = False
 
             return claims
 
