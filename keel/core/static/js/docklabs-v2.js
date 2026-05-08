@@ -354,6 +354,16 @@
               ? (btn.dataset.labelFollowing || 'Following')
               : (btn.dataset.labelFollow || 'Follow');
           }
+          // Show/hide the dropdown caret + sync its color with the main btn.
+          var group = btn.closest('.keel-follow-group');
+          if (group) {
+            var caret = group.querySelector('.keel-follow-dropdown-toggle');
+            if (caret) {
+              caret.style.display = isFollowing ? '' : 'none';
+              caret.classList.toggle('btn-primary', isFollowing);
+              caret.classList.toggle('btn-outline-primary', !isFollowing);
+            }
+          }
         }).catch(function(err) {
           console.warn('keel-follow-btn toggle failed:', err);
         }).finally(function() {
@@ -362,10 +372,59 @@
       });
     });
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { wireFollowButtons(); });
-  } else {
+
+  function wireFollowCategoryCheckboxes(root) {
+    // Each .keel-follow-dropdown contains N .keel-follow-cat checkboxes.
+    // On change, post the union of currently-checked categories to the
+    // categories endpoint. Debounced to coalesce rapid clicks.
+    var scope = root || document;
+    var dropdowns = scope.querySelectorAll('.keel-follow-dropdown');
+    Array.prototype.forEach.call(dropdowns, function(dd) {
+      if (dd.dataset.cat_wired === '1') return;
+      dd.dataset.cat_wired = '1';
+      var url = dd.dataset.categoriesUrl;
+      var ctId = dd.dataset.targetCtId;
+      var tid = dd.dataset.targetId;
+      var pending = null;
+
+      function commit() {
+        var checked = Array.prototype.filter.call(
+          dd.querySelectorAll('.keel-follow-cat'),
+          function(cb) { return cb.checked; }
+        ).map(function(cb) { return cb.dataset.category; });
+        var fd = new FormData();
+        fd.append('target_ct_id', ctId || '');
+        fd.append('target_id', tid || '');
+        fd.append('categories', checked.join(','));
+        return fetch(url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'X-CSRFToken': getCookie('csrftoken') || ''},
+          body: fd,
+        }).then(function(resp) {
+          if (!resp.ok) throw new Error('category save failed: ' + resp.status);
+          return resp.json();
+        }).catch(function(err) {
+          console.warn('keel-follow categories save failed:', err);
+        });
+      }
+
+      dd.addEventListener('change', function(ev) {
+        if (!ev.target.classList.contains('keel-follow-cat')) return;
+        if (pending) clearTimeout(pending);
+        pending = setTimeout(commit, 300);
+      });
+    });
+  }
+
+  function wireKeelFollow() {
     wireFollowButtons();
+    wireFollowCategoryCheckboxes();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireKeelFollow);
+  } else {
+    wireKeelFollow();
   }
 
 })();

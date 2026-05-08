@@ -92,9 +92,31 @@ def follow_button(
         # than a button that posts to a nonexistent endpoint.
         return {'enabled': False}
 
-    is_following = Watcher.objects.filter(
+    watcher = Watcher.objects.filter(
         user=user, target_ct=target_ct, target_id=str(obj.pk),
-    ).exists()
+    ).first()
+    is_following = watcher is not None
+
+    # Pre-resolve current category state so the dropdown renders with the
+    # right checkboxes ticked on first paint. Categories endpoint URL is
+    # also pre-reversed so the JS doesn't have to know it.
+    from keel.activity.views import (
+        CATEGORY_LABELS, _categories_for_verbs,
+    )
+    try:
+        categories_url = reverse('keel_activity:set_categories')
+    except NoReverseMatch:
+        categories_url = ''
+
+    if watcher is not None:
+        active_categories = set(_categories_for_verbs(watcher.notify_verbs or []))
+    else:
+        # Default: all categories active when not yet following.
+        active_categories = set(CATEGORY_LABELS.keys())
+    category_rows = [
+        {'key': key, 'label': label, 'active': key in active_categories}
+        for key, label in CATEGORY_LABELS.items()
+    ]
 
     return {
         'enabled': True,
@@ -102,6 +124,8 @@ def follow_button(
         'target_ct_id': target_ct.pk,
         'target_id': str(obj.pk),
         'toggle_url': toggle_url,
+        'categories_url': categories_url,
+        'category_rows': category_rows,
         'size': size,
         'label_following': label_following,
         'label_follow': label_follow,
