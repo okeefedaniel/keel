@@ -314,10 +314,61 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                         'SSO: Linked Keel OIDC account to existing user %s',
                         linked.username,
                     )
-            # Keep ProductAccess in sync with the latest claim on every login
-            # (save_user only fires on first sign-in, so returning users would
-            # otherwise keep stale access rows if Keel admin changed their role).
+            # Keep identity + ProductAccess in sync with the latest claims on
+            # every login. save_user only fires on first sign-in, so returning
+            # users would otherwise drift whenever Keel admin changes their
+            # role, or when the user renames themselves on Keel.
             if sociallogin.is_existing and sociallogin.user and sociallogin.user.pk:
+                u = sociallogin.user
+                User = get_user_model()
+
+                # --- Identity fields ---------------------------------------
+                # Compute the full set of changes first so we can do one
+                # UPDATE and avoid partial-write races.
+                identity_updates = {}
+                if preferred and u.username != preferred:
+                    identity_updates['username'] = preferred
+                if email and u.email != email:
+                    identity_updates['email'] = email
+                given = claims.get('given_name') or ''
+                family = claims.get('family_name') or ''
+                if given and u.first_name != given:
+                    identity_updates['first_name'] = given
+                if family and u.last_name != family:
+                    identity_updates['last_name'] = family
+                if hasattr(u, 'is_state_user'):
+                    state_flag = bool(claims.get('is_state_user'))
+                    if u.is_state_user != state_flag:
+                        identity_updates['is_state_user'] = state_flag
+                if hasattr(u, 'timezone'):
+                    tz = claims.get('zoneinfo')
+                    if tz is not None and u.timezone != tz:
+                        identity_updates['timezone'] = tz
+                if hasattr(u, 'locale'):
+                    loc = claims.get('locale')
+                    if loc is not None and u.locale != loc:
+                        identity_updates['locale'] = loc
+                if hasattr(u, 'avatar_url'):
+                    pic = claims.get('picture')
+                    if pic is not None and u.avatar_url != pic:
+                        identity_updates['avatar_url'] = pic
+
+                if identity_updates:
+                    try:
+                        User.objects.filter(pk=u.pk).update(**identity_updates)
+                        for k, v in identity_updates.items():
+                            setattr(u, k, v)
+                        logger.debug(
+                            'SSO: synced identity fields %s for user=%s',
+                            list(identity_updates), u.pk,
+                        )
+                    except Exception:
+                        logger.exception(
+                            'SSO: Failed to sync identity fields for user=%s',
+                            u.pk,
+                        )
+
+                # --- ProductAccess rows ------------------------------------
                 product_access = claims.get('product_access') or {}
                 if isinstance(product_access, dict) and product_access:
                     try:
@@ -326,14 +377,14 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                             if not prod or not role:
                                 continue
                             ProductAccess.objects.update_or_create(
-                                user=sociallogin.user,
+                                user=u,
                                 product=str(prod).lower(),
                                 defaults={'role': role, 'is_active': True},
                             )
                     except Exception:
                         logger.exception(
                             'SSO: Failed to refresh product_access for %s',
-                            sociallogin.user,
+                            u,
                         )
             return
 
