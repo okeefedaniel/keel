@@ -1,12 +1,13 @@
-{# AI key prompt — rendered when the user has AI access on this product but no Anthropic key set.
+{% comment %}
+AI key prompt — rendered when the user has AI access on this product but no Anthropic key set.
 
-   Self-suppressing: nothing renders unless `show` is True. Templates can include
-   {% ai_key_prompt %} unconditionally and the tag handles when it's appropriate.
+Self-suppressing: nothing renders unless `show` is True. Templates can include
+the ai_key_prompt tag unconditionally and the tag handles when it's appropriate.
 
-   Surface: an inline alert with a link to the user's AI settings panel where they
-   can paste their key. The link points at Keel in suite mode, or at the local
-   /settings/ in standalone mode (resolved by the tag, see _ai_settings_url).
-#}
+Surface: an inline alert with a link to the user's AI settings panel where they
+can paste their key. The link points at Keel in suite mode, or at the local
+/settings/ in standalone mode (resolved by the tag, see _ai_settings_url).
+{% endcomment %}
 {% if show %}
 <div class="alert alert-warning d-flex align-items-start mb-3" role="status">
   <i class="bi bi-stars me-2 mt-1"></i>
