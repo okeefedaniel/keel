@@ -110,6 +110,12 @@ urlpatterns = [
     # plaintext Anthropic key for AI features. See keel.ai.views.
     path('api/v1/ai/', include('keel.ai.urls')),
 
+    # Suite-wide /settings/ — registered panels (Profile, Account,
+    # AI, Notifications). On Keel itself, this is where users enter
+    # their Anthropic key on /settings/ai/. Products mount the same
+    # include in their own urls.py so the framework is shared.
+    path('settings/', include('keel.settings.urls')),
+
     # Invitation acceptance (clean URL — emails point users here directly).
     # Bind the views directly rather than re-include `keel.accounts.urls`
     # so the URLs stay at /invite/<token>/ instead of nesting under
