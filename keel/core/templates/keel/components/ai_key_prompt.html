@@ -1,0 +1,27 @@
+{# AI key prompt — rendered when the user has AI access on this product but no Anthropic key set.
+
+   Self-suppressing: nothing renders unless `show` is True. Templates can include
+   {% ai_key_prompt %} unconditionally and the tag handles when it's appropriate.
+
+   Surface: an inline alert with a link to the user's AI settings panel where they
+   can paste their key. The link points at Keel in suite mode, or at the local
+   /settings/ in standalone mode (resolved by the tag, see _ai_settings_url).
+#}
+{% if show %}
+<div class="alert alert-warning d-flex align-items-start mb-3" role="status">
+  <i class="bi bi-stars me-2 mt-1"></i>
+  <div class="flex-grow-1">
+    <strong>AI features need your API key.</strong>
+    <div class="small mb-0">
+      You have not yet put in your
+      {% if settings_url %}<a href="{{ settings_url }}">API key</a>{% else %}API key{% endif %}.
+      Add an Anthropic API key in your settings to start using AI features.
+    </div>
+  </div>
+  {% if settings_url %}
+  <a href="{{ settings_url }}" class="btn btn-sm btn-warning ms-3 flex-shrink-0">
+    Add API key <i class="bi bi-arrow-right ms-1"></i>
+  </a>
+  {% endif %}
+</div>
+{% endif %}

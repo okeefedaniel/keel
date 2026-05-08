@@ -185,6 +185,35 @@ def site_context(request):
                     )
                     break
 
+        # AI gating context — used by sidebar/header surfaces and by the
+        # ``ai_gate`` template tag's fast-path. Computed once per
+        # request so AI-aware partials don't each trigger their own
+        # ProductAccess query.
+        try:
+            from keel.core.ai_access import (
+                ai_enabled_products_for_user, user_ai_state,
+            )
+            current_product = (
+                getattr(settings, 'KEEL_PRODUCT_CODE', '')
+                or getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+            )
+            context['ai_enabled_products'] = ai_enabled_products_for_user(
+                request.user
+            )
+            context['ai_state'] = (
+                user_ai_state(request.user, current_product)
+                if current_product else 'off'
+            )
+            context['ai_key_present'] = (
+                bool(request.user.has_anthropic_key())
+                if hasattr(request.user, 'has_anthropic_key') else False
+            )
+        except Exception:
+            # Defensive: a broken AI gate must never block page render.
+            context.setdefault('ai_enabled_products', [])
+            context.setdefault('ai_state', 'off')
+            context.setdefault('ai_key_present', False)
+
     return context
 
 

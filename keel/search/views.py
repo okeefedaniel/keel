@@ -29,11 +29,16 @@ def instant_search_view(request, engine):
     return JsonResponse({'results': results, 'query': query})
 
 
-def chat_stream_view(request, chat):
+def chat_stream_view(request, chat, *, product_code=None):
     """SSE streaming endpoint for AI chat search.
 
     POST with JSON body: {"message": "..."}
     Returns: text/event-stream with JSON chunks.
+
+    Threads ``request`` and ``request.user`` into ``chat.handle_stream``
+    so the underlying ``SearchChat`` resolves the user's own Anthropic
+    key via the three-layer AI access check (see
+    ``keel.core.ai_access.user_can_use_ai``).
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -48,7 +53,12 @@ def chat_stream_view(request, chat):
         return JsonResponse({'error': 'No message provided'}, status=400)
 
     def stream():
-        for chunk in chat.handle_stream(user_message):
+        for chunk in chat.handle_stream(
+            user_message,
+            user=getattr(request, 'user', None),
+            request=request,
+            product_code=product_code,
+        ):
             yield f"data: {chunk}\n\n"
 
     response = StreamingHttpResponse(stream(), content_type='text/event-stream')

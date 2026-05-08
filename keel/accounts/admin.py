@@ -12,17 +12,31 @@ class ProductAccessInline(admin.TabularInline):
     model = ProductAccess
     fk_name = 'user'
     extra = 1
-    fields = ('product', 'role', 'is_active', 'is_beta_tester', 'granted_at')
+    fields = ('product', 'role', 'is_active', 'is_beta_tester', 'ai_enabled', 'granted_at')
     readonly_fields = ('granted_at',)
 
 
 @admin.register(KeelUser)
 class KeelUserAdmin(UserAdmin):
-    list_display = ('username', 'email', 'organization', 'agency', 'is_state_user', 'is_active')
+    list_display = ('username', 'email', 'organization', 'agency', 'is_state_user', 'ai_key_set', 'is_active')
     list_filter = ('is_state_user', 'is_active', 'is_staff', 'organization', 'agency')
     search_fields = ('username', 'email', 'first_name', 'last_name')
     raw_id_fields = ('organization', 'agency')
     inlines = [ProductAccessInline]
+
+    @admin.display(boolean=True, description='AI key')
+    def ai_key_set(self, obj):
+        """Read-only column: does this user have an Anthropic key set?
+
+        Plaintext is intentionally NOT exposed in admin — keys live
+        only in the encrypted column and are read by the user via
+        their settings panel. Showing the boolean lets ops audit
+        coverage without leaking the credential.
+        """
+        try:
+            return bool(obj.has_anthropic_key())
+        except Exception:
+            return False
 
     fieldsets = UserAdmin.fieldsets + (
         ('Keel Profile', {
@@ -77,16 +91,23 @@ class AgencyAdmin(admin.ModelAdmin):
 
 @admin.register(ProductAccess)
 class ProductAccessAdmin(admin.ModelAdmin):
-    list_display = ('user', 'product', 'role', 'is_active', 'is_beta_tester', 'granted_at')
-    list_filter = ('product', 'role', 'is_active')
+    list_display = (
+        'user', 'product', 'role', 'is_active', 'is_beta_tester',
+        'ai_enabled', 'granted_at',
+    )
+    list_filter = ('product', 'role', 'is_active', 'ai_enabled')
+    list_editable = ('ai_enabled',)
     search_fields = ('user__email', 'user__username')
     raw_id_fields = ('user', 'granted_by')
 
 
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
-    list_display = ('email', 'product', 'role', 'status', 'invited_by', 'created_at', 'expires_at')
-    list_filter = ('status', 'product')
+    list_display = (
+        'email', 'product', 'role', 'status', 'ai_enabled',
+        'invited_by', 'created_at', 'expires_at',
+    )
+    list_filter = ('status', 'product', 'ai_enabled')
     search_fields = ('email',)
     raw_id_fields = ('invited_by', 'accepted_by')
     readonly_fields = ('token',)
@@ -95,7 +116,7 @@ class InvitationAdmin(admin.ModelAdmin):
 class OrganizationProductSubscriptionInline(admin.TabularInline):
     model = OrganizationProductSubscription
     extra = 0
-    fields = ('product', 'is_active', 'started_at', 'ends_at')
+    fields = ('product', 'is_active', 'ai_enabled', 'started_at', 'ends_at')
 
 
 @admin.register(Organization)
@@ -110,8 +131,12 @@ class OrganizationAdmin(admin.ModelAdmin):
 
 @admin.register(OrganizationProductSubscription)
 class OrganizationProductSubscriptionAdmin(admin.ModelAdmin):
-    list_display = ('organization', 'product', 'is_active', 'started_at', 'ends_at')
-    list_filter = ('is_active', 'product')
+    list_display = (
+        'organization', 'product', 'is_active', 'ai_enabled',
+        'started_at', 'ends_at',
+    )
+    list_filter = ('is_active', 'ai_enabled', 'product')
+    list_editable = ('ai_enabled',)
     search_fields = ('organization__name', 'organization__slug', 'product')
     raw_id_fields = ('organization',)
 
