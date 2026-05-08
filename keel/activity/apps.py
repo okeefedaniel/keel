@@ -47,3 +47,11 @@ class ActivityConfig(AppConfig):
         # is wrapped in apps.is_installed() so a standalone deploy never registers peers' rules.
         from . import product_promotions
         product_promotions.register_all_promotions()
+
+        # Auto-register VERB_CATALOG entries as NotificationTypes so they appear on
+        # /notifications/preferences/ and per-user preference filtering takes effect on
+        # the activity dispatch path. Keyed as 'activity.<verb.code>'. Idempotent —
+        # skips any keys an upstream caller has already registered (so a product can
+        # ship a richer NotificationType for a specific verb and the default skips it).
+        from . import notifications as _activity_notifications
+        _activity_notifications.register_verb_notification_types()
