@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'keel.calendar',
     'keel.scheduling',
     'keel.signatures',
+    'keel.ai.apps.KeelAIConfig',  # /api/v1/ai/key/ — user AI key handoff
     'keel.oidc.apps.KeelOIDCConfig',  # Phase 2b: OIDC validator + claims
 ]
 
@@ -228,6 +229,12 @@ OAUTH2_PROVIDER = {
         # scope so products that don't need them aren't forced to
         # accept org-level data in their tokens.
         'organization': 'DockLabs customer organization',
+        # AI gating claims (ai_enabled_products + ai_key_present).
+        # Products that want AI gating must add ``'ai'`` to their
+        # SOCIALACCOUNT_PROVIDERS APP scope list — otherwise the
+        # claims are silently scrubbed by oidc_claim_scope filtering
+        # (same trap as ``product_access`` and ``organization``).
+        'ai': 'DockLabs AI feature gating',
     },
     # DEFAULT_SCOPES intentionally does NOT include 'organization' —
     # only products that have explicitly added it to their

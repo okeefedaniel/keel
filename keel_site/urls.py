@@ -105,6 +105,11 @@ urlpatterns = [
     path('keel/notifications/', include('keel.notifications.urls')),
     path('scheduling/', include('keel.scheduling.urls')),
 
+    # Cross-product AI key handoff. Products call this with the user's
+    # OIDC access token (must include the `ai` scope) to fetch the
+    # plaintext Anthropic key for AI features. See keel.ai.views.
+    path('api/v1/ai/', include('keel.ai.urls')),
+
     # Invitation acceptance (clean URL — emails point users here directly).
     # Bind the views directly rather than re-include `keel.accounts.urls`
     # so the URLs stay at /invite/<token>/ instead of nesting under
