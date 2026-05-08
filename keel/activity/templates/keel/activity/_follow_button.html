@@ -1,0 +1,35 @@
+{% comment %}
+keel.activity follow toggle button.
+
+Rendered by the {% follow_button %} template tag. Expects:
+  enabled         -- gate; if False, render nothing
+  is_following    -- bool, current state
+  target_ct_id    -- int
+  target_id       -- str
+  toggle_url      -- str (reverse('keel_activity:toggle_follow'))
+  size            -- '' | 'sm' | 'lg'
+  label_following -- text on the button when already following
+  label_follow    -- text on the button when not yet following
+
+Behaviour: vanilla-JS click handler in keel-activity-follow.js does fetch()
+toggle and rewrites the button's class + label. The button is a single
+<button> element, no form wrapper, so it works inside an existing form.
+
+CSRF: data-csrf-cookie="csrftoken" — the JS reads document.cookie. Products
+must have CsrfViewMiddleware (default in Django).
+{% endcomment %}
+{% if enabled %}
+<button type="button"
+        class="btn{% if size %} btn-{{ size }}{% endif %} {% if is_following %}btn-primary{% else %}btn-outline-primary{% endif %} keel-follow-btn"
+        data-toggle-url="{{ toggle_url }}"
+        data-target-ct-id="{{ target_ct_id }}"
+        data-target-id="{{ target_id }}"
+        data-following="{% if is_following %}true{% else %}false{% endif %}"
+        data-label-following="{{ label_following }}"
+        data-label-follow="{{ label_follow }}"
+        title="{% if is_following %}Click to unfollow{% else %}Click to follow{% endif %}"
+        aria-pressed="{% if is_following %}true{% else %}false{% endif %}">
+  <i class="bi bi-{% if is_following %}eye-fill{% else %}eye{% endif %} me-1" aria-hidden="true"></i>
+  <span class="keel-follow-btn-label">{% if is_following %}{{ label_following }}{% else %}{{ label_follow }}{% endif %}</span>
+</button>
+{% endif %}

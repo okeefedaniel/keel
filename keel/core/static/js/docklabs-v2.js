@@ -307,6 +307,67 @@
     return cookieValue;
   }
 
+  // =========================================================================
+  // keel.activity follow-button toggle (.keel-follow-btn)
+  //
+  // The button is rendered by keel.activity.templatetags.follow_tags's
+  // {% follow_button %}. Auto-wires on DOMContentLoaded so any page that
+  // loads docklabs-v2.js gets toggle behavior for free.
+  // =========================================================================
+  function wireFollowButtons(root) {
+    var scope = root || document;
+    var buttons = scope.querySelectorAll('.keel-follow-btn');
+    Array.prototype.forEach.call(buttons, function(btn) {
+      if (btn.dataset.follow_wired === '1') return;
+      btn.dataset.follow_wired = '1';
+      btn.addEventListener('click', function(ev) {
+        ev.preventDefault();
+        var url = btn.dataset.toggleUrl;
+        if (!url) return;
+        var fd = new FormData();
+        fd.append('target_ct_id', btn.dataset.targetCtId || '');
+        fd.append('target_id', btn.dataset.targetId || '');
+        btn.disabled = true;
+        fetch(url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'X-CSRFToken': getCookie('csrftoken') || ''},
+          body: fd,
+        }).then(function(resp) {
+          if (!resp.ok) throw new Error('toggle failed: ' + resp.status);
+          return resp.json();
+        }).then(function(data) {
+          var isFollowing = !!data.following;
+          btn.dataset.following = isFollowing ? 'true' : 'false';
+          btn.setAttribute('aria-pressed', isFollowing ? 'true' : 'false');
+          btn.classList.toggle('btn-primary', isFollowing);
+          btn.classList.toggle('btn-outline-primary', !isFollowing);
+          btn.title = isFollowing ? 'Click to unfollow' : 'Click to follow';
+          var icon = btn.querySelector('i.bi');
+          if (icon) {
+            icon.classList.toggle('bi-eye-fill', isFollowing);
+            icon.classList.toggle('bi-eye', !isFollowing);
+          }
+          var lbl = btn.querySelector('.keel-follow-btn-label');
+          if (lbl) {
+            lbl.textContent = isFollowing
+              ? (btn.dataset.labelFollowing || 'Following')
+              : (btn.dataset.labelFollow || 'Follow');
+          }
+        }).catch(function(err) {
+          console.warn('keel-follow-btn toggle failed:', err);
+        }).finally(function() {
+          btn.disabled = false;
+        });
+      });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { wireFollowButtons(); });
+  } else {
+    wireFollowButtons();
+  }
+
 })();
 
 
