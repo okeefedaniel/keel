@@ -21,7 +21,7 @@ class KeelUserAdmin(UserAdmin):
     list_display = ('username', 'email', 'organization', 'agency', 'is_state_user', 'ai_key_set', 'is_active')
     list_filter = ('is_state_user', 'is_active', 'is_staff', 'organization', 'agency')
     search_fields = ('username', 'email', 'first_name', 'last_name')
-    raw_id_fields = ('organization', 'agency')
+    autocomplete_fields = ('organization', 'agency')
     inlines = [ProductAccessInline]
 
     @admin.display(boolean=True, description='AI key')
