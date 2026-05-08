@@ -20,7 +20,7 @@
   'use strict';
 
   var DEBOUNCE_MS = 300;
-  var DEFAULT_URL = '/keel/username-available/';
+  var DEFAULT_URL = '/keel/accounts/username-available/';
 
   var REASON_MESSAGES = {
     taken: 'That username is already taken.',

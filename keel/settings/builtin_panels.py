@@ -187,7 +187,7 @@ class AccountPanel(SettingsPanel):
             'username_form': username_form or UsernameChangeForm(user=request.user),
             'email_form': email_form or EmailChangeForm(user=request.user),
             'password_form': password_form or PasswordChangeForm(user=request.user),
-            'username_check_url': '/keel/username-available/',
+            'username_check_url': '/keel/accounts/username-available/',
         }
 
     def post(self, request):

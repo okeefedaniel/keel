@@ -8,6 +8,7 @@ import zoneinfo
 
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
+from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 from .models import KeelUser
@@ -151,6 +152,7 @@ class UsernameChangeForm(forms.Form):
             'autocapitalize': 'off',
             'spellcheck': 'false',
             'data-username-check': 'true',
+            'data-username-check-url': reverse_lazy('keel_accounts:username_available'),
         }),
     )
 
