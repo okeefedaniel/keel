@@ -96,12 +96,18 @@ def _resolve_token_user(request):
     )
 
 
-def _audit_fetch(user, app_id, success, hint=''):
+def _audit_fetch(user, app_id, success, hint='', request=None):
     """Write one ``AuditLog`` row for an /ai/key/ fetch.
 
     Best-effort: an audit-log failure does NOT block the key handoff.
     The fetch is still observable via app logs; the audit row is the
     canonical trail for compliance review.
+
+    Records the calling IP (``request.audit_ip`` set by the
+    ``AuditMiddleware``) so ops can spot anomalous egress patterns —
+    a stolen bearer token shipped from an unexpected host shows up as
+    an IP delta in the audit stream. Without this, the strongest
+    mitigating control on the BYO-key model is blind to source.
     """
     try:
         from django.apps import apps as django_apps
@@ -121,6 +127,7 @@ def _audit_fetch(user, app_id, success, hint=''):
                 'success': bool(success),
                 'hint': hint,
             },
+            ip_address=getattr(request, 'audit_ip', None) if request else None,
         )
     except Exception:
         logger.exception('Failed to write ai_key_fetch audit row')
@@ -143,16 +150,16 @@ def ai_key_view(request):
         return JsonResponse({'error': 'invalid_token'}, status=401)
 
     if not _rate_limit(user.pk):
-        _audit_fetch(user, app_id, success=False, hint='rate_limited')
+        _audit_fetch(user, app_id, success=False, hint='rate_limited', request=request)
         return JsonResponse({'error': 'rate_limited'}, status=429)
 
     if not getattr(user, 'has_anthropic_key', lambda: False)():
-        _audit_fetch(user, app_id, success=False, hint='no_key')
+        _audit_fetch(user, app_id, success=False, hint='no_key', request=request)
         return JsonResponse({'error': 'no_key_configured'}, status=404)
 
     key = user.anthropic_api_key
     hint = user.anthropic_key_hint() if hasattr(user, 'anthropic_key_hint') else ''
-    _audit_fetch(user, app_id, success=True, hint=hint)
+    _audit_fetch(user, app_id, success=True, hint=hint, request=request)
 
     # Cache-Control: never store. The endpoint returns plaintext
     # credentials — every cache layer (browser, CDN, intermediary)

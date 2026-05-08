@@ -70,6 +70,21 @@ def get_client(api_key=None):
         logger.error('No Anthropic API key found')
         return None
 
+    # Surface every legacy fallback at WARN so consumer-product
+    # refactors that accidentally drop the user (background tasks,
+    # signal handlers, missed wiring) are detectable in app logs
+    # before they show up on the DockLabs Anthropic bill. Skip the
+    # warn when an explicit key was passed (caller knows what
+    # they're doing) or when the deployment opts out via
+    # ``KEEL_AI_QUIET_DEPLOYMENT_FALLBACK=True``.
+    if api_key is None and not getattr(
+        settings, 'KEEL_AI_QUIET_DEPLOYMENT_FALLBACK', False,
+    ):
+        logger.warning(
+            'get_client() resolved key from deployment-wide ANTHROPIC_API_KEY '
+            '— this bills DockLabs, not the user. Prefer get_client_for_user(user, request=request) '
+            'for user-attributed AI calls. Set KEEL_AI_QUIET_DEPLOYMENT_FALLBACK=True to suppress.'
+        )
     return anthropic.Anthropic(api_key=key)
 
 
@@ -202,6 +217,33 @@ def _fetch_key_from_keel(user, request):
         logger.error(
             'KEEL_OIDC_ISSUER must use https:// in production — refusing '
             "to send bearer token over plaintext to %r", issuer,
+        )
+        return ''
+
+    # Host allowlist — defense against env-var corruption / typo
+    # attacks. ``KEEL_AI_KEY_FETCH_HOSTS`` is a comma-separated
+    # allowlist of acceptable issuer hosts. Default permits the
+    # canonical DockLabs domain plus localhost for dev; a deployment
+    # using a different host MUST opt in via setting. Without this,
+    # a typo'd ``KEEL_OIDC_ISSUER=https://attaker.com`` (or env-var
+    # injection) would ship the user's bearer token there.
+    from urllib.parse import urlparse
+    issuer_host = urlparse(issuer).hostname or ''
+    default_hosts = {
+        'keel.docklabs.ai', 'demo-keel.docklabs.ai',
+        'localhost', '127.0.0.1',
+    }
+    allowed_hosts = set(
+        (getattr(settings, 'KEEL_AI_KEY_FETCH_HOSTS', '') or '')
+        .replace(' ', '').split(',')
+    ) - {''} or default_hosts
+    if issuer_host not in allowed_hosts and not (
+        getattr(settings, 'DEBUG', False) or is_local
+    ):
+        logger.error(
+            'KEEL_OIDC_ISSUER host %r not in allowlist %r — refusing '
+            'to send bearer token. Set KEEL_AI_KEY_FETCH_HOSTS to '
+            'override.', issuer_host, sorted(allowed_hosts),
         )
         return ''
 

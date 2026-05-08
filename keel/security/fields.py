@@ -70,10 +70,21 @@ class EncryptedTextField(models.TextField):
         """
         if value is None or value == '':
             return value
+        # Hard-require cryptography. Falling back to ``Exception`` would
+        # make the InvalidToken-only catch swallow every error class
+        # (DB stutter, settings race, anything) and silently return ''
+        # — which would look identical to "user has no key" and erase
+        # the work this branch did to differentiate the two failure
+        # modes. cryptography is a transitive dep of every keel deploy
+        # already; fail-closed if it's somehow missing.
         try:
             from cryptography.fernet import InvalidToken
-        except ImportError:  # pragma: no cover — cryptography always present
-            InvalidToken = Exception  # type: ignore[misc, assignment]
+        except ImportError as exc:  # pragma: no cover
+            from django.core.exceptions import ImproperlyConfigured
+            raise ImproperlyConfigured(
+                'EncryptedTextField requires the cryptography package. '
+                'Install with: pip install "keel[encryption]"'
+            ) from exc
         try:
             from keel.security.encryption import decrypt
             return decrypt(value)

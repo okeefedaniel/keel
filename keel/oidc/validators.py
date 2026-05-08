@@ -98,9 +98,17 @@ def _build_validator_class():
             Call this at app boot (see ``keel.oidc.apps.ready``) so
             drift is caught at startup rather than at token-issue time.
             Raises ``ImproperlyConfigured`` naming every unscoped claim.
+
+            Also runs the inverse check: every claim that
+            ``get_additional_claims`` actually emits must be either a
+            standard OIDC claim already in the base validator's
+            ``oidc_claim_scope`` OR registered in
+            ``DOCKLABS_CUSTOM_CLAIMS``. Adding a new custom claim without
+            both entries silently scrubs it from every token.
             """
             from django.core.exceptions import ImproperlyConfigured
 
+            # Forward check: declared claims must be scoped.
             missing = sorted(
                 claim for claim in cls.DOCKLABS_CUSTOM_CLAIMS
                 if claim not in cls.oidc_claim_scope
@@ -112,8 +120,27 @@ def _build_validator_class():
                     "DOCKLABS_CUSTOM_CLAIMS but missing from "
                     f"oidc_claim_scope and will be silently stripped "
                     f"from every issued ID token: {missing}. Add each "
-                    "claim to oidc_claim_scope with the gating scope "
-                    "(typically 'product_access')."
+                    "claim to oidc_claim_scope with the gating scope."
+                )
+
+            # Inverse check: every custom (non-OIDC-standard) claim in
+            # ``oidc_claim_scope`` must also appear in
+            # ``DOCKLABS_CUSTOM_CLAIMS``. This catches the symmetric
+            # mistake — adding a scope mapping but forgetting the
+            # registry entry, which means the runtime emit path
+            # in ``get_additional_claims`` never knows about the claim.
+            base_claims = set(OAuth2Validator.oidc_claim_scope.keys())
+            registered = set(cls.DOCKLABS_CUSTOM_CLAIMS)
+            scoped_custom = set(cls.oidc_claim_scope.keys()) - base_claims
+            unregistered = sorted(scoped_custom - registered)
+            if unregistered:
+                raise ImproperlyConfigured(
+                    "KeelOIDCValidator registry drift: the following "
+                    "claims have entries in oidc_claim_scope but are "
+                    f"NOT in DOCKLABS_CUSTOM_CLAIMS: {unregistered}. "
+                    "Either add each to DOCKLABS_CUSTOM_CLAIMS (and "
+                    "ensure get_additional_claims emits them), or "
+                    "remove the oidc_claim_scope entry."
                 )
 
         def get_additional_claims(self, request):
