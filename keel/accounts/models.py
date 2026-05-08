@@ -29,6 +29,8 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from keel.security.fields import EncryptedTextField
+
 
 # Slugs reserved for system-managed organizations. The default org
 # created by the data migration cannot be created (or duplicated) by
@@ -247,6 +249,21 @@ class OrganizationProductSubscription(models.Model):
         help_text=_('Product code (e.g. harbor, beacon).'),
     )
     is_active = models.BooleanField(default=True)
+    # Per-org-per-product AI gate. When False, the org's users see no AI
+    # surfaces in this product regardless of their per-user
+    # ProductAccess.ai_enabled. When True, the org's users see AI
+    # surfaces if their ProductAccess.ai_enabled is also True AND they
+    # have an Anthropic API key set on their KeelUser. Defaults to
+    # False so existing customers don't auto-opt-in to AI billing
+    # without an explicit admin toggle.
+    ai_enabled = models.BooleanField(
+        default=False,
+        help_text=_(
+            'Whether AI features are enabled for this org on this '
+            'product. AI surfaces are gated by both this flag and the '
+            'per-user ProductAccess.ai_enabled flag.'
+        ),
+    )
     started_at = models.DateField(default=timezone.now)
     ends_at = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -291,6 +308,24 @@ class OrganizationProductSubscription(models.Model):
         return list(
             cls.objects.filter(organization=organization, is_active=True)
                 .values_list('product', flat=True)
+        )
+
+    @classmethod
+    def ai_enabled_product_codes(cls, organization):
+        """Return product codes this org has AI enabled for.
+
+        Subset of ``active_product_codes`` further filtered by
+        ``ai_enabled=True``. Used by the invitation-matrix template
+        (to decide which rows render the AI checkbox) and the OIDC
+        validator (to build the ``ai_enabled_products`` claim
+        intersected with per-user ProductAccess.ai_enabled).
+        """
+        if organization is None:
+            return []
+        return list(
+            cls.objects.filter(
+                organization=organization, is_active=True, ai_enabled=True,
+            ).values_list('product', flat=True)
         )
 
 
@@ -379,6 +414,21 @@ class KeelUser(AbstractUser):
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # User-supplied Anthropic API key for AI features. Encrypted at
+    # rest with keel.security.encryption (Fernet/MultiFernet, supports
+    # rolling key rotation). Cleartext when read in Python; ciphertext
+    # in the column. Empty string means "no key set"; the user sees
+    # the "you have not yet put in your API key" prompt on AI surfaces
+    # they're otherwise entitled to. Set/cleared by the AI settings
+    # panel; never exposed in admin (only a read-only "key set" flag).
+    anthropic_api_key_encrypted = EncryptedTextField(
+        blank=True, default='',
+        help_text=_(
+            "User's Anthropic API key. Encrypted at rest. Set via "
+            'Settings → AI; never edit directly in admin.'
+        ),
+    )
 
     # Suite-wide logout epoch. Stamped by Keel's /suite/logout/ endpoint
     # AND by reconcile_user_product_access when an org reassignment
@@ -582,6 +632,52 @@ class KeelUser(AbstractUser):
         self.accepted_terms_at = timezone.now()
         self.save(update_fields=['accepted_terms', 'accepted_terms_at'])
 
+    # ------------------------------------------------------------------
+    # Anthropic API key — convenience accessors over the encrypted field
+    # ------------------------------------------------------------------
+    @property
+    def anthropic_api_key(self):
+        """Cleartext key, or empty string when unset.
+
+        Read-through to the encrypted column; decryption happens on
+        DB load via ``EncryptedTextField.from_db_value``. This property
+        exists so call sites don't need to know about the column name
+        or worry about double-encrypting on assignment.
+        """
+        return self.anthropic_api_key_encrypted or ''
+
+    @anthropic_api_key.setter
+    def anthropic_api_key(self, value):
+        """Set the cleartext key (will be encrypted on save).
+
+        Pass empty string to clear. Caller is responsible for calling
+        ``save(update_fields=['anthropic_api_key_encrypted'])`` after
+        assignment so the change actually persists.
+        """
+        self.anthropic_api_key_encrypted = value or ''
+
+    def has_anthropic_key(self) -> bool:
+        """Whether this user has set an Anthropic API key.
+
+        Used by the AI gating helpers (`keel.core.ai_access`) and the
+        OIDC ``ai_key_present`` claim emitter. Cheap — no decryption,
+        just a non-empty check on the ciphertext column.
+        """
+        return bool(self.anthropic_api_key_encrypted)
+
+    def anthropic_key_hint(self) -> str:
+        """Last-4 hint for the AI settings panel masked display.
+
+        Returns an empty string if no key is set. The hint is shown
+        next to the "Replace" / "Remove" buttons so the user can
+        confirm at a glance that the key on file is the one they
+        expect (e.g. "●●●●●●●●xyz1").
+        """
+        key = self.anthropic_api_key
+        if not key:
+            return ''
+        return '●●●●●●●●' + key[-4:] if len(key) >= 4 else '●●●●'
+
 
 # ---------------------------------------------------------------------------
 # Agency — concrete shared model (replaces AbstractAgency for shared DB)
@@ -649,6 +745,21 @@ class ProductAccess(models.Model):
         default=False,
         help_text=_('Beta testers can submit feedback directly from within the product.'),
     )
+    # Per-user AI gate (combined with OrganizationProductSubscription.
+    # ai_enabled). Defaulted from the per-product AI checkbox in the
+    # invite matrix (which itself defaults checked). Admins can toggle
+    # this individually per ProductAccess row to revoke AI from one
+    # user without affecting the rest of the org. Default True so an
+    # invite created before this field existed continues to grant AI
+    # access when the org-sub flips on.
+    ai_enabled = models.BooleanField(
+        default=True,
+        help_text=_(
+            'Whether this user sees AI features in this product. '
+            'Combined with OrganizationProductSubscription.ai_enabled '
+            'and the user having an Anthropic API key configured.'
+        ),
+    )
     granted_at = models.DateTimeField(auto_now_add=True)
     granted_by = models.ForeignKey(
         KeelUser, on_delete=models.SET_NULL,
@@ -700,6 +811,19 @@ class Invitation(models.Model):
     is_beta_tester = models.BooleanField(
         default=False,
         help_text=_('Grant beta tester status when invitation is accepted.'),
+    )
+
+    # Per-(invitation, product) AI gate. Carried through to
+    # ProductAccess.ai_enabled at accept time. The invite matrix UI
+    # only renders the AI checkbox for products where the inviting
+    # org's OrganizationProductSubscription.ai_enabled is True; for
+    # other products the field is set to False at row-creation time.
+    ai_enabled = models.BooleanField(
+        default=True,
+        help_text=_(
+            'Whether to grant AI access on this product when the '
+            'invitation is accepted.'
+        ),
     )
 
     batch_id = models.UUIDField(
@@ -797,6 +921,7 @@ class Invitation(models.Model):
             defaults={
                 'role': self.role,
                 'is_beta_tester': self.is_beta_tester,
+                'ai_enabled': self.ai_enabled,
                 'granted_by': self.invited_by,
             },
         )
@@ -809,6 +934,13 @@ class Invitation(models.Model):
             if self.is_beta_tester and not access.is_beta_tester:
                 access.is_beta_tester = True
                 updated_fields.append('is_beta_tester')
+            # AI flag is authoritative from the invitation: a re-invite
+            # with AI unchecked revokes a previously granted AI flag,
+            # and a re-invite with AI checked re-grants it. Only update
+            # when the values differ to avoid noisy save() rows.
+            if access.ai_enabled != self.ai_enabled:
+                access.ai_enabled = self.ai_enabled
+                updated_fields.append('ai_enabled')
             if updated_fields:
                 access.save(update_fields=updated_fields)
 
@@ -1044,6 +1176,10 @@ class AuditLog(models.Model):
         LOGIN_FAILED = 'login_failed', _('Login Failed')
         SECURITY_EVENT = 'security_event', _('Security Event')
         ROLE_GRANT_DENIED = 'role_grant_denied', _('Role Grant Denied')
+        # Logged by /api/v1/ai/key/ on every fetch (success and failure).
+        # Plaintext keys are NEVER recorded — only the last-4 hint and
+        # the calling client_id, so ops can spot anomalous patterns.
+        AI_KEY_FETCH = 'ai_key_fetch', _('AI Key Fetch')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
