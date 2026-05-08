@@ -67,6 +67,12 @@ Products extend this and override blocks:
 
       <nav class="sidebar-body" aria-label="Sections">
         {% block sidebar_favorites %}{% endblock %}
+        {# sidebar_collab — opt-in slot for the per-record activity panel
+           or a "what's happening" widget. Empty by default so products
+           that don't override it see the original layout. Detail-page
+           templates can populate it via {% block sidebar_collab %}
+           {% activity_panel object limit=10 %}{% endblock %}. #}
+        {% block sidebar_collab %}{% endblock %}
         {% block sidebar_tree %}{% endblock %}
         {% block sidebar_recent %}{% endblock %}
         {% block sidebar_extra_sections %}{% endblock %}
