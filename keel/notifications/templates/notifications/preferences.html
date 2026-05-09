@@ -125,10 +125,11 @@
     {% endfor %}
 
     {% if sms_available and not user_has_phone %}
+    {% url 'keel_settings:panel' slug='profile' as profile_url %}
     <div class="alert alert-warning">
       <i class="bi bi-phone me-2"></i>
       To receive SMS notifications, add your phone number in
-      <a href="/auth/profile/">your profile</a>.
+      {% if profile_url %}<a href="{{ profile_url }}">your profile</a>{% else %}your profile{% endif %}.
     </div>
     {% endif %}
 
