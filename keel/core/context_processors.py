@@ -463,12 +463,14 @@ def breadcrumb_context(request):
     namespace = match.namespace or ''
     ns_singular = _singularize(namespace) if namespace else ''
 
-    # The `/dashboard/` canonical alias uses url_name='dashboard_alias' on
-    # products where the real dashboard view lives at a different historical
-    # path. Treat it as 'Dashboard' so the breadcrumb doesn't leak the
-    # implementation detail.
-    if url_name == 'dashboard_alias':
-        crumbs.append({'label': 'Dashboard', 'url': None})
+    # `*_alias` url_names are the same canonical-URL pattern as
+    # ``dashboard_alias`` — the real view lives at a different historical
+    # path and we mount it again at the canonical URL. Strip the suffix
+    # so the breadcrumb reads "Dashboard"/"Fleet"/etc. and doesn't leak
+    # the implementation detail.
+    if url_name.endswith('_alias'):
+        bare = url_name[:-len('_alias')]
+        crumbs.append({'label': bare.replace('_', ' ').replace('-', ' ').title(), 'url': None})
         return {'auto_breadcrumbs': crumbs}
 
     # ── Parse url_name into (prefix, action) ────────────────────
