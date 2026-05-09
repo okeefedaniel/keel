@@ -9,10 +9,11 @@ Identity edits are gated by deployment mode:
 
 - **Standalone** (``KEEL_OIDC_CLIENT_ID`` unset): all panels are editable;
   the local KeelUser row is the source of truth.
-- **Suite** (product, OIDC client of Keel): Profile panel renders
-  read-only with a deep link to ``KEEL_OIDC_ISSUER/settings/profile/``;
-  the Account panel is hidden entirely. Editing identity in-product
-  would create drift between the JWT and the product's local row.
+- **Suite** (product, OIDC client of Keel): Profile panel is editable
+  locally; changes are synced back to Keel IdP best-effort via the
+  user's own OIDC access token. Account panel is visible but informational
+  — users are linked to ``KEEL_OIDC_ISSUER/settings/account/`` to change
+  username, email, or password.
 - **Keel IdP** (``KEEL_IS_IDP=True``): all panels editable. Username,
   email, and password edits propagate to every product on the user's
   next login via JWT claims + ``SessionFreshnessMiddleware``.
@@ -38,10 +39,19 @@ logger = logging.getLogger(__name__)
 def _identity_is_editable() -> bool:
     """Identity edits are allowed on standalone products and on Keel itself.
 
-    Suite-mode products mirror identity from JWT claims and never write
-    to it locally — see the panel docstrings for the rationale.
+    Gates AccountPanel (username / email / password) and AIPanel. Profile
+    fields are gated separately by _profile_is_editable() so they can be
+    edited everywhere without changing the credential-change rules.
     """
     return is_keel_idp() or not is_suite_mode()
+
+
+def _profile_is_editable() -> bool:
+    """Profile fields (name, title, phone, timezone, locale) are editable
+    in every deployment mode. In suite mode, saves propagate to Keel IdP
+    best-effort via the user's own OIDC access token.
+    """
+    return True
 
 
 def _keel_profile_url() -> str:
@@ -49,6 +59,13 @@ def _keel_profile_url() -> str:
     issuer = getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or ''
     issuer = issuer.rstrip('/')
     return f'{issuer}/settings/profile/' if issuer else ''
+
+
+def _keel_account_url() -> str:
+    """Build the Keel account-settings URL surfaced in suite-mode Account panel."""
+    issuer = getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or ''
+    issuer = issuer.rstrip('/')
+    return f'{issuer}/settings/account/' if issuer else ''
 
 
 # ---------------------------------------------------------------------------
@@ -71,28 +88,23 @@ class ProfilePanel(SettingsPanel):
     def get_context(self, request, *, form=None, avatar_error=None):
         from keel.accounts.forms import ProfileForm
 
-        editable = _identity_is_editable()
         ctx = {
-            'editable': editable,
-            'keel_profile_url': _keel_profile_url(),
+            'editable': True,
             'user': request.user,
             'avatar_error': avatar_error,
             # Surface the bytes ceiling to the template so client-side
             # validation matches the server-side ValueError code.
             'avatar_max_mb': 5,
+            'form': form or ProfileForm(instance=request.user),
         }
-        if editable:
-            ctx['form'] = form or ProfileForm(instance=request.user)
+        # In suite mode, surface a link to Keel for identity settings
+        # (username / email / password) that can't be changed in-product.
+        account_url = _keel_account_url()
+        if account_url and is_suite_mode():
+            ctx['keel_account_url'] = account_url
         return ctx
 
     def post(self, request):
-        if not _identity_is_editable():
-            messages.error(
-                request,
-                'Profile edits live on DockLabs. Use the link above to update.',
-            )
-            return self.get_context(request)
-
         action = (request.POST.get('_action') or 'profile').strip()
         if action == 'avatar_upload':
             return self._post_avatar_upload(request)
@@ -108,6 +120,14 @@ class ProfilePanel(SettingsPanel):
         form = ProfileForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
+            # Best-effort sync to Keel IdP in suite mode. Never blocks the
+            # local save — failures are logged and silently skipped.
+            if is_suite_mode():
+                try:
+                    from keel.settings.keel_client import sync_profile_to_keel
+                    sync_profile_to_keel(request.user, form.cleaned_data)
+                except Exception:
+                    logger.exception('settings.profile.sync: unexpected error during sync')
             return None
         return self.get_context(request, form=form)
 
@@ -173,24 +193,38 @@ class AccountPanel(SettingsPanel):
     def is_visible(self, user) -> bool:
         if not super().is_visible(user):
             return False
-        # Suite-mode products have nothing to offer here. Hiding the
-        # panel (rather than rendering a stub) keeps the left-rail nav
-        # honest about where credential edits actually live.
-        return _identity_is_editable()
+        # Always visible: in suite mode we show an informational card
+        # linking to Keel for credential edits (gives users a discoverable
+        # path), and in standalone mode we show the actual forms.
+        return True
 
     def get_context(self, request, *, username_form=None, email_form=None,
                     password_form=None):
         from keel.accounts.forms import EmailChangeForm, UsernameChangeForm
 
-        return {
+        ctx = {
             'user': request.user,
-            'username_form': username_form or UsernameChangeForm(user=request.user),
-            'email_form': email_form or EmailChangeForm(user=request.user),
-            'password_form': password_form or PasswordChangeForm(user=request.user),
             'username_check_url': '/keel/accounts/username-available/',
         }
+        if _identity_is_editable():
+            ctx.update({
+                'username_form': username_form or UsernameChangeForm(user=request.user),
+                'email_form': email_form or EmailChangeForm(user=request.user),
+                'password_form': password_form or PasswordChangeForm(user=request.user),
+            })
+        else:
+            # Suite mode: render informational card with link to Keel.
+            ctx['suite_mode'] = True
+            account_url = _keel_account_url()
+            if account_url:
+                ctx['keel_account_url'] = account_url
+        return ctx
 
     def post(self, request):
+        if not _identity_is_editable():
+            # Suite mode: no forms to submit, nothing to do.
+            return self.get_context(request)
+
         action = (request.POST.get('_action') or '').strip()
 
         if action == 'username':

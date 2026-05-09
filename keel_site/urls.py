@@ -110,6 +110,10 @@ urlpatterns = [
     # plaintext Anthropic key for AI features. See keel.ai.views.
     path('api/v1/ai/', include('keel.ai.urls')),
 
+    # Profile sync from suite-mode products back to Keel IdP.
+    # PATCH /api/v1/settings/profile/ — authenticated by user's OIDC token.
+    path('api/v1/settings/', include('keel.settings.api_urls')),
+
     # Suite-wide /settings/ — registered panels (Profile, Account,
     # AI, Notifications). On Keel itself, this is where users enter
     # their Anthropic key on /settings/ai/. Products mount the same
