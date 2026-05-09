@@ -191,7 +191,7 @@ def site_context(request):
         # ProductAccess query.
         try:
             from keel.core.ai_access import (
-                ai_enabled_products_for_user, user_ai_state,
+                _user_has_key, ai_enabled_products_for_user, user_ai_state,
             )
             current_product = (
                 getattr(settings, 'KEEL_PRODUCT_CODE', '')
@@ -204,10 +204,7 @@ def site_context(request):
                 user_ai_state(request.user, current_product)
                 if current_product else 'off'
             )
-            context['ai_key_present'] = (
-                bool(request.user.has_anthropic_key())
-                if hasattr(request.user, 'has_anthropic_key') else False
-            )
+            context['ai_key_present'] = _user_has_key(request.user)
         except Exception:
             # Defensive: a broken AI gate must never block page render.
             context.setdefault('ai_enabled_products', [])

@@ -356,19 +356,29 @@ class AIPanel(SettingsPanel):
             return True
 
     def get_context(self, request, *, error: str | None = None):
-        from keel.core.ai_access import ai_enabled_products_for_user
+        from keel.core.ai_access import _user_has_key, ai_enabled_products_for_user
 
         editable = _identity_is_editable()
         user = request.user
+        # Use _user_has_key instead of user.has_anthropic_key() so that
+        # suite-mode products (where the key lives in Keel's DB, not locally)
+        # read the ai_key_present claim from stored OIDC extra_data rather
+        # than always showing "Not set".
+        has_key = _user_has_key(user)
+        # key_hint requires the local plaintext — only available when the key
+        # is stored locally (Keel itself or standalone mode). In suite mode
+        # has_anthropic_key() returns False so the hint is empty anyway.
+        key_hint = (
+            user.anthropic_key_hint()
+            if hasattr(user, 'anthropic_key_hint') and hasattr(user, 'has_anthropic_key') and user.has_anthropic_key()
+            else ''
+        )
         return {
             'editable': editable,
             'keel_settings_url': _keel_ai_url(),
             'user': user,
-            'has_key': bool(user.has_anthropic_key()) if hasattr(user, 'has_anthropic_key') else False,
-            'key_hint': (
-                user.anthropic_key_hint()
-                if hasattr(user, 'anthropic_key_hint') else ''
-            ),
+            'has_key': has_key,
+            'key_hint': key_hint,
             'ai_enabled_products': ai_enabled_products_for_user(user),
             'anthropic_console_url': self.ANTHROPIC_CONSOLE_URL,
             'error': error,

@@ -108,14 +108,44 @@ def _user_has_ai(user, product_code: str) -> bool:
         return False
 
 
+def _oidc_ai_key_present(user) -> bool:
+    """Read ai_key_present from stored OIDC claims (SocialAccount.extra_data).
+
+    Used as a fallback in suite-mode products where the user's Anthropic key
+    lives in Keel's database, not the local product's database. The claim is
+    stamped at login time by Keel's OIDC validator (requires the 'ai' scope).
+    """
+    try:
+        from allauth.socialaccount.models import SocialAccount
+        acct = SocialAccount.objects.filter(user=user, provider='keel').first()
+        if acct is None:
+            return False
+        data = acct.extra_data or {}
+        # allauth 65+ stores claims under 'userinfo' / 'id_token' keys.
+        userinfo = data.get('userinfo')
+        if isinstance(userinfo, dict) and 'ai_key_present' in userinfo:
+            return bool(userinfo['ai_key_present'])
+        id_token = data.get('id_token')
+        if isinstance(id_token, dict) and 'ai_key_present' in id_token:
+            return bool(id_token['ai_key_present'])
+        return bool(data.get('ai_key_present', False))
+    except Exception:  # noqa: BLE001 — defensive; allauth may not be installed
+        return False
+
+
 def _user_has_key(user) -> bool:
-    """Layer 3: has the user set an Anthropic key?"""
+    """Layer 3: has the user set an Anthropic key?
+
+    Checks the local encrypted field first (fast, no network). Falls back to
+    the OIDC ai_key_present claim for suite-mode products where the key lives
+    in Keel's database and the local field is always empty.
+    """
     if user is None or not getattr(user, 'is_authenticated', False):
         return False
     method = getattr(user, 'has_anthropic_key', None)
-    if callable(method):
-        return bool(method())
-    return False
+    if callable(method) and method():
+        return True
+    return _oidc_ai_key_present(user)
 
 
 def user_can_use_ai(user, product_code: str | None = None) -> bool:
