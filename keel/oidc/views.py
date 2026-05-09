@@ -16,6 +16,17 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 
+def _verify_client_secret(provided, stored):
+    """Compare provided secret against stored value (hashed or plaintext)."""
+    from django.contrib.auth.hashers import check_password, identify_hasher
+    from django.utils.crypto import constant_time_compare
+    try:
+        identify_hasher(stored)
+        return check_password(provided, stored)
+    except ValueError:
+        return constant_time_compare(provided, stored)
+
+
 def _authenticate_peer_client(request):
     """Validate HTTP Basic credentials against a registered OIDC client.
 
@@ -42,8 +53,7 @@ def _authenticate_peer_client(request):
     ).first()
     if app is None:
         return None
-    # check_client_secret handles hashed-vs-plaintext storage transparently.
-    if not app.check_client_secret(secret):
+    if not _verify_client_secret(secret, app.client_secret):
         return None
     return app
 
