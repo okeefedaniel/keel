@@ -2383,3 +2383,55 @@ summary:focus-visible,
     max-width: 640px;
     margin: -1.5rem auto 2.5rem auto;
 }
+
+/* === Tabs — underline-only treatment ===
+ *
+ * Bootstrap's default .nav-tabs draws a 1px bottom border on the strip and
+ * makes the active tab "lift" by hiding its bottom border, on the assumption
+ * that the tab strip sits directly atop a paneled container. When tabs are
+ * used inline with content that has no panel container (cards, plain divs,
+ * grid rows), the active-tab indicator visually points at empty space and
+ * the layout reads as broken. Replace with a clean underline-only treatment
+ * that doesn't pretend to attach to a panel below it.
+ *
+ * Tabs SHOULD only be used for switching views WITHIN a detail page — never
+ * for top-level section navigation (sections go in the sidebar). See
+ * keel/CLAUDE.md → "UI & Frontend → Tabs are for in-record view switching."
+ */
+.nav-tabs {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    margin-bottom: -1px;
+    background: transparent;
+    transition: color 120ms ease, border-color 120ms ease;
+}
+
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus-visible {
+    color: var(--text-primary);
+    border-color: transparent;
+    background: transparent;
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+    color: var(--text-primary);
+    background: transparent;
+    border-color: transparent;
+    border-bottom-color: var(--brand-primary, currentColor);
+    font-weight: 600;
+}
+
+.nav-tabs .nav-link.disabled,
+.nav-tabs .nav-link:disabled {
+    color: var(--text-muted);
+    border-color: transparent;
+    background: transparent;
+}
