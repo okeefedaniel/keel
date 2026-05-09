@@ -27,11 +27,7 @@
   // 2. HTMX CSRF token injection
   // =========================================================================
   document.body.addEventListener('htmx:configRequest', function (event) {
-    var token = getCookie('csrftoken');
-    if (!token) {
-      var el = document.querySelector('[name=csrfmiddlewaretoken]');
-      if (el) token = el.value;
-    }
+    var token = getCsrfToken();
     if (token) {
       event.detail.headers['X-CSRFToken'] = token;
     }
@@ -307,6 +303,18 @@
     return cookieValue;
   }
 
+  // getCsrfToken: reads from cookie first, falls back to a DOM element so
+  // that CSRF_COOKIE_HTTPONLY=True (which blocks JS cookie access) doesn't
+  // silently break AJAX requests. Django renders csrfmiddlewaretoken inputs
+  // inside every {% csrf_token %} form tag on the page.
+  function getCsrfToken() {
+    return getCookie('csrftoken')
+      || (function() {
+           var el = document.querySelector('[name=csrfmiddlewaretoken]');
+           return el ? el.value : '';
+         })();
+  }
+
   // =========================================================================
   // keel.activity follow-button toggle (.keel-follow-btn)
   //
@@ -331,7 +339,7 @@
         fetch(url, {
           method: 'POST',
           credentials: 'same-origin',
-          headers: {'X-CSRFToken': getCookie('csrftoken') || ''},
+          headers: {'X-CSRFToken': getCsrfToken()},
           body: fd,
         }).then(function(resp) {
           if (!resp.ok) throw new Error('toggle failed: ' + resp.status);
@@ -399,7 +407,7 @@
         return fetch(url, {
           method: 'POST',
           credentials: 'same-origin',
-          headers: {'X-CSRFToken': getCookie('csrftoken') || ''},
+          headers: {'X-CSRFToken': getCsrfToken()},
           body: fd,
         }).then(function(resp) {
           if (!resp.ok) throw new Error('category save failed: ' + resp.status);
