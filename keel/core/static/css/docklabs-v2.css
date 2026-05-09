@@ -1943,7 +1943,40 @@ summary:focus-visible,
    33. Responsive
    ============================================= */
 @media (max-width: 1024px) {
-    .dl-sidebar { display: none; }
+    .dl-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100dvh;
+        z-index: 1050;
+        width: var(--sidebar-width);
+        transform: translateX(-100%);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    }
+    .dl-sidebar.collapsed {
+        width: var(--sidebar-width);
+        opacity: 0;
+        border-right: none;
+        pointer-events: none;
+    }
+    .dl-sidebar.mobile-open,
+    .dl-sidebar.mobile-open.collapsed {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+        width: var(--sidebar-width);
+        border-right: 1px solid var(--border-light);
+    }
+    .dl-sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1040;
+    }
+    .dl-sidebar-backdrop.active { display: block; }
     .topbar-expand { display: flex !important; }
     .stats-row { grid-template-columns: repeat(2, 1fr); }
     .two-col { grid-template-columns: 1fr; }

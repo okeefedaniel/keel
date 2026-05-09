@@ -194,12 +194,28 @@
 
   /**
    * Toggle the sidebar collapsed/expanded state.
+   * On mobile (<=1024px) uses a slide-over with backdrop instead of width collapse.
    */
   window.dlToggleSidebar = function () {
     var sidebar = document.getElementById('dl-sidebar');
     if (!sidebar) return;
-    sidebar.classList.toggle('collapsed');
-    localStorage.setItem('dl-sidebar-collapsed', sidebar.classList.contains('collapsed'));
+    var isMobile = window.matchMedia('(max-width: 1024px)').matches;
+    if (isMobile) {
+      var opening = !sidebar.classList.contains('mobile-open');
+      sidebar.classList.toggle('mobile-open');
+      var backdrop = document.getElementById('dl-sidebar-backdrop');
+      if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.className = 'dl-sidebar-backdrop';
+        backdrop.id = 'dl-sidebar-backdrop';
+        backdrop.addEventListener('click', function () { dlToggleSidebar(); });
+        sidebar.parentNode.insertBefore(backdrop, sidebar.nextSibling);
+      }
+      backdrop.classList.toggle('active', opening);
+    } else {
+      sidebar.classList.toggle('collapsed');
+      localStorage.setItem('dl-sidebar-collapsed', sidebar.classList.contains('collapsed'));
+    }
   };
 
   /**
