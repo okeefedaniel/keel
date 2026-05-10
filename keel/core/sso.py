@@ -317,8 +317,13 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
             # Keep identity + ProductAccess in sync with the latest claims on
             # every login. save_user only fires on first sign-in, so returning
             # users would otherwise drift whenever Keel admin changes their
-            # role, or when the user renames themselves on Keel.
-            if sociallogin.is_existing and sociallogin.user and sociallogin.user.pk:
+            # role, or when the user renames themselves on Keel. We also
+            # cover the freshly-linked case (pre-existing local user just
+            # connected to its Keel SocialAccount on this request) — without
+            # this, fields like ``avatar_url`` stay blank until the user
+            # logs in a *second* time, which is how Beacon/Yeoman ended up
+            # showing initials instead of the uploaded avatar.
+            if sociallogin.user and sociallogin.user.pk:
                 u = sociallogin.user
                 User = get_user_model()
 
