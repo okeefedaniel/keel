@@ -6,13 +6,15 @@
 {% block content %}
 {% include "keel/login_card.html" %}
 
-{# ── Cross-suite demo entry — only on demo-keel ──
-   The shared `{% demo_login_buttons %}` tag short-circuits when
-   KEEL_PRODUCT_NAME == 'keel' (because Keel admin isn't a product).
-   But for the cross-suite SSO demo, demo-keel IS the IdP and we need
-   one-click personas here so the walkthrough doesn't start at a
-   password form. Render an inline equivalent gated on DEMO_MODE +
-   KEEL_DEMO_FORCE_OIDC so production keel stays clean. #}
+{% comment %}
+Cross-suite demo entry — only on demo-keel.
+The shared `{% demo_login_buttons %}` tag short-circuits when
+KEEL_PRODUCT_NAME == 'keel' (because Keel admin isn't a product).
+But for the cross-suite SSO demo, demo-keel IS the IdP and we need
+one-click personas here so the walkthrough doesn't start at a
+password form. Render an inline equivalent gated on DEMO_MODE +
+unauthenticated session so production keel stays clean.
+{% endcomment %}
 {% if DEMO_MODE and request and not request.user.is_authenticated %}
 <div class="login-card mt-3">
     <div class="card border-0 shadow-sm">
