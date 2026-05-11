@@ -325,7 +325,15 @@ KEEL_PRODUCT_API_KEYS = {
 }
 KEEL_PRODUCT_API_KEYS = {k: v for k, v in KEEL_PRODUCT_API_KEYS.items() if v}
 DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
-DEMO_ROLES = ['admin', 'system_admin']
+# DEMO_ROLES = which usernames the demo-login buttons (and `/demo-login/`
+# endpoint) accept. Configurable via env so the cross-suite demo can add
+# personas like ``agency_admin`` without a code push.
+_DEMO_ROLES_ENV = os.environ.get('DEMO_ROLES', '')
+DEMO_ROLES = (
+    [r.strip() for r in _DEMO_ROLES_ENV.split(',') if r.strip()]
+    if _DEMO_ROLES_ENV else
+    ['admin', 'system_admin', 'agency_admin']
+)
 KEEL_AUDIT_LOG_MODEL = 'keel_accounts.AuditLog'
 
 # This service IS the IdP. Set on Keel only — products leave it unset
