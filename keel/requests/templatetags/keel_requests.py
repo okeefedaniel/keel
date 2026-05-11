@@ -23,7 +23,11 @@ def request_widget(context):
     """Render the feedback submission widget."""
     request = context.get('request')
     user = getattr(request, 'user', None)
-    product = getattr(settings, 'KEEL_PRODUCT_NAME', '')
+    # ProductAccess.product is stored lowercase (Product.BEACON = 'beacon')
+    # but products set KEEL_PRODUCT_NAME in TitleCase. Lower-case here so the
+    # filter actually matches — otherwise show_widget is False for everyone
+    # but superusers.
+    product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
 
     show_widget = False
     if user and user.is_authenticated:

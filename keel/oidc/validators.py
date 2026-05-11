@@ -46,6 +46,7 @@ def _build_validator_class():
         # ``validate_claim_scope`` exists to catch.
         DOCKLABS_CUSTOM_CLAIMS = frozenset({
             'product_access',
+            'beta_products',
             'is_state_user',
             'agency_abbr',
             'organization',
@@ -67,6 +68,7 @@ def _build_validator_class():
         oidc_claim_scope = {
             **OAuth2Validator.oidc_claim_scope,
             'product_access': 'product_access',
+            'beta_products': 'product_access',
             'is_state_user': 'product_access',
             'agency_abbr': 'product_access',
             # Organization claims are gated on a separate ``organization``
@@ -217,6 +219,23 @@ def _build_validator_class():
                 # Table doesn't exist yet (initial migration) or any other
                 # error: omit the claim rather than failing token issuance.
                 claims['product_access'] = {}
+
+            # Beta-tester membership — a list of product codes where this
+            # user has ``is_beta_tester=True``. Separate from
+            # ``product_access`` so the existing {product: role} shape
+            # stays untouched. Gated on the same ``product_access`` scope
+            # so products pick it up automatically on keel bump without
+            # updating their requested-scopes list.
+            try:
+                from keel.accounts.models import ProductAccess
+                beta_qs = ProductAccess.objects.filter(
+                    user=user,
+                    is_active=True,
+                    is_beta_tester=True,
+                ).values_list('product', flat=True)
+                claims['beta_products'] = sorted(beta_qs)
+            except Exception:
+                claims['beta_products'] = []
 
             # Organization claims — what customer this user belongs to.
             # Wrapped in the same defensive try/except as product_access

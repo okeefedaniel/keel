@@ -38,3 +38,4 @@ def test_product_access_claim_mapped_to_product_access_scope():
     assert KeelOIDCValidator.oidc_claim_scope['product_access'] == 'product_access'
     assert KeelOIDCValidator.oidc_claim_scope['is_state_user'] == 'product_access'
     assert KeelOIDCValidator.oidc_claim_scope['agency_abbr'] == 'product_access'
+    assert KeelOIDCValidator.oidc_claim_scope['beta_products'] == 'product_access'

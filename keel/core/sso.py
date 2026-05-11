@@ -375,16 +375,24 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
 
                 # --- ProductAccess rows ------------------------------------
                 product_access = claims.get('product_access') or {}
+                beta_set = {
+                    str(p).lower() for p in (claims.get('beta_products') or [])
+                }
                 if isinstance(product_access, dict) and product_access:
                     try:
                         from keel.accounts.models import ProductAccess
                         for prod, role in product_access.items():
                             if not prod or not role:
                                 continue
+                            code = str(prod).lower()
                             ProductAccess.objects.update_or_create(
                                 user=u,
-                                product=str(prod).lower(),
-                                defaults={'role': role, 'is_active': True},
+                                product=code,
+                                defaults={
+                                    'role': role,
+                                    'is_active': True,
+                                    'is_beta_tester': code in beta_set,
+                                },
                             )
                     except Exception:
                         logger.exception(
@@ -532,16 +540,24 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
         if _is_keel_provider(sociallogin):
             claims = _extract_keel_claims(sociallogin)
             product_access = claims.get('product_access') or {}
+            beta_set = {
+                str(p).lower() for p in (claims.get('beta_products') or [])
+            }
             if isinstance(product_access, dict) and product_access:
                 try:
                     from keel.accounts.models import ProductAccess
                     for prod, role in product_access.items():
                         if not prod or not role:
                             continue
+                        code = str(prod).lower()
                         ProductAccess.objects.update_or_create(
                             user=user,
-                            product=str(prod).lower(),
-                            defaults={'role': role, 'is_active': True},
+                            product=code,
+                            defaults={
+                                'role': role,
+                                'is_active': True,
+                                'is_beta_tester': code in beta_set,
+                            },
                         )
                     logger.info(
                         'SSO: Mirrored Keel product_access claim for %s: %s',
