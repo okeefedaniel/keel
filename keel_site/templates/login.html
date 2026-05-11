@@ -1,7 +1,53 @@
 {% extends "keel/layouts/auth.html" %}
+{% load keel_demo %}
 
 {% block title %}Sign In | Keel{% endblock %}
 
 {% block content %}
 {% include "keel/login_card.html" %}
+
+{# ── Cross-suite demo entry — only on demo-keel ──
+   The shared `{% demo_login_buttons %}` tag short-circuits when
+   KEEL_PRODUCT_NAME == 'keel' (because Keel admin isn't a product).
+   But for the cross-suite SSO demo, demo-keel IS the IdP and we need
+   one-click personas here so the walkthrough doesn't start at a
+   password form. Render an inline equivalent gated on DEMO_MODE +
+   KEEL_DEMO_FORCE_OIDC so production keel stays clean. #}
+{% if DEMO_MODE and request and not request.user.is_authenticated %}
+<div class="login-card mt-3">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            <p class="text-muted small text-center mb-3">
+                <i class="bi bi-play-circle me-1"></i>Quick Demo Login &mdash; cross-suite walkthrough
+            </p>
+            <div class="d-flex flex-wrap gap-2 justify-content-center">
+                <form method="post" action="/demo-login/" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="role" value="agency_admin">
+                    <button type="submit" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-building-gear me-1"></i>Sign in as Agency Admin
+                    </button>
+                </form>
+                <form method="post" action="/demo-login/" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="role" value="system_admin">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-shield-lock me-1"></i>Sign in as System Admin
+                    </button>
+                </form>
+                <form method="post" action="/demo-login/" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="role" value="admin">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-shield-check me-1"></i>Sign in as Admin
+                    </button>
+                </form>
+            </div>
+            <p class="text-muted small text-center mt-3 mb-0">
+                After signing in here, the fleet switcher in any product will SSO automatically.
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
