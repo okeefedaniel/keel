@@ -53,7 +53,7 @@ Products extend this and override blocks:
           <div class="sidebar-brand-icon">
             <i class="bi {% block sidebar_brand_icon %}bi-gear{% endblock %}"></i>
           </div>
-          <div class="sidebar-brand-text">{% block sidebar_brand_name %}DockLabs{% endblock %}</div>
+          <div class="sidebar-brand-text">{% block sidebar_brand_name %}{{ SITE_NAME|default:"DockLabs" }}{% endblock %}</div>
         </a>
         <button class="sidebar-collapse-btn" onclick="dlToggleSidebar()" title="Collapse sidebar">&laquo;</button>
       </div>
