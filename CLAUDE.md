@@ -674,18 +674,44 @@ Every product that exposes machine-callable endpoints follows the same shape so 
 
 **Why:** DockLabs products operate in a government transparency context. FOIA staff must be able to one-click export any agency-submitted record to Admiralty without developer intervention. Incomplete FOIA coverage is a legal liability.
 
-## Groups & Tags on People/Entity Records
+## Groups & Tags on Entity Records
 
-Products that maintain people-style records (contacts, stakeholders, applicants) should follow a getdex-style split between **Tags** and **Groups**:
+Products that classify records (contacts, stakeholders, applicants, opportunities, bills) MUST subclass keel's `AbstractTag` and `AbstractGroup` from [`keel.core.models`](keel/core/models.py). These primitives ship with keel ≥ 0.34.0 and provide the getdex-style split that's been standard suite convention since keel 0.11.x — now as real abstracts you inherit, not just a pattern you reimplement.
 
-- **Tag** = a categorical label controlled by the platform/admin (industry, region, program). Often enumerated (`TagType` choices). Shared across many entity types.
-- **ContactGroup** (or analogous) = a user-defined collection of records the user curates ("Inbound", "VIPs", "Board Candidates", "Reporters"). Has a `slug`, a human-readable `name`, and an `is_system` flag for platform-managed groups that users cannot rename or delete.
-- Both are M2M on the entity — a contact can carry any number of tags AND any number of groups. Neither implies an org/parent affiliation — that is the job of a `Company` / `Organization` FK.
-- **Parent FK (e.g. `Contact.company`) MUST be nullable.** A contact the user knows personally, or one that arrived via external intake without an organization, belongs to no company but still lives in Beacon — typically surfaced via the "Inbound" system group. Do not invent a sentinel "Inbound" company to satisfy a NOT NULL constraint; groups are the right primitive for that.
-- **System groups are seeded lazily by the code that needs them** (e.g. intake API calls `get_or_create(slug='inbound', defaults={'is_system': True, ...})`), not via migrations. This keeps the pattern portable across products and avoids data migrations every time a new intake source appears.
-- Detail templates / list pages must tolerate `entity.company is None` and simply omit the company — a contact without a company is just a contact, not an "orphan." The canonical contact URL should be by primary key (`/contacts/<id>/`), not scoped under a company slug, so it works regardless of company affiliation. `get_absolute_url()` should always use the pk-based route.
+- **`AbstractTag`** = a categorical label (industry, region, program). Often enumerated via a product-specific `TagType` `TextChoices` enum declared on the subclass. Shared across many entity types within a product. Fields on the abstract: `id` (UUID PK), `name`, `slug`, `description`, `color`, `is_system`, `created_at`. Subclasses add the product-specific axis (e.g. `tag_type`, an `agency` scope FK) and any uniqueness constraints (Beacon: global unique on name; Yeoman: per-agency unique on slug).
+- **`AbstractGroup`** = a user-curated cohort of records ("Inbound", "VIPs", "Board Candidates", "Reporters", "Bioscience Cluster"). Independent of any organizational parent FK. Fields on the abstract: `id`, `name`, `slug`, `description`, `color`, `is_system`, `created_by`, `created_at`, `updated_at`. Subclasses pick a concrete name (`ContactGroup` in Beacon, `OpportunityGroup` if Bounty adopts, etc.) and declare uniqueness.
 
-**Why:** Real-world CRM-style data includes lots of people who don't neatly belong to an organization — inbound leads, journalists, personal contacts, event attendees. Forcing every contact to attach to a company creates sentinel-company pollution ("Inbound", "Unknown", "Individual") that corrupts reporting and duplicates the job groups already do well. The getdex model — contacts have many groups, many tags, and optionally an org — is a better fit.
+### Required pattern
+
+```python
+from keel.core.models import AbstractTag, AbstractGroup
+
+class Tag(AbstractTag):
+    class TagType(models.TextChoices):
+        INDUSTRY = 'industry', _('Industry')
+        # ...
+    tag_type = models.CharField(max_length=20, choices=TagType.choices, default=TagType.CUSTOM)
+
+    class Meta(AbstractTag.Meta):
+        constraints = [models.UniqueConstraint(fields=['name'], name='unique_tag_name')]
+
+class ContactGroup(AbstractGroup):
+    class Meta(AbstractGroup.Meta):
+        constraints = [
+            models.UniqueConstraint(fields=['name'], name='unique_contactgroup_name'),
+            models.UniqueConstraint(fields=['slug'], name='unique_contactgroup_slug'),
+        ]
+```
+
+### Suite contract
+
+- **Both are M2M on the entity** — a record can carry any number of tags AND any number of groups. Neither implies an org/parent affiliation — that is the job of a `Company` / `Organization` FK.
+- **Parent FK (e.g. `Contact.company`) MUST be nullable.** A contact the user knows personally, or one that arrived via external intake without an organization, belongs to no company but still lives in the product — typically surfaced via an "Inbound" system group. Do not invent a sentinel "Inbound" company to satisfy a NOT NULL constraint; groups are the right primitive for that.
+- **System groups are seeded lazily by the code that needs them** (e.g. intake API calls `get_or_create(slug='inbound', defaults={'is_system': True, ...})`), not via migrations. This keeps the pattern portable and avoids data migrations every time a new intake source appears.
+- **Detail templates / list pages must tolerate `entity.company is None`** and simply omit the company — a contact without a company is just a contact, not an "orphan." The canonical URL should be by primary key (`/contacts/<id>/`), not scoped under a company slug. `get_absolute_url()` should always use the pk-based route.
+- **Reference implementations:** Beacon's [`companies.Tag`](../beacon/companies/models.py) (with `TagType` enum) and [`companies.ContactGroup`](../beacon/companies/models.py); Yeoman's [`yeoman.InvitationTag`](../yeoman/yeoman/models.py) (agency-scoped).
+
+**Why:** Real-world CRM-style data includes lots of people who don't neatly belong to an organization — inbound leads, journalists, personal contacts, event attendees. Forcing every contact to attach to a company creates sentinel-company pollution ("Inbound", "Unknown", "Individual") that corrupts reporting and duplicates the job groups already do well. The getdex model — entities have many groups, many tags, and optionally an org — is a better fit. Pinning the abstracts in keel prevents the per-product drift that produced Yeoman's `InvitationTag` (no description/created_at) and Beacon's `Tag` (no slug/color) growing in different directions.
 
 ## Cross-Product Linkage (Provenance)
 

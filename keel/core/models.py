@@ -536,3 +536,79 @@ class AbstractAttachment(models.Model):
             except (OSError, ValueError):
                 pass
         super().save(*args, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Tags and Groups — suite-wide primitives for classifying entity records.
+#
+# Tag  = admin-curated categorical label (industry, region, program). Often
+#        enumerated via a product-specific TagType. Cheap to apply; searchable.
+# Group = user-curated cohort of records ("Reporters", "Inbound", "Board
+#        Candidates"). Independent of any organizational FK; a record can
+#        belong to any number of groups. Supports `is_system` for platform-
+#        managed groups users cannot rename or delete.
+#
+# Subclasses add the owning-entity M2M plus product-specific fields (e.g.
+# Beacon's `Tag.tag_type` enum, Yeoman's per-agency scoping) and any uniqueness
+# constraints (global vs. per-tenant). See keel CLAUDE.md "Groups & Tags on
+# People/Entity Records" for the design contract.
+# ---------------------------------------------------------------------------
+class AbstractTag(models.Model):
+    """Categorical label applied to records for filtering and search."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=120, blank=True)
+    description = models.TextField(blank=True)
+    color = models.CharField(
+        max_length=20, blank=True,
+        help_text=_('Optional hex code or named color.'),
+    )
+    is_system = models.BooleanField(
+        default=False,
+        help_text=_('System-managed tags cannot be renamed or deleted by users.'),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class AbstractGroup(models.Model):
+    """User-curated cohort of records, independent of organizational parent.
+
+    A record can belong to any number of groups. Groups do NOT imply an org
+    or parent affiliation — that is the job of a product-specific FK
+    (e.g. Beacon's `Contact.company`). System groups (`is_system=True`) are
+    created by intake code and should not be renamed or deleted by users.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=120, blank=True)
+    description = models.TextField(blank=True)
+    color = models.CharField(
+        max_length=20, blank=True,
+        help_text=_('Optional hex code or named color.'),
+    )
+    is_system = models.BooleanField(
+        default=False,
+        help_text=_('System-managed groups cannot be renamed or deleted by users.'),
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
