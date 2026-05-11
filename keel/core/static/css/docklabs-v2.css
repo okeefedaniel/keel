@@ -2435,3 +2435,118 @@ summary:focus-visible,
     border-color: transparent;
     background: transparent;
 }
+
+/* =============================================
+   22. Status dots — calm, low-saturation status markers
+   The default visual treatment for a status field across
+   the suite. A 6px colored dot + the label rendered in
+   body text color. No background fill, no border, no
+   shouting saturation. Reserve .dl-status-pill for
+   exception states the user must act on.
+
+   See keel/CLAUDE.md → "Status pills — default to text +
+   dot, not filled colored pills" for the rule + rationale.
+   ============================================= */
+:root {
+    /* Status color palette. Hues are pulled from the existing
+       semantic tokens but desaturated/darkened so the dot reads
+       calmly on the cream background and the (rare) filled
+       exception pill doesn't shout. */
+    --status-received:     #8A8275;    /* warm muted */
+    --status-draft:        #8A8275;
+    --status-cancelled:    #8A8275;
+    --status-scheduled:    #2C5F8D;    /* info blue */
+    --status-in-progress:  #2C5F8D;
+    --status-completed:    #2D5F3F;    /* forest */
+    --status-approved:     #2D5F3F;
+    --status-declined:     #8B2E2A;    /* brick */
+    --status-needs-info:   #B8860B;    /* brass — needs action */
+    --status-blocked:      #8B2E2A;
+    --status-failed:       #8B2E2A;
+    --status-urgent:       #8B2E2A;
+    --status-overdue:      #8B2E2A;
+}
+
+.dl-status-dot {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5em;
+    color: var(--text-primary);
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    white-space: nowrap;
+    --status-color: var(--text-tertiary);
+}
+.dl-status-dot::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--status-color);
+    /* Nudge the dot down so its visual centre lines up with
+       text x-height instead of the baseline. */
+    transform: translateY(-1px);
+    flex: 0 0 auto;
+}
+
+/* Status modifiers — each sets the --status-color custom
+   property so the ::before background picks it up. Add new
+   statuses by extending this list, not by adding new dot
+   markup. */
+.dl-status-dot--received     { --status-color: var(--status-received); }
+.dl-status-dot--draft        { --status-color: var(--status-draft); }
+.dl-status-dot--cancelled    { --status-color: var(--status-cancelled); }
+.dl-status-dot--scheduled    { --status-color: var(--status-scheduled); }
+.dl-status-dot--in-progress,
+.dl-status-dot--in_progress  { --status-color: var(--status-in-progress); }
+.dl-status-dot--completed    { --status-color: var(--status-completed); }
+.dl-status-dot--approved     { --status-color: var(--status-approved); }
+.dl-status-dot--declined     { --status-color: var(--status-declined); }
+.dl-status-dot--needs-info,
+.dl-status-dot--needs_info   { --status-color: var(--status-needs-info); }
+.dl-status-dot--blocked      { --status-color: var(--status-blocked); }
+.dl-status-dot--failed       { --status-color: var(--status-failed); }
+.dl-status-dot--urgent       { --status-color: var(--status-urgent); }
+.dl-status-dot--overdue      { --status-color: var(--status-overdue); }
+
+/* Exception variant — for URGENT / OVERDUE / NEEDS INFO /
+   BLOCKED / FAILED only. Same dot, but the row gets a
+   hairline border + a 12% tint of the status color so it
+   reads as "you must act on this" without crossing into
+   color-soup territory. */
+.dl-status-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5em;
+    color: var(--text-primary);
+    font-size: inherit;
+    font-weight: 500;
+    line-height: 1.2;
+    padding: 2px 8px;
+    border: 1px solid color-mix(in srgb, var(--status-color) 30%, var(--border));
+    background: color-mix(in srgb, var(--status-color) 12%, transparent);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    --status-color: var(--status-urgent);
+}
+.dl-status-pill::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--status-color);
+    transform: translateY(-1px);
+    flex: 0 0 auto;
+}
+.dl-status-pill--needs-info,
+.dl-status-pill--needs_info { --status-color: var(--status-needs-info); }
+.dl-status-pill--blocked    { --status-color: var(--status-blocked); }
+.dl-status-pill--failed     { --status-color: var(--status-failed); }
+.dl-status-pill--urgent     { --status-color: var(--status-urgent); }
+.dl-status-pill--overdue    { --status-color: var(--status-overdue); }
