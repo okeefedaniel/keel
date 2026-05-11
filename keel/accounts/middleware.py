@@ -14,6 +14,7 @@ Usage in product settings.py:
 """
 import base64
 import logging
+import os
 from datetime import datetime
 from urllib.parse import quote, urlencode
 
@@ -157,7 +158,15 @@ class AutoOIDCLoginMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.client_id = getattr(settings, 'KEEL_OIDC_CLIENT_ID', '')
-        self.demo_force_oidc = getattr(settings, 'KEEL_DEMO_FORCE_OIDC', False)
+        # Read from Django settings first; fall back to env var so the
+        # toggle works without forcing every consumer's settings.py to
+        # add an explicit `KEEL_DEMO_FORCE_OIDC = os.environ.get(...)`
+        # line. This is a deployment-time toggle, not a code-level one.
+        self.demo_force_oidc = bool(
+            getattr(settings, 'KEEL_DEMO_FORCE_OIDC', False)
+            or os.environ.get('KEEL_DEMO_FORCE_OIDC', '').lower()
+            in ('true', '1', 'yes')
+        )
 
     def __call__(self, request):
         # Demo instances deliberately don't auto-bounce through OIDC by
@@ -272,11 +281,15 @@ class SessionFreshnessMiddleware:
         # Effective only when we have everything we need to call Keel.
         # Demo instances normally skip session-freshness polling; setting
         # KEEL_DEMO_FORCE_OIDC=True opts them back in so a cross-suite
-        # demo's logout chain behaves like prod.
-        demo_skip = (
-            getattr(settings, 'DEMO_MODE', False)
-            and not getattr(settings, 'KEEL_DEMO_FORCE_OIDC', False)
+        # demo's logout chain behaves like prod. Same env-var fallback
+        # as AutoOIDCLoginMiddleware (above) so the toggle works without
+        # touching each product's settings.py.
+        force = bool(
+            getattr(settings, 'KEEL_DEMO_FORCE_OIDC', False)
+            or os.environ.get('KEEL_DEMO_FORCE_OIDC', '').lower()
+            in ('true', '1', 'yes')
         )
+        demo_skip = getattr(settings, 'DEMO_MODE', False) and not force
         self.enabled = bool(
             self.client_id
             and self.client_secret
