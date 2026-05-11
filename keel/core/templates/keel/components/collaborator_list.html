@@ -1,0 +1,110 @@
+{% comment %}
+Collaborator list — renders an AbstractCollaborator queryset grouped by role.
+
+Usage:
+    {% include "keel/components/collaborator_list.html" with collaborators=invitation.collaborators.all assignment=invitation.assignments.first invite_action=invite_url remove_action=remove_url csrf_token=csrf_token %}
+
+Each collaborator object must come from a model extending AbstractCollaborator
+(role choices: lead/contributor/reviewer/observer; fields: user, email, name,
+invited_at, accepted_at, is_active, is_external, is_pending).
+
+`assignment` is optional — pass the active AbstractAssignment row to show a
+"Claimed by …" header. `invite_action` enables the inline invite form.
+`remove_action` enables a per-row remove control (POSTs `collaborator_id`).
+{% endcomment %}
+{% load humanize %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-bold"><i class="bi bi-people me-1"></i>Collaborators</span>
+        {% if collaborators %}<span class="badge bg-secondary">{{ collaborators|length }}</span>{% endif %}
+    </div>
+    <div class="card-body">
+        {% if assignment and assignment.assigned_to %}
+        <div class="d-flex align-items-center mb-3 pb-3 border-bottom">
+            <div class="flex-shrink-0 me-2">
+                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                    <i class="bi bi-flag-fill"></i>
+                </div>
+            </div>
+            <div class="flex-grow-1 small">
+                <div class="text-muted text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ assignment.get_assignment_type_display }}</div>
+                <div><strong>{{ assignment.assigned_to.get_full_name|default:assignment.assigned_to.username }}</strong>
+                  <span class="text-muted">— {{ assignment.get_status_display|lower }}</span></div>
+            </div>
+            <div class="text-muted small">{{ assignment.claimed_at|naturaltime }}</div>
+        </div>
+        {% endif %}
+
+        {% if collaborators %}
+        {% regroup collaborators by role as role_groups %}
+        {% for group in role_groups %}
+        <div class="mb-3">
+            <div class="text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+                {{ group.grouper|title }}{% if group.list|length > 1 %}s{% endif %}
+            </div>
+            {% for c in group.list %}
+            <div class="d-flex align-items-center mb-2 {% if not forloop.last %}{% endif %}">
+                <div class="flex-shrink-0 me-2">
+                    <div class="rounded-circle {% if c.role == 'lead' %}bg-primary{% elif c.role == 'reviewer' %}bg-info{% elif c.role == 'observer' %}bg-secondary{% else %}bg-dark{% endif %} text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                        {% if c.user %}{{ c.user.first_name|default:c.user.username|first|upper }}{% else %}{{ c.name|default:c.email|first|upper }}{% endif %}
+                    </div>
+                </div>
+                <div class="flex-grow-1">
+                    <div>
+                        <strong>{% if c.user %}{{ c.user.get_full_name|default:c.user.username }}{% else %}{{ c.name|default:c.email }}{% endif %}</strong>
+                        {% if c.is_external %}<span class="badge bg-light text-dark ms-1" title="External invite">External</span>{% endif %}
+                        {% if c.is_pending %}<span class="badge bg-warning text-dark ms-1" title="Invite not yet accepted">Pending</span>{% endif %}
+                        {% if not c.is_active %}<span class="badge bg-secondary ms-1">Inactive</span>{% endif %}
+                    </div>
+                    <div class="small text-muted">
+                        {% if c.user and c.user.email %}{{ c.user.email }}{% elif c.email %}{{ c.email }}{% endif %}
+                        &middot; invited {{ c.invited_at|naturaltime }}
+                    </div>
+                </div>
+                {% if remove_action %}
+                <form method="post" action="{{ remove_action }}" class="ms-2"
+                      onsubmit="return confirm('Remove this collaborator?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="collaborator_id" value="{{ c.pk }}">
+                    <button type="submit" class="btn btn-sm btn-link text-muted p-0" title="Remove">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-muted small mb-3"><i class="bi bi-person-plus me-1"></i>No collaborators yet.</p>
+        {% endif %}
+
+        {% if invite_action %}
+        <hr>
+        <form method="post" action="{{ invite_action }}">
+            {% csrf_token %}
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-5">
+                    <label class="form-label small text-muted mb-1">User or email</label>
+                    <input type="text" name="identifier" class="form-control form-control-sm"
+                           placeholder="username or external@example.com" required>
+                </div>
+                <div class="col-7 col-md-4">
+                    <label class="form-label small text-muted mb-1">Role</label>
+                    <select name="role" class="form-select form-select-sm">
+                        <option value="contributor" selected>Contributor</option>
+                        <option value="lead">Lead</option>
+                        <option value="reviewer">Reviewer</option>
+                        <option value="observer">Observer</option>
+                    </select>
+                </div>
+                <div class="col-5 col-md-3">
+                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-person-plus me-1"></i>Invite
+                    </button>
+                </div>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</div>
