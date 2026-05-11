@@ -157,18 +157,26 @@ class AutoOIDCLoginMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.client_id = getattr(settings, 'KEEL_OIDC_CLIENT_ID', '')
+        self.demo_force_oidc = getattr(settings, 'KEEL_DEMO_FORCE_OIDC', False)
 
     def __call__(self, request):
+        # Demo instances deliberately don't auto-bounce through OIDC by
+        # default — they're supposed to have only the one-click demo role
+        # users, and auto-starting SSO would lay a real DockLabs identity
+        # row in the demo DB. Set KEEL_DEMO_FORCE_OIDC=True on a demo
+        # instance that IS supposed to act as a real OIDC client (e.g. a
+        # cross-suite demo where demo-keel is the IdP and the fleet
+        # walkthrough should SSO across products without re-login).
+        demo_skip = (
+            getattr(settings, 'DEMO_MODE', False)
+            and not self.demo_force_oidc
+        )
         if (
             self.client_id
             and request.method in ('GET', 'HEAD')
             and request.path in _LOGIN_PATHS
             and 'next' in request.GET
-            # Demo instances deliberately don't auto-bounce through OIDC.
-            # They're supposed to have only the one-click demo role users;
-            # if we auto-started SSO here a real DockLabs identity would
-            # get a lingering user row in the demo DB.
-            and not getattr(settings, 'DEMO_MODE', False)
+            and not demo_skip
         ):
             user = getattr(request, 'user', None)
             if user is None or not user.is_authenticated:
@@ -262,11 +270,18 @@ class SessionFreshnessMiddleware:
             getattr(settings, 'KEEL_EXEMPT_PATHS', DEFAULT_EXEMPT_PATHS)
         )
         # Effective only when we have everything we need to call Keel.
+        # Demo instances normally skip session-freshness polling; setting
+        # KEEL_DEMO_FORCE_OIDC=True opts them back in so a cross-suite
+        # demo's logout chain behaves like prod.
+        demo_skip = (
+            getattr(settings, 'DEMO_MODE', False)
+            and not getattr(settings, 'KEEL_DEMO_FORCE_OIDC', False)
+        )
         self.enabled = bool(
             self.client_id
             and self.client_secret
             and self.status_url
-            and not getattr(settings, 'DEMO_MODE', False)
+            and not demo_skip
         )
 
     def __call__(self, request):
