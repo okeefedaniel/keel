@@ -146,6 +146,58 @@ def user_avatar(user, size=40):
 
 
 # =========================================================================
+# Status dots — suite-wide visual treatment for status fields.
+# See keel/CLAUDE.md "Status pills — default to text + dot" for the rule.
+# =========================================================================
+
+# Statuses that justify the filled exception variant. Anything else
+# gets the calm dot+text treatment. Keep this list short — every
+# addition is more shouting on the page.
+EXCEPTION_STATUSES = frozenset({
+    'urgent', 'overdue', 'needs_info', 'needs-info',
+    'blocked', 'failed',
+})
+
+
+@register.simple_tag
+def status_dot(value, label=None, exception=None):
+    """Render a calm dot+label or filled exception pill for *value*.
+
+    ``value`` is the status slug (e.g. ``"received"``, ``"needs_info"``).
+    ``label`` defaults to the title-cased value with underscores/hyphens
+    swapped for spaces. Pass ``exception=True`` / ``exception=False`` to
+    override the auto-routing.
+
+    Usage::
+
+        {% load keel_tags %}
+        {% status_dot record.status %}
+        {% status_dot record.status "Awaiting review" %}
+        {% status_dot "needs_info" exception=True %}
+    """
+    slug = (str(value) if value is not None else '').strip().lower()
+    if not slug:
+        return ''
+
+    if label is None:
+        label = slug.replace('_', ' ').replace('-', ' ').title()
+
+    if exception is None:
+        exception = slug in EXCEPTION_STATUSES
+
+    base_class = 'dl-status-pill' if exception else 'dl-status-dot'
+    # Normalize the modifier so both "needs_info" and "needs-info"
+    # land on the same class hook (CSS declares both forms).
+    modifier = slug.replace('_', '-')
+    return format_html(
+        '<span class="{base} {base}--{modifier}">{label}</span>',
+        base=base_class,
+        modifier=modifier,
+        label=label,
+    )
+
+
+# =========================================================================
 # AI feature gating
 # =========================================================================
 
