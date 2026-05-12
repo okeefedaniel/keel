@@ -15,6 +15,7 @@ from keel.core.views import favicon_view, robots_txt, suite_logout_endpoint
 from keel.oidc.views import session_status as oidc_session_status
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
+from .audit.views import AuditLogListView
 
 
 def home(request):
@@ -137,6 +138,9 @@ urlpatterns = [
     path('tools/', tools.tools_dashboard, name='tools_dashboard'),
     path('tools/run/', tools.run_tool, name='tools_run'),
     path('tools/run/<str:run_id>/', tools.run_detail, name='tools_run_detail'),
+
+    # Cross-product audit log
+    path('audit/', AuditLogListView.as_view(), name='audit'),
 
     # Django admin (fallback)
     path('admin/', admin.site.urls),
