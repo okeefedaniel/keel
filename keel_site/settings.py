@@ -66,6 +66,8 @@ INSTALLED_APPS = [
     'keel.ai.apps.KeelAIConfig',  # /api/v1/ai/key/ — user AI key handoff
     'keel.settings.apps.KeelSettingsConfig',  # /settings/ panel framework
     'keel.oidc.apps.KeelOIDCConfig',  # Phase 2b: OIDC validator + claims
+    # keel_site local apps
+    'keel_site.audit.apps.AuditConfig',  # /audit/ cross-product audit log
 ]
 
 # ---------------------------------------------------------------------------

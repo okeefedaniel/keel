@@ -2435,3 +2435,85 @@ summary:focus-visible,
     border-color: transparent;
     background: transparent;
 }
+
+/* ===========================================================================
+ * Audit page (/audit/) — cross-product audit browse
+ * Lives in the shared design system so any product that adopts an audit
+ * surface inherits the same chip / row palette (review decision D8).
+ * =========================================================================== */
+
+.audit-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    border: 1px solid transparent;
+    background: var(--bs-light, #f8f9fa);
+    color: var(--bs-body-color);
+}
+.audit-chip-ok           { background:#d1e7dd; color:#0a3622; border-color:#a3cfbb; }
+.audit-chip-pending      { background:#e9ecef; color:#495057; border-color:#dee2e6; }
+.audit-chip-unauthorized { background:#fff3cd; color:#664d03; border-color:#ffe69c; }
+.audit-chip-timeout      { background:#ffe5d0; color:#7a3e00; border-color:#fdcfa6; }
+.audit-chip-error        { background:#f8d7da; color:#58151c; border-color:#f1aeb5; }
+.audit-chip .bi          { font-size: 0.9rem; }
+
+/* Row tints — color PLUS icon prefix (the .audit-row-icon cell) so users
+ * who can't distinguish red/yellow still see the SECURITY_EVENT /
+ * LOGIN_FAILED signal (review decision D4, a11y). */
+.audit-row-security      { background-color: rgba(220, 53, 69, 0.10); }
+.audit-row-security:hover{ background-color: rgba(220, 53, 69, 0.18) !important; }
+.audit-row-login-failed  { background-color: rgba(255, 193, 7, 0.14); }
+.audit-row-login-failed:hover { background-color: rgba(255, 193, 7, 0.22) !important; }
+.audit-row-icon { width: 1.5rem; text-align: center; }
+
+.audit-cell-link {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(108, 117, 125, 0.5);
+    cursor: pointer;
+}
+.audit-cell-link:hover,
+.audit-cell-link:focus-visible {
+    color: var(--bs-primary, #0d6efd);
+    border-bottom-color: var(--bs-primary, #0d6efd);
+    border-bottom-width: 2px;
+    outline: none;
+}
+
+/* Clickable status chips — feedback that the chip is a filter shortcut. */
+.audit-chip-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: filter 0.1s ease;
+}
+.audit-chip-link:hover { filter: brightness(0.95); }
+.audit-chip-link:focus-visible {
+    outline: 2px solid var(--bs-primary, #0d6efd);
+    outline-offset: 2px;
+}
+
+/* Filters drawer summary focus state */
+.dl-filters-collapse summary:focus-visible {
+    outline: 2px solid var(--bs-primary, #0d6efd);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+}
+
+.audit-filter-bar .form-control,
+.audit-filter-bar .form-select { font-size: 0.875rem; }
+
+/* Mobile filters collapse — decision D3 */
+@media (max-width: 767.98px) {
+    .dl-filters-collapse summary { display: block; }
+    .dl-filters-collapse:not([open]) .audit-filter-bar { display: none; }
+}
+@media (min-width: 768px) {
+    .dl-filters-collapse summary { display: none; }
+    .dl-filters-collapse[open] .audit-filter-bar,
+    .dl-filters-collapse .audit-filter-bar { display: flex; }
+}
