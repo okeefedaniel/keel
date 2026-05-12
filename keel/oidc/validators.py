@@ -44,6 +44,13 @@ def _build_validator_class():
         # silently strip it from every issued ID token. Adding a claim
         # here without wiring the scope mapping is the failure mode
         # ``validate_claim_scope`` exists to catch.
+        #
+        # The ``ProductAccess``-derived claims (``product_access``,
+        # ``beta_products``, ``ai_enabled_products``) are sourced from
+        # ``keel.accounts.models.SYNCED_FIELDS`` — that registry is the
+        # single source of truth for which ``ProductAccess`` fields
+        # cross the OIDC boundary. ``validate_claim_scope`` cross-checks
+        # the registry against the entries below.
         DOCKLABS_CUSTOM_CLAIMS = frozenset({
             'product_access',
             'beta_products',
@@ -145,6 +152,32 @@ def _build_validator_class():
                     "remove the oidc_claim_scope entry."
                 )
 
+            # SYNCED_FIELDS check: every ProductAccess field that's
+            # supposed to cross the OIDC boundary must have its claim
+            # wired into both DOCKLABS_CUSTOM_CLAIMS and oidc_claim_scope.
+            # This is the boot-time guard that closes the discipline gap
+            # that let ``is_beta_tester`` ship as a no-op for months.
+            try:
+                from keel.accounts.models import SYNCED_FIELDS
+            except Exception:
+                SYNCED_FIELDS = ()
+            missing_pa = []
+            for sf in SYNCED_FIELDS:
+                if (sf.claim not in cls.DOCKLABS_CUSTOM_CLAIMS
+                        or sf.claim not in cls.oidc_claim_scope):
+                    missing_pa.append((sf.field, sf.claim))
+            if missing_pa:
+                raise ImproperlyConfigured(
+                    "KeelOIDCValidator: the following ProductAccess "
+                    "fields are registered in SYNCED_FIELDS but their "
+                    "claim names are missing from DOCKLABS_CUSTOM_CLAIMS "
+                    f"or oidc_claim_scope: {missing_pa}. Each entry needs "
+                    "both a claim registration and a scope mapping, or "
+                    "the field will silently fail to propagate to consumer "
+                    "products (the failure mode that let is_beta_tester "
+                    "ship as a no-op for months)."
+                )
+
         def get_additional_claims(self, request):
             """Build the DockLabs claims dict for the requesting user.
 
@@ -205,37 +238,26 @@ def _build_validator_class():
                 except Exception:
                     pass
 
-            # Per-product role mapping — the heart of suite SSO.
-            # Read every active ProductAccess record for this user and embed
-            # them as a {product_code: role} dict in the token.
+            # Per-product ProductAccess claims — driven by SYNCED_FIELDS
+            # so adding a new field to ProductAccess only has to be wired
+            # in three places (the registry, DOCKLABS_CUSTOM_CLAIMS, and
+            # oidc_claim_scope) instead of also requiring a hand-rolled
+            # emit block here. The boot-time check in validate_claim_scope
+            # catches drift.
             try:
-                from keel.accounts.models import ProductAccess
-                access_qs = ProductAccess.objects.filter(
-                    user=user,
-                    is_active=True,
-                ).values_list('product', 'role')
-                claims['product_access'] = {p: r for p, r in access_qs}
+                from keel.accounts.models import SYNCED_FIELDS, emit_synced_claim
+                for sf in SYNCED_FIELDS:
+                    claims[sf.claim] = emit_synced_claim(sf, user)
             except Exception:
                 # Table doesn't exist yet (initial migration) or any other
-                # error: omit the claim rather than failing token issuance.
-                claims['product_access'] = {}
-
-            # Beta-tester membership — a list of product codes where this
-            # user has ``is_beta_tester=True``. Separate from
-            # ``product_access`` so the existing {product: role} shape
-            # stays untouched. Gated on the same ``product_access`` scope
-            # so products pick it up automatically on keel bump without
-            # updating their requested-scopes list.
-            try:
-                from keel.accounts.models import ProductAccess
-                beta_qs = ProductAccess.objects.filter(
-                    user=user,
-                    is_active=True,
-                    is_beta_tester=True,
-                ).values_list('product', flat=True)
-                claims['beta_products'] = sorted(beta_qs)
-            except Exception:
-                claims['beta_products'] = []
+                # error: emit empty values for every SYNCED_FIELDS claim
+                # rather than failing token issuance.
+                try:
+                    from keel.accounts.models import SYNCED_FIELDS
+                    for sf in SYNCED_FIELDS:
+                        claims[sf.claim] = [] if sf.shape == 'list' else {}
+                except Exception:
+                    pass
 
             # Organization claims — what customer this user belongs to.
             # Wrapped in the same defensive try/except as product_access
@@ -257,19 +279,13 @@ def _build_validator_class():
                 claims['organization'] = None
                 claims['organization_name'] = None
 
-            # AI gating claims (``ai`` scope). ``ai_enabled_products``
-            # is the intersection of org-sub.ai_enabled and per-user
-            # ProductAccess.ai_enabled — the set of products where this
-            # user can see AI surfaces. ``ai_key_present`` is whether
-            # the user has set an Anthropic key on Keel; products use
-            # it to decide whether to render AI surfaces in active
-            # state or in the "needs key" prompt state without having
-            # to make a separate Keel API call.
-            try:
-                from keel.core.ai_access import ai_enabled_products_for_user
-                claims['ai_enabled_products'] = ai_enabled_products_for_user(user)
-            except Exception:
-                claims['ai_enabled_products'] = []
+            # ``ai_key_present`` is whether the user has set an Anthropic
+            # key on Keel — products use it to decide whether to render AI
+            # surfaces in active state or in the "needs key" prompt state
+            # without having to make a separate Keel API call. The
+            # companion ``ai_enabled_products`` claim is emitted above by
+            # SYNCED_FIELDS (via a custom builder that returns the
+            # org-sub × per-user intersection).
             try:
                 claims['ai_key_present'] = bool(user.has_anthropic_key())
             except Exception:
