@@ -166,6 +166,78 @@ def _is_keel_provider(sociallogin) -> bool:
         return False
 
 
+def _mirror_product_access(user, claims) -> int:
+    """Mirror per-product fields from a Keel JWT into local ``ProductAccess``.
+
+    Single call site for both ``pre_social_login`` (returning users) and
+    ``save_user`` (new users). Drives field assignments off
+    ``keel.accounts.models.SYNCED_FIELDS`` so adding a new field to
+    ``ProductAccess`` only requires updating the registry — not these
+    two adapter call sites.
+
+    Returns the number of rows written (zero on any failure or empty
+    claim set). The caller is expected to have already vetted that
+    this login came from the Keel OIDC provider.
+    """
+    try:
+        from keel.accounts.models import ProductAccess, mirror_synced_fields
+    except Exception:
+        logger.exception(
+            'SSO: keel.accounts not importable; cannot mirror product_access'
+        )
+        return 0
+    defaults_by_code = mirror_synced_fields(claims)
+    if not defaults_by_code:
+        return 0
+    written = 0
+    try:
+        for code, defaults in defaults_by_code.items():
+            # Drop any defaults the local schema doesn't have. Older
+            # product DBs migrated before a new ProductAccess column
+            # exists would otherwise crash the entire login.
+            safe_defaults = {
+                k: v for k, v in defaults.items()
+                if _product_access_has_field(ProductAccess, k)
+            }
+            if not safe_defaults:
+                continue
+            ProductAccess.objects.update_or_create(
+                user=user, product=code, defaults=safe_defaults,
+            )
+            written += 1
+    except Exception:
+        logger.exception(
+            'SSO: Failed to mirror product_access for %s', user,
+        )
+        return written
+    if written:
+        logger.info(
+            'SSO: Mirrored Keel ProductAccess claims for %s: %d row(s)',
+            user, written,
+        )
+    return written
+
+
+def _product_access_has_field(model, field_name) -> bool:
+    """Return True when the local ProductAccess model declares this field.
+
+    Cached on the function object — products don't add fields at runtime.
+    """
+    cache = _product_access_has_field._cache
+    key = (model, field_name)
+    if key in cache:
+        return cache[key]
+    try:
+        model._meta.get_field(field_name)
+        cache[key] = True
+    except Exception:
+        cache[key] = False
+    return cache[key]
+
+
+_product_access_has_field._cache = {}
+
+
 def _extract_keel_claims(sociallogin) -> dict:
     """Pull OIDC claims out of the sociallogin extra_data.
 
@@ -374,31 +446,10 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                         )
 
                 # --- ProductAccess rows ------------------------------------
-                product_access = claims.get('product_access') or {}
-                beta_set = {
-                    str(p).lower() for p in (claims.get('beta_products') or [])
-                }
-                if isinstance(product_access, dict) and product_access:
-                    try:
-                        from keel.accounts.models import ProductAccess
-                        for prod, role in product_access.items():
-                            if not prod or not role:
-                                continue
-                            code = str(prod).lower()
-                            ProductAccess.objects.update_or_create(
-                                user=u,
-                                product=code,
-                                defaults={
-                                    'role': role,
-                                    'is_active': True,
-                                    'is_beta_tester': code in beta_set,
-                                },
-                            )
-                    except Exception:
-                        logger.exception(
-                            'SSO: Failed to refresh product_access for %s',
-                            u,
-                        )
+                # Driven by SYNCED_FIELDS so adding a field to
+                # ProductAccess only requires updating the registry, not
+                # this site and ``save_user`` separately.
+                _mirror_product_access(u, claims)
             return
 
         # --- Microsoft Entra ID path (unchanged) --------------------------
@@ -539,34 +590,7 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
         # --- Keel OIDC path: mirror the full product_access claim --------
         if _is_keel_provider(sociallogin):
             claims = _extract_keel_claims(sociallogin)
-            product_access = claims.get('product_access') or {}
-            beta_set = {
-                str(p).lower() for p in (claims.get('beta_products') or [])
-            }
-            if isinstance(product_access, dict) and product_access:
-                try:
-                    from keel.accounts.models import ProductAccess
-                    for prod, role in product_access.items():
-                        if not prod or not role:
-                            continue
-                        code = str(prod).lower()
-                        ProductAccess.objects.update_or_create(
-                            user=user,
-                            product=code,
-                            defaults={
-                                'role': role,
-                                'is_active': True,
-                                'is_beta_tester': code in beta_set,
-                            },
-                        )
-                    logger.info(
-                        'SSO: Mirrored Keel product_access claim for %s: %s',
-                        user, list(product_access.keys()),
-                    )
-                except Exception:
-                    logger.exception(
-                        'SSO: Failed to mirror product_access claim for %s', user,
-                    )
+            _mirror_product_access(user, claims)
             return user
 
         # --- Microsoft / default path: grant access to current product ---

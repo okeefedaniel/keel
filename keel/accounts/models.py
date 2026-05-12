@@ -777,6 +777,171 @@ class ProductAccess(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# OIDC sync registry — single source of truth for the fields on
+# ``ProductAccess`` that cross the OIDC boundary.
+#
+# Three places must agree on every field that's synced from Keel's
+# canonical ``ProductAccess`` to a consumer product's mirror:
+#
+#   1. ``KeelOIDCValidator.get_additional_claims`` emits the claim.
+#   2. ``KeelOIDCValidator.oidc_claim_scope`` gates the claim on a
+#      scope so django-oauth-toolkit doesn't strip it.
+#   3. ``KeelSocialAccountAdapter`` reads the claim and writes the
+#      field on the local ``ProductAccess`` row.
+#
+# Forgetting any one of those three silently drops the field on every
+# token. ``is_beta_tester`` shipped in this state for months — admins
+# ticked the flag in Keel admin and saw no observable effect downstream.
+# This registry forces all three sites to read from one structure, and
+# ``KeelOIDCValidator.validate_claim_scope`` runs a boot-time check that
+# every entry here is wired into the scope mapping.
+# ---------------------------------------------------------------------------
+class SyncedField:
+    """Declares one ``ProductAccess`` field that crosses the OIDC boundary.
+
+    ``field``: attribute name on ``ProductAccess`` (e.g. ``'role'``).
+
+    ``claim``: JWT claim name carrying the value (e.g. ``'beta_products'``).
+    Must also appear as a key in ``KeelOIDCValidator.oidc_claim_scope``.
+
+    ``shape``: one of ``'dict'`` or ``'list'``.
+    - ``'dict'`` emits ``{product_code: value}`` — for string-valued
+      fields like ``role``.
+    - ``'list'`` emits a sorted list of product codes where the
+      boolean field is True — for flag fields like ``is_beta_tester``.
+
+    ``builder``: optional callable ``builder(user) -> claim_value`` that
+    overrides the default per-user query. Used by ``ai_enabled``, whose
+    canonical claim value is the intersection of org-sub × per-user
+    rather than the raw per-user value. The adapter always interprets
+    the claim through its declared shape regardless of how it was built.
+    """
+
+    __slots__ = ('field', 'claim', 'shape', 'builder')
+
+    def __init__(self, field, claim, shape, builder=None):
+        if shape not in ('dict', 'list'):
+            raise ValueError(
+                f'SyncedField {field!r}: shape must be "dict" or "list", '
+                f'got {shape!r}'
+            )
+        self.field = field
+        self.claim = claim
+        self.shape = shape
+        self.builder = builder
+
+    def __repr__(self):
+        return f'SyncedField({self.field!r} → {self.claim!r}, {self.shape})'
+
+
+def _build_ai_enabled_claim(user):
+    """Override builder for ``ai_enabled`` → ``ai_enabled_products``.
+
+    The canonical claim semantics are the intersection of
+    ``OrganizationProductSubscription.ai_enabled`` × per-user
+    ``ProductAccess.ai_enabled``, not the raw per-user flag. The
+    adapter still mirrors the intersection result back to the local
+    per-user row — that's correct on consumer products because they
+    don't carry the org-sub data and derive effective AI from the
+    local ``ProductAccess.ai_enabled`` directly.
+    """
+    from keel.core.ai_access import ai_enabled_products_for_user
+    return ai_enabled_products_for_user(user)
+
+
+#: Tuple of every ``ProductAccess`` field that must cross the OIDC
+#: boundary. Adding a new field to ``ProductAccess`` that should be
+#: visible to consumer products means: (1) append a ``SyncedField`` here,
+#: (2) add the matching scope mapping to ``oidc_claim_scope`` on
+#: ``KeelOIDCValidator``, (3) add the claim name to ``DOCKLABS_CUSTOM_CLAIMS``.
+#: The boot-time check raises ``ImproperlyConfigured`` if any of those
+#: three are missing.
+SYNCED_FIELDS = (
+    SyncedField('role', 'product_access', 'dict'),
+    SyncedField('is_beta_tester', 'beta_products', 'list'),
+    SyncedField('ai_enabled', 'ai_enabled_products', 'list',
+                builder=_build_ai_enabled_claim),
+)
+
+
+def emit_synced_claim(field, user):
+    """Build the claim value for a single ``SyncedField`` from a user.
+
+    Used by the validator's ``get_additional_claims``. Returns the
+    declared shape's empty value (``{}`` or ``[]``) on any error so
+    token issuance never fails on a per-claim query.
+    """
+    if field.builder is not None:
+        try:
+            return field.builder(user)
+        except Exception:
+            return [] if field.shape == 'list' else {}
+    try:
+        qs = ProductAccess.objects.filter(user=user, is_active=True)
+        if field.shape == 'dict':
+            return {
+                p: v for p, v in qs.values_list('product', field.field)
+            }
+        # 'list': product codes where the flag is True
+        return sorted(
+            qs.filter(**{field.field: True}).values_list('product', flat=True)
+        )
+    except Exception:
+        return [] if field.shape == 'list' else {}
+
+
+def mirror_synced_fields(claims):
+    """Translate JWT claims into a ``defaults`` dict keyed by product code.
+
+    Returns ``{product_code: {field_name: value, ...}}`` ready to drop
+    into ``ProductAccess.objects.update_or_create(defaults=...)``. The
+    SSO adapter calls this once per login and iterates the result.
+
+    For ``shape='dict'`` claims (e.g. ``product_access``), the value
+    for each code is the dict's value. For ``shape='list'`` claims
+    (e.g. ``beta_products``, ``ai_enabled_products``), the value is
+    ``True`` if the code is in the list, else ``False``.
+
+    Empty/malformed claims are tolerated silently — a missing claim
+    simply doesn't contribute to ``defaults``, leaving the existing
+    row value untouched (or, on first sync, the model default).
+    """
+    product_codes = set()
+    per_field = {}
+
+    for sf in SYNCED_FIELDS:
+        value = claims.get(sf.claim)
+        if sf.shape == 'dict':
+            if not isinstance(value, dict):
+                continue
+            per_field[sf] = {
+                str(k).lower(): v for k, v in value.items()
+                if k and v not in (None, '')
+            }
+            product_codes.update(per_field[sf].keys())
+        else:  # 'list'
+            if not isinstance(value, (list, tuple, set)):
+                continue
+            per_field[sf] = {str(k).lower() for k in value if k}
+
+    defaults_by_code = {}
+    for code in product_codes:
+        defaults = {}
+        for sf in SYNCED_FIELDS:
+            if sf not in per_field:
+                continue
+            if sf.shape == 'dict':
+                if code in per_field[sf]:
+                    defaults[sf.field] = per_field[sf][code]
+            else:
+                defaults[sf.field] = code in per_field[sf]
+        if defaults:
+            defaults['is_active'] = True
+            defaults_by_code[code] = defaults
+    return defaults_by_code
+
+
+# ---------------------------------------------------------------------------
 # Invitation — invite users to a product via email link
 # ---------------------------------------------------------------------------
 def _generate_token():
