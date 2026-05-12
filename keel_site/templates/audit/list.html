@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% load static %}
+{% load audit_tags %}
+
+{% block page_title %}Audit{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 audit-page">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Audit</h1>
+    <small class="text-muted">
+      Window {{ window_start|date:"Y-m-d H:i" }} &rarr; {{ window_end|date:"Y-m-d H:i" }} UTC
+    </small>
+  </div>
+
+  {# === Per-product status chip row (above filters — incident scan order, decision D1) === #}
+  {# Chips are clickable to scope the page to one product (closes the journey-loop gap design review flagged). #}
+  <div class="audit-chip-row d-flex flex-wrap gap-2 mb-3" role="status" aria-label="Per-product fetch status">
+    {% for code, status in per_product.items %}
+      {% filter_url 'products' code as chip_href %}
+      <a href="{{ chip_href }}"
+         class="audit-chip audit-chip-{{ status.status }} audit-chip-link"
+         aria-label="Filter to {{ code }}; status {{ status.status }}{% if status.capped %}, capped at 200{% endif %}"
+         title="{{ status.status|title }}{% if status.capped %} · {{ status.total_in_window }} entries, showing 200{% endif %}{% if status.error %} · {{ status.error }}{% endif %}">
+        <i class="bi
+          {% if status.status == 'ok' %}bi-check-circle
+          {% elif status.status == 'pending' %}bi-hourglass-split
+          {% elif status.status == 'unauthorized' %}bi-key
+          {% elif status.status == 'timeout' %}bi-clock
+          {% else %}bi-x-circle{% endif %}"></i>
+        {{ code|title }}
+        {% if status.capped %}<small class="text-muted ms-1">200+</small>{% endif %}
+      </a>
+    {% empty %}
+      <span class="text-muted small">No products visible in your scope.</span>
+    {% endfor %}
+  </div>
+
+  {% if all_failed %}
+  <div class="alert alert-danger py-2 mb-3" role="alert">
+    <i class="bi bi-exclamation-octagon me-2"></i>
+    All audit sources are unavailable. Results may be incomplete &mdash; see the status chips above for details.
+  </div>
+  {% endif %}
+
+  {# === T1: jump-to-security-events pill === #}
+  {% if security_event_count and security_event_url %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" role="alert">
+    <div>
+      <i class="bi bi-shield-exclamation me-2"></i>
+      <strong>{{ security_event_count }}</strong> security event{{ security_event_count|pluralize }} in window
+    </div>
+    <a href="{{ security_event_url }}" class="btn btn-sm btn-outline-warning">View all</a>
+  </div>
+  {% endif %}
+
+  {# === Filters (mobile: collapse into a drawer — decision D3) === #}
+  <details class="dl-filters-collapse mb-3" {% if request.GET %}open{% endif %}>
+    <summary class="d-md-none small text-muted mb-2" style="cursor:pointer;">
+      <i class="bi bi-funnel me-1"></i>Filters
+    </summary>
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-end audit-filter-bar">
+      <div class="flex-grow-0">
+        <label class="form-label small mb-1" for="id_window">Window</label>
+        {{ form.window }}
+      </div>
+      {% if form.window.value == 'custom' %}
+      <div class="flex-grow-0">
+        <label class="form-label small mb-1" for="id_window_from">From (UTC)</label>
+        {{ form.window_from }}
+      </div>
+      <div class="flex-grow-0">
+        <label class="form-label small mb-1" for="id_window_to">To (UTC)</label>
+        {{ form.window_to }}
+      </div>
+      {% endif %}
+      <div class="flex-grow-0">
+        <label class="form-label small mb-1" for="id_products">Products</label>
+        {{ form.products }}
+      </div>
+      <div class="flex-grow-0">
+        <label class="form-label small mb-1" for="id_actions">Actions</label>
+        {{ form.actions }}
+      </div>
+      <div class="flex-grow-1" style="min-width:200px;">
+        <label class="form-label small mb-1" for="id_q">Keyword</label>
+        {{ form.q }}
+      </div>
+      <div>
+        <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+        <a href="{% url 'audit' %}" class="btn btn-sm btn-link">Reset</a>
+      </div>
+    </form>
+    {% if form.errors %}
+      <div class="text-danger small mt-2">
+        {% for field, errors in form.errors.items %}{% for e in errors %}{{ e }} {% endfor %}{% endfor %}
+      </div>
+    {% endif %}
+    <div class="form-text small">
+      Keyword matches description, entity, and user fields. Cross-product user-name
+      search is asymmetric &mdash; a user is only searchable on products they have
+      logged into. Use the per-row click filter for suite-wide user pivots.
+    </div>
+  </details>
+
+  {# === Audit table === #}
+  {# Multi-target rows (entity link + click-to-filter cells), so we intentionally #}
+  {# do NOT apply `table-clickable` here — decision D5. #}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle audit-table">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 1%"></th>
+          <th>Time</th>
+          <th>Product</th>
+          <th>Action</th>
+          <th>User</th>
+          <th>Entity</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in page %}
+        <tr class="{% if row.action == 'security_event' %}audit-row-security{% elif row.action == 'login_failed' %}audit-row-login-failed{% endif %}">
+          <td class="audit-row-icon">
+            {% if row.action == 'security_event' %}
+              <span class="visually-hidden">Security event:</span>
+              <i class="bi bi-shield-exclamation text-danger" aria-hidden="true"></i>
+            {% elif row.action == 'login_failed' %}
+              <span class="visually-hidden">Login failed:</span>
+              <i class="bi bi-x-circle text-warning" aria-hidden="true"></i>
+            {% endif %}
+          </td>
+          <td class="text-nowrap small">{{ row.timestamp|slice:":19" }}</td>
+          <td>{% filter_link "products" row.product %}</td>
+          <td>{% filter_link "actions" row.action %}</td>
+          <td>{% if row.user_username %}{% filter_link "q" row.user_username %}{% else %}<span class="text-muted">system</span>{% endif %}</td>
+          <td>{% audit_deep_link row %}</td>
+          <td class="small">{{ row.description|default:"" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="text-center py-4">
+          {% include "keel/components/empty_state.html" with icon="bi-clipboard-data" title="No audit entries match" %}
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# === Pagination === #}
+  {% if paginator.num_pages > 1 %}
+  <nav class="d-flex justify-content-between align-items-center mt-2">
+    <small class="text-muted">
+      Page {{ page.number }} of {{ paginator.num_pages }} &middot; {{ paginator.count }} entries
+    </small>
+    <ul class="pagination pagination-sm mb-0">
+      {% if page.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?{% if base_querystring %}{{ base_querystring }}&{% endif %}page={{ page.previous_page_number }}">Prev</a>
+      </li>
+      {% endif %}
+      {% if page.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?{% if base_querystring %}{{ base_querystring }}&{% endif %}page={{ page.next_page_number }}">Next</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}
