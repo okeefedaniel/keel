@@ -4,6 +4,38 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.43.0 — 2026-05-14
+
+**Retry command for failed cross-product mention dispatches.** New
+`python manage.py retry_failed_mention_deliveries` walks
+`MentionDelivery` rows with `peer_status='failed'` and replays the
+Beacon POST. Beacon-side `(contact_slug, source_url)` idempotency
+keys keep retries safe — successes on the original attempt that
+just dropped the response can't double-write the provenance row.
+
+Intended as a daily cron after restoring Beacon connectivity, or as
+an on-demand admin tool. Safe to run repeatedly: no side effects on
+already-OK or already-gone rows.
+
+### Added
+- `keel.mentions.management.commands.retry_failed_mention_deliveries`
+  — the new mgmt command. Flags: `--limit N` (default 100), `--dry-run`,
+  `--include-gone` (also retry 410 rows; default skips them).
+- 10 new tests in `tests/test_mentions_retry_command.py` pinning every
+  branch of the command: unconfigured Beacon (no-op), no failed rows
+  (no-op), success path (peer_status → ok), failure path (peer_error
+  refreshed), 410 path (peer_status → gone), skip-ok-rows, default
+  skip-gone vs `--include-gone` opt-in, dry-run sends zero requests,
+  missing source note silently skipped, `--limit` caps the batch size.
+
+## 0.42.1 — 2026-05-14
+
+**Fix:** `MentionDelivery` CheckConstraint used the deprecated
+`check=` kwarg (removed in Django 5.1). Renamed to `condition=`. The
+generated migration already uses `condition=`; the model class
+matched after this fix. Caught by a Railway deploy failure on
+`harbor-demo` (5.1+ runtime).
+
 ## 0.42.0 — 2026-05-14
 
 **Suite-wide `@`-mentions on internal notes.** New `keel.mentions` module
