@@ -65,6 +65,45 @@
     </div>
   </div>
 
+  {% if peer_notifications %}
+  {# Cross-product notifications, injected by KEEL_NOTIFICATION_LIST_CONTEXT_HOOK.
+     Only Helm sets this hook today; other products render nothing here. Each item
+     deep-links into the originating product — mark-read isn't wired because
+     that's a product-local action on the peer's own Notification row. #}
+  <div class="mb-4">
+    <div class="text-uppercase fw-semibold text-muted mb-2" style="font-size:.7rem; letter-spacing:.05em;">
+      <i class="bi bi-collection me-1"></i>From other products
+      <span class="badge bg-secondary rounded-pill ms-1">{{ peer_notifications|length }}</span>
+    </div>
+    <div class="list-group list-group-flush border rounded">
+      {% for n in peer_notifications %}
+      <a href="{{ n.deep_link|default:'#' }}" target="_blank" rel="noopener"
+         class="list-group-item list-group-item-action keel-notif keel-notif--unread">
+        <div class="d-flex w-100 gap-3 align-items-start">
+          <div style="width: 8px; padding-top: 2px;">
+            <span class="keel-notif__dot"></span>
+          </div>
+          <div class="flex-grow-1 min-width-0">
+            <span class="keel-notif__title d-block mb-0">
+              <i class="{{ n.product_icon|default:'bi-app' }} text-muted me-1"></i>
+              <span class="text-uppercase text-muted me-1" style="font-size:.65rem; letter-spacing:.04em;">{{ n.product_label }}</span>
+              {{ n.title }}
+              <i class="bi bi-box-arrow-up-right text-muted ms-1" style="font-size:.7rem;"></i>
+            </span>
+            {% if n.body %}
+            <small class="keel-notif__message text-muted d-block mt-1">{{ n.body|truncatewords:20 }}</small>
+            {% endif %}
+          </div>
+          <div class="text-end text-nowrap ms-2">
+            <small class="text-muted">{{ n.created_at|truncatechars:10 }}</small>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Filter tabs -->
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item">
@@ -156,10 +195,16 @@
   {% endif %}
 
   {% else %}
+  {% if not peer_notifications %}
   <div class="keel-notif-empty">
     <i class="bi bi-bell-slash d-block mb-2"></i>
     <p class="mb-0">No notifications{% if filter_status %} ({{ filter_status }}){% endif %}.</p>
   </div>
+  {% else %}
+  <div class="text-muted small text-center py-3">
+    No local notifications{% if filter_status %} ({{ filter_status }}){% endif %} — see "From other products" above.
+  </div>
+  {% endif %}
   {% endif %}
 </div>
 {% endblock %}

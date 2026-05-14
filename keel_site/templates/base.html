@@ -1,5 +1,6 @@
 {% extends "keel/layouts/app.html" %}
 {% load static %}
+{% load audit_tags %}
 
 {% block title %}Keel | {% block page_title %}Admin Console{% endblock %}{% endblock %}
 
@@ -53,6 +54,15 @@
     <span class="sb-icon"><i class="bi bi-wrench-adjustable"></i></span>
     <span class="sb-item-label">Tools</span>
   </a>
+
+  {% can_view_audit user as user_can_audit %}
+  {% if user_can_audit %}
+  <a class="sb-item{% if request.resolver_match.url_name == 'audit' %} active{% endif %}" href="{% url 'audit' %}">
+    <span class="sb-toggle" style="visibility:hidden">&rsaquo;</span>
+    <span class="sb-icon"><i class="bi bi-clipboard-data"></i></span>
+    <span class="sb-item-label">Audit</span>
+  </a>
+  {% endif %}
 </div>
 {% endblock %}
 
