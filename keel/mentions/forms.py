@@ -144,8 +144,12 @@ class MentionFormMixin:
             content, author,
         )
 
-        # Populate the ``mentions`` M2M (Django's super won't know about it
-        # unless ``mentions`` is in Meta.fields; we set it directly).
+        # Run super FIRST so any product-declared M2Ms persist. If super
+        # raises here, the ``mentions`` M2M is untouched — fail-closed.
+        super()._save_m2m()
+
+        # Now populate the ``mentions`` M2M (Django's super won't know about
+        # it unless ``mentions`` is in Meta.fields; we set it directly).
         try:
             self.instance.mentions.set(resolved_users)
         except Exception:
@@ -153,9 +157,6 @@ class MentionFormMixin:
                 'MentionFormMixin: failed to set mentions M2M (note=%s)',
                 getattr(self.instance, 'pk', '?'),
             )
-
-        # Now run super so any product-declared M2Ms persist too.
-        super()._save_m2m()
 
         # Diff and dispatch.
         added_users = [u for u in resolved_users if u.pk not in prior_user_ids]

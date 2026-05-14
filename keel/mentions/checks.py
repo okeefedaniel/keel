@@ -20,14 +20,23 @@ from django.core.checks import register
 
 @register()
 def check_urls_included(app_configs, **kwargs):
-    """W001: keel.mentions is in INSTALLED_APPS but URL include missing."""
+    """W001: keel.mentions is in INSTALLED_APPS but URL include missing.
+
+    Catches NoReverseMatch only — broader exceptions (ImproperlyConfigured
+    during partial urlconf load, e.g. mid-makemigrations) are skipped
+    silently so this check doesn't spam warnings during management
+    commands that don't fully load the URL graph.
+    """
     if 'keel.mentions' not in settings.INSTALLED_APPS:
         return []
     try:
-        from django.urls import reverse
+        from django.urls import NoReverseMatch, reverse
+    except ImportError:
+        return []
+    try:
         reverse('keel_mentions:mentions_search')
         return []
-    except Exception:
+    except NoReverseMatch:
         return [
             DjangoWarning(
                 "keel.mentions is installed but its URLs are not included.",
@@ -38,6 +47,10 @@ def check_urls_included(app_configs, **kwargs):
                 id='keel.mentions.W001',
             ),
         ]
+    except Exception:
+        # Urlconf not fully loaded (likely a management command mid-boot).
+        # Skip silently — the check will run again on a real request.
+        return []
 
 
 @register()

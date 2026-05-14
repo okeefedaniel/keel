@@ -111,10 +111,22 @@ def dispatch_mentions(
             )
             summary['users_notified'] += 1
         except Exception:
+            # Orphan-row safety: if notify() raised, the delivery row would
+            # become a permanent "already-delivered" marker that silently
+            # suppresses every future attempt. Roll back the row so a retry
+            # (next save, retry job) gets a fresh shot at the recipient.
             logger.exception(
-                'dispatch_mentions: notify() raised for user=%s note=%s',
+                'dispatch_mentions: notify() raised for user=%s note=%s '
+                '— rolling back MentionDelivery row',
                 user.pk, note.pk,
             )
+            try:
+                delivery.delete()
+            except Exception:
+                logger.exception(
+                    'dispatch_mentions: failed to roll back orphan delivery '
+                    'row %s', delivery.pk,
+                )
 
     # --- Contact mentions -------------------------------------------------
     for contact in added_contacts:

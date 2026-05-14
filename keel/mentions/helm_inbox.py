@@ -64,23 +64,47 @@ def build_inbox_items(user) -> list[dict]:
 
 
 def _title_and_link(note, row) -> tuple[str, str]:
-    """Best-effort title + deep link for a mention row. Gracefully degrades."""
+    """Best-effort title + deep link for a mention row. Gracefully degrades.
+
+    Resolution order:
+
+    1. ``note.get_mention_parent()`` if the note model defines it. Return shape:
+       a single parent object whose ``str()`` is the label and whose
+       ``get_absolute_url()`` is the link. This is the override hook for
+       products that have ambiguous FKs (e.g., a note with both
+       ``application`` and ``contact`` FKs).
+    2. Fallback: walk a fixed list of common parent attribute names. This is
+       a best-effort heuristic — when the order matters, define
+       ``get_mention_parent()``.
+    """
     if note is None:
         return 'You were mentioned in a note (record removed)', ''
 
-    # Derive a parent-record label + URL by walking common attribute names.
+    # Override hook
+    parent = None
+    if hasattr(note, 'get_mention_parent'):
+        try:
+            parent = note.get_mention_parent()
+        except Exception:
+            parent = None
+
+    if parent is None:
+        # Fallback heuristic — walk common parent attribute names.
+        for candidate in ('application', 'company', 'contact', 'invitation',
+                          'opportunity', 'bill', 'program', 'project'):
+            target = getattr(note, candidate, None)
+            if target is not None:
+                parent = target
+                break
+
     parent_label = ''
     parent_url = ''
-    for candidate in ('application', 'company', 'contact', 'invitation',
-                      'opportunity', 'bill', 'program', 'project'):
-        target = getattr(note, candidate, None)
-        if target is not None:
-            parent_label = str(target)
-            try:
-                parent_url = target.get_absolute_url() or ''
-            except Exception:
-                parent_url = ''
-            break
+    if parent is not None:
+        parent_label = str(parent)
+        try:
+            parent_url = parent.get_absolute_url() or ''
+        except Exception:
+            parent_url = ''
     if not parent_label:
         parent_label = type(note).__name__
     title = f'Mentioned in {parent_label}'

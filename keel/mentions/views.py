@@ -36,7 +36,12 @@ def _current_product_code() -> str:
 
 
 def _audit_search(user, q: str) -> None:
-    """Log each mention-search query for audit. Silent if no AuditLog wired."""
+    """Log each mention-search query for audit. Silent if no AuditLog wired.
+
+    When KEEL_AUDIT_LOG_MODEL IS configured but the write fails, log at
+    ``warning`` rather than ``debug`` — a misconfigured audit pipeline is
+    security-relevant signal that should surface in normal log review.
+    """
     model_path = getattr(settings, 'KEEL_AUDIT_LOG_MODEL', None)
     if not model_path:
         return
@@ -48,7 +53,10 @@ def _audit_search(user, q: str) -> None:
             metadata={'q': q[:128], 'product': _current_product_code()},
         )
     except Exception:
-        logger.debug('mention_search audit log write failed', exc_info=True)
+        logger.warning(
+            'mention_search audit log write failed (model=%s)',
+            model_path, exc_info=True,
+        )
 
 
 def _build_user_avatar_url(user) -> str:

@@ -52,6 +52,12 @@ def _strip_code(text: str) -> str:
     return text
 
 
+# Hard cap on input length so a pathological note can't DoS the regex
+# engine. 100KB is ~25k words — far beyond any realistic comment. Past
+# this, we silently truncate before parsing.
+_MAX_INPUT_CHARS = 100_000
+
+
 def parse_mentions(text: str) -> list[MentionToken]:
     """Extract @-mention tokens from a note's text content.
 
@@ -61,6 +67,14 @@ def parse_mentions(text: str) -> list[MentionToken]:
     """
     if not text:
         return []
+
+    # DoS guard: cap input length before regex backtracking.
+    if len(text) > _MAX_INPUT_CHARS:
+        text = text[:_MAX_INPUT_CHARS]
+        logger.info(
+            'mentions.parser: truncated input from %d to %d chars',
+            len(text), _MAX_INPUT_CHARS,
+        )
 
     stripped = _strip_code(text)
 
