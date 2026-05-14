@@ -1,0 +1,113 @@
+"""Polymorphic MentionDelivery ledger.
+
+One row per (note, recipient) pair. ``recipient`` is either a KeelUser
+(in-suite mention) or a Beacon contact slug (cross-product provenance).
+The CheckConstraint enforces exactly one shape per row.
+
+This table is the idempotency primitive for ``dispatch_mentions``: a
+unique key on (note_ct, note_id, recipient_kind, recipient_user/ref)
+guarantees that re-saving a note never double-notifies an in-suite
+recipient or double-writes a Beacon ContactNote.
+"""
+from __future__ import annotations
+
+import uuid
+
+from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.db import models
+
+
+class MentionDelivery(models.Model):
+    """Per-(note, recipient) row recording a @-mention dispatch."""
+
+    KIND_USER = 'keel_user'
+    KIND_CONTACT = 'beacon_contact'
+    KIND_CHOICES = [
+        (KIND_USER, 'KeelUser'),
+        (KIND_CONTACT, 'Beacon contact'),
+    ]
+
+    PEER_OK = 'ok'
+    PEER_FAILED = 'failed'
+    PEER_GONE = 'gone'
+    PEER_STATUS_CHOICES = [
+        ('', ''),  # blank for user mentions (no peer call)
+        (PEER_OK, 'OK'),
+        (PEER_FAILED, 'Failed'),
+        (PEER_GONE, 'Gone'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # The note being mentioned-on. Generic FK because the note model is
+    # product-specific (Harbor.ApplicationComment, etc.).
+    note_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    note_object_id = models.UUIDField()
+    note = GenericForeignKey('note_content_type', 'note_object_id')
+
+    # Discriminator + the two possible recipient shapes.
+    recipient_kind = models.CharField(max_length=24, choices=KIND_CHOICES)
+    recipient_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name='+',
+    )
+    # Populated when recipient_kind == KIND_CONTACT.
+    recipient_ref = models.CharField(max_length=128, blank=True)
+    recipient_peer_url = models.URLField(blank=True)
+
+    delivered_at = models.DateTimeField(auto_now_add=True)
+
+    # Cross-product peer call status (blank for in-suite user mentions).
+    peer_status = models.CharField(
+        max_length=16, blank=True, choices=PEER_STATUS_CHOICES, default='',
+    )
+    peer_error = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = 'mention delivery'
+        verbose_name_plural = 'mention deliveries'
+        constraints = [
+            # User mentions are unique by (note, recipient_user).
+            models.UniqueConstraint(
+                fields=['note_content_type', 'note_object_id', 'recipient_user'],
+                condition=models.Q(recipient_kind='keel_user'),
+                name='unique_mention_delivery_user',
+            ),
+            # Beacon contact mentions are unique by (note, recipient_ref).
+            models.UniqueConstraint(
+                fields=['note_content_type', 'note_object_id', 'recipient_ref'],
+                condition=models.Q(recipient_kind='beacon_contact'),
+                name='unique_mention_delivery_contact',
+            ),
+            # Exactly one shape per row.
+            models.CheckConstraint(
+                check=(
+                    models.Q(
+                        recipient_kind='keel_user',
+                        recipient_user__isnull=False,
+                        recipient_ref='',
+                    )
+                    | models.Q(
+                        recipient_kind='beacon_contact',
+                        recipient_user__isnull=True,
+                    )
+                ),
+                name='mention_delivery_shape_consistent',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['recipient_user', '-delivered_at']),
+            models.Index(fields=['recipient_kind', 'recipient_ref']),
+            models.Index(fields=['note_content_type', 'note_object_id']),
+        ]
+
+    def __str__(self):
+        if self.recipient_kind == self.KIND_USER:
+            target = self.recipient_user_id or '(deleted user)'
+        else:
+            target = f'beacon:{self.recipient_ref}'
+        return f'MentionDelivery({target}, {self.delivered_at:%Y-%m-%d %H:%M})'

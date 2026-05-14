@@ -658,11 +658,33 @@ Every product that exposes machine-callable endpoints follows the same shape so 
 - **Project lifecycle:** Any product shepherding "a thing" through stages MUST use the standard lifecycle primitives — see **Project Lifecycle Standard** above.
 - **Claim / assignment:** Extend `keel.core.models.AbstractAssignment` for the explicit claim gesture. Do not conflate "create record" with "claim record."
 - **Collaborators:** Extend `keel.core.models.AbstractCollaborator`. Canonical roles are LEAD / CONTRIBUTOR / REVIEWER / OBSERVER only — do not add product-specific role enum values.
-- **Internal notes:** Extend `keel.core.models.AbstractInternalNote` (provides `is_internal` visibility flag). Do not create custom note models without this pattern.
+- **Internal notes:** Extend `keel.core.models.AbstractInternalNote` (provides `is_internal` visibility flag, plus the `mentions` M2M added in 0.39.0). Do not create custom note models without this pattern.
 - **Document attachments:** Extend `keel.core.models.AbstractAttachment` for uploaded files, including signed PDFs returned from Manifest. Provides the applicant-visible / staff-only `visibility` split.
 - **Comments with visibility:** Always support internal (staff-only) and external visibility.
 
-**Why:** Harbor's comment system is the reference — government staff need to add internal-only notes that applicants can't see. Every workflow-carrying product needs the same claim / collaborate / diligence primitives, and pinning them in keel prevents drift.
+### @-mentions on notes (`keel.mentions`, added 0.39.0)
+
+`AbstractInternalNote` carries a `mentions` M2M to `KeelUser`. The `keel.mentions` module ships the picker widget, parser, dispatch, and a polymorphic `MentionDelivery` ledger (idempotent get-or-create on every dispatch).
+
+- **`@username`** — DockLabs user mention. Fires `note_mentioned` via `keel.notifications.notify()` — in-app + email, user-mutable via the standard preferences UI.
+- **`@beacon:contact-slug`** — Beacon contact mention. Best-effort cross-product POST to `/api/v1/intake/contact-mentions/` on Beacon (the existing `is_available()` pattern); Beacon appends a `ContactNote` + `ContactMentionProvenance` row to the contact's record. The external person is **not** notified — this is provenance / relationship-tracking, not communication. Picker shows zero contacts when Beacon isn't configured.
+
+**Per-product integration is 5 steps** (see `keel/mentions/README.md`):
+1. Add `keel.mentions` to `INSTALLED_APPS`
+2. Include `path('keel/mentions/', include('keel.mentions.urls'))`
+3. Inherit `MentionFormMixin` + use `MentionableTextarea` on the comment form's `content` field
+4. `python manage.py makemigrations <app> && migrate` — the inherited `mentions` M2M generates a through-table migration per concrete subclass
+5. Add `prefetch_related('mentions')` to list views rendering notes (prevents N+1)
+
+**Lockstep rollout (required).** Bumping keel to 0.39.0 forces every consuming product to migrate their concrete `AbstractInternalNote` subclasses. Bump the keel pin AND ship the per-product migration in the **same PR**. Skipping the migration causes a 500 on the next comment save. CI gate: `python manage.py makemigrations --check`. Run `python manage.py check_mentions_wiring` post-merge to verify integration.
+
+**Idempotency.** `MentionDelivery` carries two partial `UniqueConstraint`s — one per recipient kind — plus a `CheckConstraint` enforcing exactly one shape per row. Re-saving a note never double-notifies or double-writes to Beacon. Removing a mention by editing the note does NOT retract a delivered notification (once sent, sent).
+
+**Rollback is forward-only.** The M2M through-table and `MentionDelivery` rows are an audit trail; do not `migrate <app> zero` on them. Orphaned tables after a keel-pin rollback are harmless and preserve audit continuity.
+
+**Helm inbox surface.** `keel.mentions.helm_inbox.build_inbox_items(user)` returns the recent unread user mentions in the Helm `UserInbox.items[]` shape — wrap into your product's `/api/v1/helm-feed/inbox/` to surface mentions in the "Awaiting Me" column. Beacon contact mentions are excluded from this surface (contacts aren't Helm users).
+
+**Why:** Harbor's comment system is the reference — government staff need to add internal-only notes that applicants can't see. Every workflow-carrying product needs the same claim / collaborate / diligence primitives, and pinning them in keel prevents drift. The @-mention layer extends the collaboration surface so a note can summon a colleague (in-suite) or annotate a contact (cross-product, Beacon-only in v1) without out-of-band Slack.
 
 ## FOIA Compliance
 
