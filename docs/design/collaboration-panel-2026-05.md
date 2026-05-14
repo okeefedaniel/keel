@@ -42,8 +42,10 @@ Capability work resumes after the Wave 4 procurement-signal gate. This work is a
    - ✅ (g) Commit this doc + CHANGELOG (landed in 0.41.1).
    - ✅ (c) Audit `AbstractActivity.visible_to` per-product implementation status — **9/9 products implement it.** No stubs needed. The Phase 3 Eng E11 concern was unfounded — every product already has a per-product `visible_to` override at `<product>/<app>/activity_models.py`. Per-product implementations: admiralty/foia (FOIA officer + watchers), beacon/interactions (zone-aware), bounty/opportunities (tracked_by + collaborators), harbor/applications (applicant + reviewer + assignment), helm/tasks (project ACL + visibility tier), lookout/tracking (tracked_by + collaborators), manifest/signatures (initiator + signers), purser (submitted_by + reviewed_by + program M2M), yeoman (agency + per-row assigned/delegated/created).
    - ✅ (e) Promote + parameterize Helm's `_claim_banner.html` and `_project_transition_controls.html` to keel components — landed in 0.41.2 as `keel/components/claim_row.html` and `keel/components/workflow_transitions.html`. Helm's own templates are unchanged; Wave 4 (Helm panel adoption) migrates Helm to consume the keel versions. 9 render tests pin the contract.
-   - ⏳ (f) Ship `python manage.py preview_collaboration_panel` management command.
-   - ⏳ (h) Final keel bump for Wave 0 (probably 0.42.0 if anything else is API-breaking, else 0.41.3).
+   - 🔁 (f) `python manage.py preview_collaboration_panel` management command — **deferred into Wave 1**. The command's purpose is to render the panel against a fake entity for 5-minute inner-loop verification, but the panel orchestrator (`collaboration_panel.html`) doesn't exist yet — Wave 1 ships it. Building a preview command for a non-existent component is busy work; bundle (f) with Wave 1 so the command can preview the real thing.
+   - 🔁 (h) Final keel bump for Wave 0 — **deferred into Wave 1**. With (f) bundled into Wave 1, there's no separate "Wave 0 closeout" version to tag. The next keel bump happens when Wave 1 ships the component + preview command together.
+
+**Wave 0 effective close: 0.41.2 (1cedc76).** 6 of 8 named items landed; the remaining 2 are bundled into Wave 1 because they depend on Wave 1's output. Anyone consuming keel for Wave 0 fixes should pin `v0.41.2` or later.
 
 1. **Wave 1 — Build the shared component in keel.** `keel/components/collaboration_panel.html` orchestrator + render-test against a fake `TestEntity`. No product changes yet.
 

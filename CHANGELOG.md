@@ -6,11 +6,16 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 
 ## 0.41.2 — 2026-05-14
 
-**Wave 0 (collaboration-panel) hardening, batch 3.** Helm-pioneered claim
-banner + workflow transitions templates promoted into `keel/components/`
-as parameterized, suite-shared partials. Helm's own templates are
-unchanged — Wave 4 (Helm panel adoption) migrates Helm to consume the
-keel versions.
+**Wave 0 effective close.** Helm-pioneered claim banner + workflow transitions
+templates promoted into `keel/components/` as parameterized, suite-shared
+partials. Helm's own templates are unchanged — Wave 4 (Helm panel adoption)
+migrates Helm to consume the keel versions.
+
+Wave 0 items (f) `preview_collaboration_panel` management command and (h)
+"final Wave 0 version bump" are deferred into Wave 1: (f) has nothing to
+preview until Wave 1 ships the panel orchestrator, and with (f) bundled
+there's no separate Wave 0 closeout version to tag. Consumers needing
+Wave 0's fixes should pin `v0.41.2` or later.
 
 ### Added
 - `keel/core/templates/keel/components/claim_row.html` — parameterized
