@@ -1,0 +1,47 @@
+{% comment %}
+Claim row — banner shown on a record's detail page when no active assignment
+exists (the record is in the "unowned pool" per the Project Lifecycle Standard).
+
+This is the parameterized, suite-shared version of the pattern Helm pioneered
+in helm/tasks/templates/tasks/partials/_claim_banner.html. The Helm template
+hard-codes `project.slug`, the `tasks:claim_project` URL name, and "project"
+copy. This component accepts those as kwargs so any product can include it.
+
+Usage (caller resolves the URL via `{% url ... %}` and passes the string):
+    {% include "keel/components/claim_row.html" with
+        active_assignment=invitation.assignment
+        is_archived=invitation.is_archived
+        claim_action=claim_url
+        entity_label="invitation"
+    %}
+
+Context variables:
+    active_assignment  — the current AbstractAssignment row, or None when unclaimed
+    is_archived        — bool; hide the claim affordance on archived records
+                         (terminal state, no further transitions)
+    claim_action       — pre-resolved URL the form POSTs to (the caller builds
+                         this with {% url ... %} since URL names are per-product)
+    entity_label       — display word for the copy ("project", "invitation",
+                         "request", "bill", "opportunity", ...). Defaults to
+                         "record" so the component is safe without it.
+    csrf_token         — required by Django (auto-available in the inclusion)
+
+Renders nothing when active_assignment is truthy or is_archived is true.
+
+Caller is responsible for filtering the assignment queryset by archival/active
+status — this component only displays the banner.
+{% endcomment %}
+{% if not active_assignment and not is_archived and claim_action %}
+<div class="alert alert-info d-flex align-items-center justify-content-between mb-3" role="alert">
+  <div>
+    <strong>This {{ entity_label|default:"record" }} has no lead.</strong>
+    Claim it to take ownership and unlock transition controls.
+  </div>
+  <form method="post" action="{{ claim_action }}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-flag-fill"></i> Claim {{ entity_label|default:"record" }}
+    </button>
+  </form>
+</div>
+{% endif %}

@@ -1,0 +1,49 @@
+{% comment %}
+Workflow transition controls — renders the list of transitions the current
+user has permission to perform, computed by the caller via
+`entity.WORKFLOW.get_available_transitions(user)` (which forwards `obj=entity`
+to the engine for object-scoped role checks; see WorkflowModelMixin).
+
+This is the parameterized, suite-shared version of Helm's pattern in
+helm/tasks/templates/tasks/partials/_project_transition_controls.html.
+
+Usage:
+    {% include "keel/components/workflow_transitions.html" with
+        transition_action=transition_url
+        available_transitions=available_transitions
+    %}
+
+Context variables:
+    transition_action       — pre-resolved URL the form POSTs to (caller builds
+                              this with {% url ... %}); per-product since URL
+                              names vary
+    available_transitions   — list of Transition objects, already filtered to
+                              ones the current user can execute (caller filters
+                              via WorkflowModelMixin.get_available_transitions)
+    csrf_token              — required by Django
+
+Renders nothing when available_transitions is empty (terminal state) or
+transition_action is missing.
+
+Comment handling: the inline text input matches Helm's current behavior.
+Phase 2 Design review flagged that comment-required transitions should
+ideally open a modal (focus trap, aria-labelledby, return focus), not an
+inline always-visible text input. That refactor is queued for Wave 1
+when the panel orchestrator ships. For now we preserve Helm's behavior
+verbatim so promotion is behaviorally identical.
+
+Caller note: the form submits one `status` value and one optional `comment`.
+The view at `transition_action` must call `entity.transition(status, user=request.user, comment=comment)`.
+{% endcomment %}
+{% if available_transitions and transition_action %}
+<form method="post" action="{{ transition_action }}" class="d-inline-flex gap-2">
+  {% csrf_token %}
+  <select name="status" class="form-select form-select-sm" style="width:auto;">
+    {% for t in available_transitions %}
+      <option value="{{ t.to_status }}">{{ t.label|default:t.to_status }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="comment" class="form-control form-control-sm" placeholder="Comment (required for some)" style="width:14rem;">
+  <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
+</form>
+{% endif %}

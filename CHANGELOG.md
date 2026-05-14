@@ -4,6 +4,42 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.41.2 — 2026-05-14
+
+**Wave 0 (collaboration-panel) hardening, batch 3.** Helm-pioneered claim
+banner + workflow transitions templates promoted into `keel/components/`
+as parameterized, suite-shared partials. Helm's own templates are
+unchanged — Wave 4 (Helm panel adoption) migrates Helm to consume the
+keel versions.
+
+### Added
+- `keel/core/templates/keel/components/claim_row.html` — parameterized
+  version of Helm's `_claim_banner.html`. Accepts `active_assignment`,
+  `is_archived`, `claim_action` (pre-resolved URL string from caller),
+  and `entity_label` (display word — defaults to "record" so the
+  component is safe without it). Renders empty when claimed / archived
+  / no claim URL.
+- `keel/core/templates/keel/components/workflow_transitions.html` —
+  parameterized version of Helm's `_project_transition_controls.html`.
+  Accepts `available_transitions` (caller filters via
+  `WorkflowModelMixin.get_available_transitions` — which now forwards
+  `obj=self` per 0.40.2) and `transition_action` (pre-resolved URL).
+  Behaviorally identical to Helm's inline-text-input version; the
+  modal-vs-inline refactor for comment-required transitions
+  (Phase 2 Design finding) is queued for Wave 1.
+- `tests/test_claim_row_workflow_transitions.py` — 9 render tests
+  pinning the public contract: render-when-empty-state-applies,
+  entity_label fallback, no-form-action-without-URL footgun, etc.
+
+### Audited
+- **`AbstractActivity.visible_to` is implemented in 9/9 products.** The
+  Phase 3 Eng review's E11 finding ("activity panel renders silently
+  empty on products without `visible_to` — list per-product status,
+  ship stubs where missing") turned out to be unfounded: every product
+  (admiralty, beacon, bounty, harbor, helm, lookout, manifest, purser,
+  yeoman) already has a per-product `visible_to` override. No stubs
+  needed. Audit recorded in `docs/design/collaboration-panel-2026-05.md`.
+
 ## 0.41.1 — 2026-05-14
 
 **Wave 0 (collaboration-panel) hardening, batch 2.** Performance fix for the

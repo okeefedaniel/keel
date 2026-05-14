@@ -23,8 +23,8 @@ Capability work resumes after the Wave 4 procurement-signal gate. This work is a
 | Lives in keel | Lives per-product |
 |---|---|
 | `keel/core/templates/keel/components/collaboration_panel.html` (Wave 1) | `<Product>Assignment(AbstractAssignment)` concrete subclass |
-| `keel/core/templates/keel/components/claim_row.html` (Wave 0 promote from Helm) | `<Product>Collaborator(AbstractCollaborator)` concrete subclass |
-| `keel/core/templates/keel/components/workflow_transitions.html` (Wave 0 promote from Helm) | `<Product>Note(AbstractInternalNote)` concrete subclass |
+| `keel/core/templates/keel/components/claim_row.html` (landed in 0.41.2) | `<Product>Collaborator(AbstractCollaborator)` concrete subclass |
+| `keel/core/templates/keel/components/workflow_transitions.html` (landed in 0.41.2) | `<Product>Note(AbstractInternalNote)` concrete subclass |
 | `keel/core/templates/keel/components/comment_section.html` (already exists; 0.40.2 hardened) | `<Product>Attachment(AbstractAttachment)` concrete subclass |
 | `keel/core/templates/keel/components/collaborator_list.html` (already exists) | `<Product>StatusHistory(AbstractStatusHistory)` concrete subclass |
 | `keel/core/templates/keel/components/attachment_list.html` (Wave 1 NEW) | `<Product>WorkflowEngine` subclass with declarative `Transition()` list |
@@ -40,10 +40,10 @@ Capability work resumes after the Wave 4 procurement-signal gate. This work is a
    - ✅ (b) Defensive `is_internal` filter in `comment_section.html` (defense in depth — landed in 0.40.2).
    - ✅ (d) `activity_panel` query optimization: `select_related('actor', 'target_ct')` + drop unused `target` from `render_for` (landed in 0.41.1).
    - ✅ (g) Commit this doc + CHANGELOG (landed in 0.41.1).
-   - ⏳ (c) Audit `AbstractActivity.visible_to` per-product implementation status; add stubs where missing.
-   - ⏳ (e) Promote + parameterize Helm's `_claim_banner.html` and `_project_transition_controls.html` to keel components.
+   - ✅ (c) Audit `AbstractActivity.visible_to` per-product implementation status — **9/9 products implement it.** No stubs needed. The Phase 3 Eng E11 concern was unfounded — every product already has a per-product `visible_to` override at `<product>/<app>/activity_models.py`. Per-product implementations: admiralty/foia (FOIA officer + watchers), beacon/interactions (zone-aware), bounty/opportunities (tracked_by + collaborators), harbor/applications (applicant + reviewer + assignment), helm/tasks (project ACL + visibility tier), lookout/tracking (tracked_by + collaborators), manifest/signatures (initiator + signers), purser (submitted_by + reviewed_by + program M2M), yeoman (agency + per-row assigned/delegated/created).
+   - ✅ (e) Promote + parameterize Helm's `_claim_banner.html` and `_project_transition_controls.html` to keel components — landed in 0.41.2 as `keel/components/claim_row.html` and `keel/components/workflow_transitions.html`. Helm's own templates are unchanged; Wave 4 (Helm panel adoption) migrates Helm to consume the keel versions. 9 render tests pin the contract.
    - ⏳ (f) Ship `python manage.py preview_collaboration_panel` management command.
-   - ⏳ (h) Final keel bump for Wave 0 (probably 0.42.0 if (e) is API-breaking, else 0.41.2).
+   - ⏳ (h) Final keel bump for Wave 0 (probably 0.42.0 if anything else is API-breaking, else 0.41.3).
 
 1. **Wave 1 — Build the shared component in keel.** `keel/components/collaboration_panel.html` orchestrator + render-test against a fake `TestEntity`. No product changes yet.
 
