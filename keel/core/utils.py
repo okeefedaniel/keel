@@ -9,6 +9,27 @@ from django.http import HttpResponse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 
+def get_product_code():
+    """Return the lowercase machine identifier for this product.
+
+    Prefers ``settings.KEEL_PRODUCT_CODE`` (the explicit machine key —
+    always lowercase, matches ``ProductAccess.Product`` values like
+    ``'beacon'``, ``'harbor'``, ``'helm'``). Falls back to
+    ``settings.KEEL_PRODUCT_NAME.lower()`` so products that haven't yet
+    set ``KEEL_PRODUCT_CODE`` continue to work — but every machine-key
+    call site routes through this helper so the casing-mismatch bug
+    class fixed in keel v0.36.0 cannot recur.
+
+    Display callers (sidebar brand, login card title, breadcrumbs)
+    should keep reading ``KEEL_PRODUCT_NAME`` directly — that setting
+    is TitleCase and meant for humans.
+    """
+    code = getattr(settings, 'KEEL_PRODUCT_CODE', '')
+    if code:
+        return code
+    return getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+
+
 def is_keel_idp():
     """True only on the Keel IdP service itself.
 

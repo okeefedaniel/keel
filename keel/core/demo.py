@@ -112,7 +112,7 @@ ROLE_DISPLAY = {
 def get_demo_roles():
     """Return the list of demo roles configured for this product.
 
-    Falls back to PRODUCT_ROLES for the current KEEL_PRODUCT_NAME when
+    Falls back to PRODUCT_ROLES for the current KEEL_PRODUCT_CODE when
     DEMO_ROLES is not explicitly set, so products don't need to duplicate
     their role list.
     """
@@ -120,7 +120,8 @@ def get_demo_roles():
     if explicit is not None:
         return explicit
 
-    product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+    from keel.core.utils import get_product_code
+    product = get_product_code()
     if product:
         from keel.accounts.models import PRODUCT_ROLES
         roles = PRODUCT_ROLES.get(product, [])

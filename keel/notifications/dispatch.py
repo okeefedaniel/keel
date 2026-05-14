@@ -138,8 +138,8 @@ def _resolve_recipients(ntype, context):
         # it's stored on ProductAccess and resolved against the current
         # product. Filter through the relation, scoped to this product,
         # and dedupe with .distinct() since the join can fan out rows.
-        from django.conf import settings
-        product = (getattr(settings, 'KEEL_PRODUCT_CODE', '') or '').lower()
+        from keel.core.utils import get_product_code
+        product = get_product_code()
         qs = qs.filter(
             product_access__role__in=ntype.default_roles,
             product_access__is_active=True,

@@ -25,7 +25,8 @@ class KeelNotificationsConfig(AppConfig):
         # On product deployments, each product's own AppConfig.ready()
         # registers its runtime types; importing other products' types here
         # would pollute the preferences UI with categories the user can't act on.
-        if getattr(settings, 'KEEL_PRODUCT_NAME', '') == 'Keel':
+        from keel.core.utils import get_product_code
+        if get_product_code() == 'keel':
             register_all_product_types()
 
         # Load admin overrides from the database on top of hardcoded defaults.

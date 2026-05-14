@@ -10,7 +10,7 @@ Usage in product settings.py:
         ...
     ]
 
-    KEEL_PRODUCT_NAME = 'harbor'  # must match ProductAccess.product value
+    KEEL_PRODUCT_CODE = 'harbor'  # must match ProductAccess.product value
 """
 import base64
 import logging
@@ -49,7 +49,8 @@ class ProductAccessMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self.product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+        from keel.core.utils import get_product_code
+        self.product = get_product_code()
         self.gate_access = getattr(settings, 'KEEL_GATE_ACCESS', False)
         self.exempt_paths = tuple(
             getattr(settings, 'KEEL_EXEMPT_PATHS', DEFAULT_EXEMPT_PATHS)

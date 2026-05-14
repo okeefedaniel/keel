@@ -162,9 +162,9 @@ def _user_product_roles(user) -> set[str]:
     missing settings or a user model without the expected reverse
     relation.
     """
-    from django.conf import settings
+    from keel.core.utils import get_product_code
 
-    product = (getattr(settings, 'KEEL_PRODUCT_CODE', '') or '').lower()
+    product = get_product_code()
     try:
         qs = user.product_access.filter(is_active=True)
         if product:
