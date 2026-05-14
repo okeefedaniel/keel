@@ -261,7 +261,7 @@ class AbstractInternalNote(models.Model):
     # @-mentions: populated by keel.mentions.forms.MentionFormMixin on save.
     # The M2M is harmless when keel.mentions is not installed (stays empty).
     # Adopting products must run makemigrations + migrate on every concrete
-    # subclass after bumping keel to 0.39.0 — see keel/mentions/README.md.
+    # subclass after bumping keel to 0.41.0 — see keel/mentions/README.md.
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,

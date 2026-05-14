@@ -3,7 +3,7 @@
 All notable changes to keel are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.39.0] - 2026-05-13
+## [0.41.0] - 2026-05-14
 
 ### Added
 
@@ -46,7 +46,7 @@ All notable changes to keel are documented here. Format follows
 - `keel.core.AbstractInternalNote` carries a new `mentions` M2M field. The
   field has `blank=True` and is harmless when `keel.mentions` is not
   installed in INSTALLED_APPS — but the inherited field DOES require a
-  per-product migration on every concrete subclass. Bumping to 0.39.0
+  per-product migration on every concrete subclass. Bumping to 0.41.0
   without that migration will 500 on the next comment save.
 - CLAUDE.md gains an `## @-mentions on notes` subsection under
   Collaboration & Notes documenting the integration tenets, the lockstep
