@@ -1,0 +1,104 @@
+/* keel.mentions — autocomplete picker styles.
+ * Uses docklabs-v2.css custom properties where available; falls back to
+ * sensible defaults so the menu still renders when v2 is not loaded.
+ */
+
+.dl-mention-menu {
+  position: absolute;
+  z-index: 1080;            /* above Bootstrap dropdowns + modal backdrops */
+  display: none;
+  min-width: 280px;
+  max-width: 480px;
+  background: var(--dl-popover-bg, #ffffff);
+  border: 1px solid var(--dl-border, #e5e7eb);
+  border-radius: var(--dl-radius-sm, 8px);
+  box-shadow: var(--dl-shadow-md, 0 10px 24px rgba(0, 0, 0, 0.12));
+  overflow-y: auto;
+  font-family: Poppins, -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--dl-text, #1f2937);
+}
+
+.dl-mention-menu--mobile {
+  position: fixed;
+  left: 0 !important;
+  right: 0;
+  bottom: 0;
+  top: auto !important;
+  width: 100% !important;
+  max-width: none;
+  max-height: 40vh;
+  border-radius: var(--dl-radius-sm, 8px) var(--dl-radius-sm, 8px) 0 0;
+}
+
+.dl-mention-section {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dl-text-tertiary, #9ca3af);
+}
+
+.dl-mention-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.dl-mention-row:hover,
+.dl-mention-row.is-active {
+  background: var(--dl-bg-warm, #fff8e7);
+}
+
+.dl-mention-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: var(--dl-bg-warm, #fff8e7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dl-ct-blue, #1e40af);
+}
+
+.dl-mention-identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.dl-mention-name {
+  font-weight: 500;
+  color: var(--dl-text, #1f2937);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dl-mention-username {
+  font-size: 12px;
+  color: var(--dl-text-tertiary, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dl-mention-status {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--dl-text-tertiary, #6b7280);
+  font-style: italic;
+}
+
+textarea.mentionable {
+  /* Keep Bootstrap form-control sizing; nothing to override here. */
+}

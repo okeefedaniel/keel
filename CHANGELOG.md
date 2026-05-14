@@ -4,6 +4,60 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.42.0 — 2026-05-14
+
+**Suite-wide `@`-mentions on internal notes.** New `keel.mentions` module
+adds the picker, parser, dispatch, and a polymorphic `MentionDelivery`
+idempotency ledger. Typing `@username` in any note notifies the named
+DockLabs user (in-app + email via `keel.notifications`); typing
+`@beacon:<contact-uuid>` best-effort POSTs to Beacon's new
+`/api/v1/intake/contact-mentions/` endpoint which appends a `Note` +
+`ContactMentionProvenance` row to that contact's record (one-way
+provenance — the external person is not notified).
+
+Coordinated rollout across the suite: Beacon receiver in beacon#44;
+full Harbor / Bounty / Helm / Yeoman wiring on the note model in
+their feat/mentions PRs; infrastructure-only registration on
+Admiralty / Lookout / Manifest / Purser (they get the picker
+endpoint but have no `AbstractInternalNote` subclass to consume it).
+
+### Added
+- `keel.mentions` — new Django app. Public API re-exported at the
+  package root: `MentionableTextarea`, `MentionFormMixin`,
+  `MentionDelivery`, `parse_mentions`, `resolve_users`,
+  `resolve_contacts`. See `keel/mentions/README.md` for the 5-step
+  per-product integration template.
+- `AbstractInternalNote.mentions` — new `ManyToManyField` to
+  `AUTH_USER_MODEL`. Inherited by every concrete subclass. Each
+  consuming product runs `makemigrations` + `migrate` in the same
+  PR as the keel pin bump — lockstep rollout enforced by the
+  `mentions.W003` system check.
+- `MentionDelivery` polymorphic model with partial `UniqueConstraint`s
+  per recipient kind (`keel_user` vs `beacon_contact`) and a
+  `CheckConstraint` enforcing exactly one shape per row. The
+  constraints are the real idempotency primitive: re-saving a note
+  never double-notifies or double-writes to Beacon.
+- Three Django system checks (`mentions.W001`/`W002`/`W003`) plus a
+  `python manage.py check_mentions_wiring` audit command that kill
+  the four silent-no-op failure modes (forgot INSTALLED_APPS, URL
+  include, widget swap, or migration).
+- `keel.mentions.helm_inbox.build_inbox_items(user)` — Helm
+  cross-product surface. Wraps into a product's existing
+  `/api/v1/helm-feed/inbox/` so the Helm aggregator picks up unread
+  user mentions. User mentions only; Beacon contacts are not Helm
+  users.
+- 38 new tests across 5 files (parser, beacon client, model
+  constraints, view, helm_inbox).
+
+### Security notes
+- The autocomplete endpoint requires `q.length >= 2`, audit-logs
+  each query, and does not return `email`. Within-org user
+  enumeration is named-and-accepted as residual for v1.
+- Beacon's `excerpt[:500]` is sent raw across the product boundary.
+  Notes containing secrets pasted into a comment will reach Beacon's
+  contact record. Consumers needing redaction must apply it before
+  save.
+
 ## 0.41.2 — 2026-05-14
 
 **Wave 0 effective close.** Helm-pioneered claim banner + workflow transitions
@@ -49,7 +103,7 @@ Wave 0's fixes should pin `v0.41.2` or later.
 
 **Wave 0 (collaboration-panel) hardening, batch 2.** Performance fix for the
 activity panel + durable documentation for the suite-wide collaboration-panel
-rollout. Bumped to 0.41.1 because `0.41.0` (`add2c43` — `KEEL_PRODUCT_NAME` /
+rollout. Bumped to 0.41.1 because `0.42.0` (`add2c43` — `KEEL_PRODUCT_NAME` /
 `KEEL_PRODUCT_CODE` split) shipped between Wave 0 batch 1 and batch 2 on the
 same day.
 

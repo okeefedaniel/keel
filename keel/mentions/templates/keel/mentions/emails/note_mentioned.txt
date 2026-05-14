@@ -1,0 +1,11 @@
+{% load i18n %}You were mentioned in {{ source_product|capfirst }}.
+
+{{ actor_name }} mentioned you in a note on "{{ record_title }}":
+
+  {{ note_excerpt }}
+
+View the note: {{ source_url }}#note-{{ note_id }}
+
+---
+You're getting this because you were @-mentioned.
+Manage notification preferences: /notifications/preferences/

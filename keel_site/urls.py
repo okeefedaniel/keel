@@ -104,6 +104,7 @@ urlpatterns = [
     path('keel/accounts/', include('keel.accounts.urls')),
     path('keel/requests/', include('keel.requests.urls')),
     path('keel/notifications/', include('keel.notifications.urls')),
+    path('keel/mentions/', include('keel.mentions.urls')),
     path('scheduling/', include('keel.scheduling.urls')),
 
     # Cross-product AI key handoff. Products call this with the user's

@@ -258,6 +258,15 @@ class AbstractInternalNote(models.Model):
         default=True,
         help_text=_('If True, only visible to staff. If False, visible to external users.'),
     )
+    # @-mentions: populated by keel.mentions.forms.MentionFormMixin on save.
+    # The M2M is harmless when keel.mentions is not installed (stays empty).
+    # Adopting products must run makemigrations + migrate on every concrete
+    # subclass after bumping keel to 0.42.0 — see keel/mentions/README.md.
+    mentions = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='%(app_label)s_%(class)s_mentioned_in',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

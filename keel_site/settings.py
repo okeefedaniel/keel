@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'keel.calendar',
     'keel.scheduling',
     'keel.signatures',
+    'keel.mentions',  # suite-wide @-mentions on notes (0.42.0)
     'keel.ai.apps.KeelAIConfig',  # /api/v1/ai/key/ — user AI key handoff
     'keel.settings.apps.KeelSettingsConfig',  # /settings/ panel framework
     'keel.oidc.apps.KeelOIDCConfig',  # Phase 2b: OIDC validator + claims
