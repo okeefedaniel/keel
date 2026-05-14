@@ -2,23 +2,11 @@
 
 Cross-product or suite-wide engineering work that's been identified but not yet scheduled. Product-specific TODOs live in each product's own repo.
 
-## Mount `/api/v1/audit-feed/` on Beacon
+## ~~Mount `/api/v1/audit-feed/` on all 9 sibling products~~ — DONE 2026-05-14
 
-**What:** Keel's `/audit/` page (shipped 2026-05-14 in keel `v0.40.1`) fans out across the suite via `keel.feed.audit_feed_view`. 8 of 9 sibling products are already mounted; only **Beacon** remains pending because its `design/beacon-header-and-dashboard` feature branch was in flight when the suite-wide rollout happened. Once that branch lands, apply the same recipe.
+All 9 products are mounted and live. Beacon was the last one — landed in beacon#46 (commit `5041b0f`), deployed via `railway up` after the standard Railway "Wait for CI" QUEUED wedge. The cross-product audit page at `https://keel.docklabs.ai/audit/` now shows 9 green chips.
 
-**Recipe:**
-1. Copy `keel/feed/audit_feed_example.py` → `beacon/api/audit_feed.py` (or `beacon/companies/audit_feed.py` if you'd rather keep it next to `companies/helm_feed.py`)
-2. Set the import to the concrete model: `from beacon.companies.models import AuditLog`
-3. Rename `build_audit` → `beacon_audit_feed` for consistency with the other products
-4. Wire URL in `beacon/api/urls.py`: `path('audit-feed/', beacon_audit_feed, name='audit-feed')` under the existing `/api/v1/` include
-5. Bump `requirements.txt`: `keel @ git+https://github.com/okeefedaniel/keel.git@v0.41.0` (or whatever's current)
-6. Open PR → merge → Railway auto-deploys (or `railway up --service beacon --detach` if the "Wait for CI" gate wedges it in QUEUED — see CLAUDE.md Known Deviations)
-7. Smoke test: `curl -H "Authorization: Bearer $HELM_FEED_API_KEY" "https://beacon.docklabs.ai/api/v1/audit-feed/?window_start=...&window_end=...&limit=1"` should return 200
-8. Reload `https://keel.docklabs.ai/audit/` as `dokadmin` — Beacon chip should flip from gray hourglass to green check
-
-**Status by product:** admiralty ✅ · **beacon ⏳** · bounty ✅ · harbor ✅ · helm ✅ · lookout ✅ · manifest ✅ · purser ✅ · yeoman ✅
-
-**Effort:** ~15 min, no novel design, no test suite expansion required.
+Per-product mount files: admiralty (`foia/audit_feed.py`), beacon (`api/audit_feed.py`), bounty (`api/audit_feed.py`), harbor (`api/audit_feed.py`), helm (`api/audit_feed.py`), lookout (`api/audit_feed.py`), manifest (`signatures/audit_feed.py`), purser (`purser/audit_feed.py`), yeoman (`yeoman/audit_feed.py`). All pinned to keel `v0.41.0`.
 
 
 ## ~~Reconcile cross-product template overrides~~ — DONE 2026-04-21
