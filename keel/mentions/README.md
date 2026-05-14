@@ -1,6 +1,6 @@
 # keel.mentions
 
-Suite-wide `@`-mentions on internal notes. Ships in keel 0.41.0.
+Suite-wide `@`-mentions on internal notes. Ships in keel 0.42.0.
 
 When a user types `@username` in a note's content, the named DockLabs
 user gets an in-app + email notification. When a user types

@@ -193,10 +193,8 @@ def site_context(request):
             from keel.core.ai_access import (
                 _user_has_key, ai_enabled_products_for_user, user_ai_state,
             )
-            current_product = (
-                getattr(settings, 'KEEL_PRODUCT_CODE', '')
-                or getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
-            )
+            from keel.core.utils import get_product_code
+            current_product = get_product_code()
             context['ai_enabled_products'] = ai_enabled_products_for_user(
                 request.user
             )

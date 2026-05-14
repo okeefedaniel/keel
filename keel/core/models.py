@@ -261,7 +261,7 @@ class AbstractInternalNote(models.Model):
     # @-mentions: populated by keel.mentions.forms.MentionFormMixin on save.
     # The M2M is harmless when keel.mentions is not installed (stays empty).
     # Adopting products must run makemigrations + migrate on every concrete
-    # subclass after bumping keel to 0.41.0 — see keel/mentions/README.md.
+    # subclass after bumping keel to 0.42.0 — see keel/mentions/README.md.
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,
@@ -298,16 +298,27 @@ class WorkflowModelMixin:
     """
 
     def get_available_transitions(self, user=None):
-        """Return Transition objects available from the current status."""
-        return self.WORKFLOW.get_available_transitions(self.status, user)
+        """Return Transition objects available from the current status.
+
+        Forwards ``obj=self`` to the engine so subclasses that resolve
+        object-scoped roles (e.g. Helm's ``ProjectWorkflowEngine`` checking
+        ``ProjectCollaborator(role=LEAD)`` against the bound project) see
+        the model instance — without it, per-record role checks silently
+        fall through to the base ``_user_has_role`` and ignore ``obj``.
+        """
+        return self.WORKFLOW.get_available_transitions(self.status, user, obj=self)
 
     def transition(self, target_status, user=None, comment=''):
         """Execute a workflow transition. Validates state and roles."""
         return self.WORKFLOW.execute(self, target_status, user=user, comment=comment)
 
     def can_transition(self, target_status, user=None):
-        """Check if a transition to target_status is allowed."""
-        return self.WORKFLOW.can_transition(self.status, target_status, user)
+        """Check if a transition to target_status is allowed.
+
+        Forwards ``obj=self`` to the engine so object-scoped role checks
+        receive the model instance. See ``get_available_transitions`` above.
+        """
+        return self.WORKFLOW.can_transition(self.status, target_status, user, obj=self)
 
 
 # ---------------------------------------------------------------------------

@@ -22,7 +22,8 @@ def demo_login_buttons(context):
     if not getattr(settings, 'DEMO_MODE', False):
         return ''
 
-    if getattr(settings, 'KEEL_PRODUCT_NAME', '').lower() == 'keel':
+    from keel.core.utils import get_product_code
+    if get_product_code() == 'keel':
         return ''
 
     request = context.get('request')

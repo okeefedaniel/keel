@@ -48,10 +48,8 @@ def _resolve_product_code(product_code: str | None) -> str:
     """Default to ``settings.KEEL_PRODUCT_CODE`` (or ``KEEL_PRODUCT_NAME`` lower-cased) when not given."""
     if product_code:
         return product_code
-    return (
-        getattr(settings, 'KEEL_PRODUCT_CODE', '')
-        or getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
-    )
+    from keel.core.utils import get_product_code
+    return get_product_code()
 
 
 def _org_has_ai(user, product_code: str) -> bool:

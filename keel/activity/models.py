@@ -222,6 +222,15 @@ class AbstractActivity(models.Model):
         Stub-tier rows hide target/deep_link/source_label and render only actor + verb + date.
         This is the cross-zone protection for Beacon's `interaction.logged` activity rows
         whose originating zone is more restricted than the viewer's zone.
+
+        ``target`` (the dereferenced GenericForeignKey) is NOT returned by default
+        — the bundled `keel/activity/_panel.html` partial renders only actor / verb /
+        created_at / deep_link / source_label / metadata / is_stub. Dereferencing
+        ``self.target`` for every row would cost one ContentType + one model lookup
+        per row (N+1) even though the template never reads it. Subclasses that
+        actually need ``target`` in their rendering should override `render_for`
+        and add it back — and pair it with `.prefetch_related('target_ct')` in
+        whatever queryset feeds them, or accept the N+1.
         """
         if self.visibility == 'stub':
             return {
@@ -233,7 +242,6 @@ class AbstractActivity(models.Model):
         return {
             'actor_name': str(self.actor) if self.actor else 'system',
             'verb': self.verb,
-            'target': self.target,
             'deep_link': self.deep_link,
             'source_label': self.source_label,
             'created_at': self.created_at,

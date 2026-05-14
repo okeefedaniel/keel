@@ -40,6 +40,7 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone as dj_tz
 
+from keel.core.utils import get_product_code
 from keel.feed import audit_feed_view
 
 # ---- Replace this import for the concrete product ------------------------
@@ -112,8 +113,7 @@ def build_audit(request):
             'ip_address': entry.ip_address,
             'user_username': entry.user.username if entry.user_id else '',
             'user_email': entry.user.email if entry.user_id else '',
-            'product': getattr(settings, 'KEEL_PRODUCT_CODE', '') or
-                       getattr(settings, 'KEEL_PRODUCT_NAME', '').lower(),
+            'product': get_product_code(),
         })
 
     return {
@@ -122,6 +122,5 @@ def build_audit(request):
         'capped': total > limit,
         'window': [window_start.isoformat(), window_end.isoformat()],
         'fetched_at': dj_tz.now().isoformat(),
-        'product': getattr(settings, 'KEEL_PRODUCT_CODE', '') or
-                   getattr(settings, 'KEEL_PRODUCT_NAME', '').lower(),
+        'product': get_product_code(),
     }

@@ -594,14 +594,15 @@ class KeelUser(AbstractUser):
         """Return the role for the current product (set by middleware).
 
         Falls back to checking ProductAccess directly using
-        KEEL_PRODUCT_NAME from settings. This keeps existing
+        KEEL_PRODUCT_CODE from settings. This keeps existing
         @role_required decorators working unchanged.
         """
         # Middleware sets _product_role on the user instance per-request
         if hasattr(self, '_product_role'):
             return self._product_role
         # Fallback: look up from settings
-        product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+        from keel.core.utils import get_product_code
+        product = get_product_code()
         if product:
             return self.get_product_role(product)
         return None
