@@ -7,6 +7,16 @@ Usage:
 
 Each comment object must have: author, content, created_at, is_internal (optional).
 Set show_internal=True to show the "Internal comment" checkbox (staff views).
+
+Visibility contract (defense in depth):
+    Callers SHOULD pass a queryset already filtered by visibility (e.g. exclude
+    is_internal=True for non-staff users) so the count badge and "no comments"
+    state are accurate. The per-row guard below is a SAFETY NET — if the caller
+    forgets, the template still hides internal-flagged rows from non-staff
+    users at render time so they never reach the rendered HTML. Requires the
+    `django.template.context_processors.request` context processor (suite
+    default). If `request` is missing from context, `request.user.is_staff`
+    resolves to False and the safe default (hide internal) applies.
 {% endcomment %}
 {% load humanize %}
 <div class="card border-0 shadow-sm mb-4">
@@ -18,6 +28,7 @@ Set show_internal=True to show the "Internal comment" checkbox (staff views).
         {% if comments %}
         <div class="comment-list">
             {% for comment in comments %}
+            {% if not comment.is_internal or request.user.is_staff %}
             <div class="d-flex mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
                 <div class="flex-shrink-0 me-3">
                     <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 0.85rem;">
@@ -35,6 +46,7 @@ Set show_internal=True to show the "Internal comment" checkbox (staff views).
                     <div class="mt-1">{{ comment.content|linebreaksbr }}</div>
                 </div>
             </div>
+            {% endif %}
             {% endfor %}
         </div>
         {% else %}

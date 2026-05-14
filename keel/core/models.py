@@ -289,16 +289,27 @@ class WorkflowModelMixin:
     """
 
     def get_available_transitions(self, user=None):
-        """Return Transition objects available from the current status."""
-        return self.WORKFLOW.get_available_transitions(self.status, user)
+        """Return Transition objects available from the current status.
+
+        Forwards ``obj=self`` to the engine so subclasses that resolve
+        object-scoped roles (e.g. Helm's ``ProjectWorkflowEngine`` checking
+        ``ProjectCollaborator(role=LEAD)`` against the bound project) see
+        the model instance — without it, per-record role checks silently
+        fall through to the base ``_user_has_role`` and ignore ``obj``.
+        """
+        return self.WORKFLOW.get_available_transitions(self.status, user, obj=self)
 
     def transition(self, target_status, user=None, comment=''):
         """Execute a workflow transition. Validates state and roles."""
         return self.WORKFLOW.execute(self, target_status, user=user, comment=comment)
 
     def can_transition(self, target_status, user=None):
-        """Check if a transition to target_status is allowed."""
-        return self.WORKFLOW.can_transition(self.status, target_status, user)
+        """Check if a transition to target_status is allowed.
+
+        Forwards ``obj=self`` to the engine so object-scoped role checks
+        receive the model instance. See ``get_available_transitions`` above.
+        """
+        return self.WORKFLOW.can_transition(self.status, target_status, user, obj=self)
 
 
 # ---------------------------------------------------------------------------
