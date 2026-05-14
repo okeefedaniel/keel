@@ -18,6 +18,8 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 
+from keel.core.utils import get_product_code
+
 logger = logging.getLogger(__name__)
 
 _RATE_LIMIT_REQUESTS = 60
@@ -226,8 +228,7 @@ def audit_feed_view(build_audit_func):
         if not payload.get('fetched_at'):
             payload['fetched_at'] = timezone.now().isoformat()
         if not payload.get('product'):
-            payload['product'] = getattr(settings, 'KEEL_PRODUCT_CODE', '') or \
-                getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+            payload['product'] = get_product_code()
 
         cache.set(cache_key, payload, timeout=AUDIT_FEED_CACHE_TTL_SECONDS)
         return JsonResponse(payload)
@@ -327,7 +328,7 @@ def helm_inbox_view(build_inbox_func):
                 or request.build_absolute_uri('/').rstrip('/')
             )
             payload = {
-                'product': getattr(settings, 'KEEL_PRODUCT_CODE', ''),
+                'product': get_product_code(),
                 'product_label': getattr(settings, 'KEEL_PRODUCT_NAME', ''),
                 'product_url': product_url,
                 'user_sub': user_sub,
@@ -520,7 +521,7 @@ def helm_activity_view(*, default_limit: int = ACTIVITY_DEFAULT_LIMIT):
         )
 
         payload = {
-            'product': getattr(settings, 'KEEL_PRODUCT_CODE', ''),
+            'product': get_product_code(),
             'product_label': getattr(settings, 'KEEL_PRODUCT_NAME', ''),
             'product_url': product_url,
             'activities': rows,
