@@ -28,6 +28,8 @@ from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from keel.core.utils import get_product_code
+
 logger = logging.getLogger(__name__)
 
 
@@ -514,7 +516,7 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
             if picture_claim is not None and hasattr(user, 'avatar_url'):
                 user.avatar_url = picture_claim or ''
             # Resolve role for the current product from the product_access claim
-            product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+            product = get_product_code()
             product_access = claims.get('product_access') or {}
             if isinstance(product_access, dict) and product:
                 user._sso_role = product_access.get(product) or self.default_role
@@ -585,7 +587,7 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
             user.accepted_terms_at = timezone.now()
             user.save(update_fields=['accepted_terms_at'])
 
-        current_product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+        current_product = get_product_code()
 
         # --- Keel OIDC path: mirror the full product_access claim --------
         if _is_keel_provider(sociallogin):

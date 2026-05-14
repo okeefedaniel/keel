@@ -283,7 +283,7 @@ Every DockLabs product MUST include:
    - `NotificationPreference(AbstractNotificationPreference)`
    - `NotificationLog(AbstractNotificationLog)`
 4. **Settings:**
-   - `KEEL_PRODUCT_NAME`, `KEEL_PRODUCT_ICON`, `KEEL_PRODUCT_SUBTITLE`
+   - `KEEL_PRODUCT_NAME` (TitleCase display string — sidebar brand, login card title), `KEEL_PRODUCT_CODE` (lowercase machine key — must match `ProductAccess.Product` values like `'beacon'`, `'harbor'`, `'helm'`), `KEEL_PRODUCT_ICON`, `KEEL_PRODUCT_SUBTITLE`. The split between NAME and CODE is structural — every ACL / `ProductAccess` query reads `KEEL_PRODUCT_CODE` (via `keel.core.utils.get_product_code()`), and every user-visible string reads `KEEL_PRODUCT_NAME`. Never use `KEEL_PRODUCT_NAME.lower()` in new code: that ambiguity caused the feedback-widget casing bug fixed in v0.36.0 and the split in v0.37.0 exists to make it impossible.
    - `KEEL_AUDIT_LOG_MODEL`, `KEEL_NOTIFICATION_MODEL`
    - `KEEL_FOIA_EXPORT_MODEL` (concrete FOIAExportItem model)
    - `LOGIN_REDIRECT_URL = '/dashboard/'`

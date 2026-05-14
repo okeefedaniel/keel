@@ -17,6 +17,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
+from keel.core.utils import get_product_code
 from keel.notifications.dispatch import _get_user_preference, _resolve_recipients
 from keel.notifications.registry import get_all_types
 
@@ -35,7 +36,7 @@ class Command(BaseCommand):
         except User.DoesNotExist:
             raise CommandError(f'No user with email {email!r}')
 
-        product = (getattr(settings, 'KEEL_PRODUCT_CODE', '') or '').lower() or '(unset)'
+        product = get_product_code() or '(unset)'
         self.stdout.write(self.style.MIGRATE_HEADING(
             f'\n=== Notification diagnosis for {user.email} (product={product}) ==='
         ))
@@ -64,7 +65,7 @@ class Command(BaseCommand):
         if not types:
             self.stdout.write('  (none registered)')
             return
-        product = (getattr(settings, 'KEEL_PRODUCT_CODE', '') or '').lower()
+        product = get_product_code()
         for key, ntype in sorted(types.items()):
             self.stdout.write(f'\n  {self.style.HTTP_INFO(key)}')
             self.stdout.write(f'    label:           {ntype.label}')

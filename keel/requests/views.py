@@ -78,10 +78,8 @@ def submit_request(request):
     description = (data.get('description') or '').strip()
     category = (data.get('category') or Category.FEATURE).strip()
     priority = (data.get('priority') or Priority.MEDIUM).strip()
-    product = (
-        data.get('product')
-        or getattr(settings, 'KEEL_PRODUCT_NAME', '')
-    ).strip().lower()
+    from keel.core.utils import get_product_code
+    product = (data.get('product') or get_product_code()).strip().lower()
     page_url = (data.get('page_url') or '').strip()
 
     if not title or not description:

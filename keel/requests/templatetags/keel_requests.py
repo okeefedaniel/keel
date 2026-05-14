@@ -21,13 +21,10 @@ logger = logging.getLogger(__name__)
 @register.inclusion_tag('requests/widget.html', takes_context=True)
 def request_widget(context):
     """Render the feedback submission widget."""
+    from keel.core.utils import get_product_code
     request = context.get('request')
     user = getattr(request, 'user', None)
-    # ProductAccess.product is stored lowercase (Product.BEACON = 'beacon')
-    # but products set KEEL_PRODUCT_NAME in TitleCase. Lower-case here so the
-    # filter actually matches — otherwise show_widget is False for everyone
-    # but superusers.
-    product = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+    product = get_product_code()
 
     show_widget = False
     if user and user.is_authenticated:
@@ -53,7 +50,7 @@ def request_widget(context):
     # Determine submission mode: only submit locally if this IS the Keel
     # admin console. All other products send cross-origin to Keel's API
     # so change requests are centralized in one database.
-    is_keel_site = getattr(settings, 'KEEL_PRODUCT_NAME', '').lower() == 'keel'
+    is_keel_site = product == 'keel'
     local_submit = is_keel_site and 'keel.requests' in settings.INSTALLED_APPS
     keel_api_url = getattr(settings, 'KEEL_API_URL', 'https://keel.docklabs.ai').rstrip('/')
     keel_api_key = getattr(settings, 'KEEL_API_KEY', '')
