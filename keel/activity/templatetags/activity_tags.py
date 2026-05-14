@@ -80,7 +80,11 @@ def activity_panel(context, obj, limit: int = 25, title: str = 'Recent Activity'
         logger.warning('activity_panel: could not resolve ContentType for %r', obj, exc_info=True)
         return {'activity_entries': [], 'activity_title': title, 'activity_more_url': more_url}
 
-    qs = Activity.objects.filter(target_ct=target_ct, target_id=str(obj.pk)).select_related('actor')
+    # select_related('actor', 'target_ct'): actor is dereferenced via str() in
+    # render_for; target_ct is dereferenced if a subclass overrides render_for
+    # to expose self.target. Defensive even though the base render_for no
+    # longer returns target — keeps the abstraction safe for product overrides.
+    qs = Activity.objects.filter(target_ct=target_ct, target_id=str(obj.pk)).select_related('actor', 'target_ct')
 
     try:
         qs = Activity.visible_to(user, queryset=qs)
