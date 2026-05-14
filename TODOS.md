@@ -4,7 +4,7 @@ Cross-product or suite-wide engineering work that's been identified but not yet 
 
 ## Mount `/api/v1/audit-feed/` on all 9 sibling products
 
-**What:** Keel's new `/audit/` page fans out across the suite via `keel.feed.audit_feed_view`, but each sibling product needs to mount its own audit-feed endpoint before its chip on Keel flips from gray "pending" to green "ok". The reference implementation is at `keel/feed/audit_feed_example.py` in keel ≥ 0.38.2 — each product copies the file, points the `AuditLog` import at its concrete model, wires `path('api/v1/audit-feed/', build_audit)`, and bumps `keel>=0.38.2` in `requirements.txt`.
+**What:** Keel's new `/audit/` page fans out across the suite via `keel.feed.audit_feed_view`, but each sibling product needs to mount its own audit-feed endpoint before its chip on Keel flips from gray "pending" to green "ok". The reference implementation is at `keel/feed/audit_feed_example.py` in keel ≥ 0.39.1 — each product copies the file, points the `AuditLog` import at its concrete model, wires `path('api/v1/audit-feed/', build_audit)`, and bumps `keel>=0.39.1` in `requirements.txt`.
 
 **Why:** Until the endpoint ships per product, Keel's audit page shows that product as "pending" with no rows. The aggregator tolerates this (decision A9 — graceful partial-suite), so Keel itself can ship now and each product rolls out on its own cadence.
 
@@ -12,7 +12,7 @@ Cross-product or suite-wide engineering work that's been identified but not yet 
 1. Copy `keel/feed/audit_feed_example.py` → `<product>/api/audit_feed.py`
 2. Replace the `from beacon.companies.models import AuditLog` line with the right concrete model for this product
 3. Wire URL: `path('api/v1/audit-feed/', build_audit, name='audit-feed')` under your existing `/api/v1/` mount
-4. Bump `requirements.txt`: `keel @ git+https://github.com/okeefedaniel/keel.git@v0.38.2`
+4. Bump `requirements.txt`: `keel @ git+https://github.com/okeefedaniel/keel.git@v0.39.1`
 5. Deploy. Smoke test with curl + `HELM_FEED_API_KEY`. Confirm Keel `/audit/` chip flips to green.
 
 **Status by product:** admiralty ❌ · beacon ❌ · bounty ❌ · harbor ❌ · helm ❌ · lookout ❌ · manifest ❌ · purser ❌ · yeoman ❌

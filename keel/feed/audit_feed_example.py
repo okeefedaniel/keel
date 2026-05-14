@@ -17,7 +17,7 @@ Per-product rollout checklist:
         from <product>.api.audit_feed import build_audit
         path('api/v1/audit-feed/', build_audit, name='audit-feed'),
 
-4. Bump ``keel`` in requirements.txt to ``>=0.38.2`` (gets the
+4. Bump ``keel`` in requirements.txt to ``>=0.39.1`` (gets the
    ``audit_feed_view`` decorator + ``fetch_product_audit`` client).
 5. Smoke test the live endpoint::
 
