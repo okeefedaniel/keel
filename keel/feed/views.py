@@ -149,6 +149,93 @@ def helm_feed_view(build_feed_func):
 
 
 # ---------------------------------------------------------------------------
+# Cross-product audit feed — companion to helm_feed_view
+#
+# Each product exposes /api/v1/audit-feed/ using ``audit_feed_view``. Keel's
+# /audit/ page fans out across the suite and merges the per-product results
+# with the local Keel audit rows. The wrapped ``build_audit`` callable runs
+# the per-product query against that product's concrete AuditLog and returns
+# rows for the requested time window + filters.
+# ---------------------------------------------------------------------------
+
+AUDIT_FEED_CACHE_TTL_SECONDS = 60
+AUDIT_FEED_DEFAULT_LIMIT = 200
+AUDIT_FEED_MAX_LIMIT = 200
+
+
+def audit_feed_view(build_audit_func):
+    """Decorator that turns a ``build_audit(request) -> dict`` into a secured
+    /api/v1/audit-feed/ endpoint.
+
+    Auth + rate-limit mirror :func:`helm_feed_view`. Cache key includes the
+    full query string (window_start, window_end, q, actions, limit) so
+    different filter requests do not collide.
+
+    The wrapped function should read ``window_start``, ``window_end``, ``q``,
+    ``actions`` (comma-separated), and ``limit`` from ``request.GET`` and
+    return a dict::
+
+        {
+            "items": [<row dict>, ...],
+            "total_in_window": <int>,       # full count before the cap
+            "capped": <bool>,               # True when total_in_window > limit
+            "window": [<iso>, <iso>],
+            "fetched_at": <iso>,
+            "product": <product code>,
+        }
+
+    Per the audit page review (decision A6), each product applies the action
+    filter inside its own SQL query — applying the 200-row cap before action
+    filtering would silently truncate rare-action results.
+    """
+
+    @csrf_exempt
+    @require_GET
+    @functools.wraps(build_audit_func)
+    def wrapper(request):
+        if not _accepted_keys(demo_mode=getattr(settings, 'DEMO_MODE', False)):
+            return JsonResponse(
+                {'error': 'Audit feed not configured (HELM_FEED_API_KEY missing).'},
+                status=503,
+            )
+
+        matched = _authenticate_helm_bearer(request)
+        if matched is None:
+            return JsonResponse({'error': 'Invalid API key.'}, status=401)
+
+        if _rate_limited(matched):
+            return JsonResponse({'error': 'Rate limit exceeded.'}, status=429)
+
+        # Cache key includes every query param that affects the response so
+        # the action filter, window, keyword, and limit each get their own
+        # cache slot. Path alone would serve user A's filter to user B.
+        qs = request.GET.urlencode()
+        cache_key = f'keel:audit_feed_cache:{request.path}?{qs}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return JsonResponse(cached)
+
+        try:
+            payload = build_audit_func(request)
+        except Exception:
+            logger.exception('Error building audit feed for %s', request.path)
+            return JsonResponse(
+                {'error': 'Internal error building audit feed.'}, status=500,
+            )
+
+        if not payload.get('fetched_at'):
+            payload['fetched_at'] = timezone.now().isoformat()
+        if not payload.get('product'):
+            payload['product'] = getattr(settings, 'KEEL_PRODUCT_CODE', '') or \
+                getattr(settings, 'KEEL_PRODUCT_NAME', '').lower()
+
+        cache.set(cache_key, payload, timeout=AUDIT_FEED_CACHE_TTL_SECONDS)
+        return JsonResponse(payload)
+
+    return wrapper
+
+
+# ---------------------------------------------------------------------------
 # Per-user inbox endpoint — companion to helm_feed_view
 #
 # The aggregate /api/v1/helm-feed/ endpoint returns "what's happening in this
