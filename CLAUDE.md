@@ -500,7 +500,7 @@ And configure three settings (all optional — product runs standalone when unse
 
 ## Scheduling (keel.scheduling)
 
-Suite-wide registry + run log + admin dashboard for scheduled management commands. **The scheduler itself is external** — Railway cron services, GitHub Actions schedules, cron-job.org, whatever your deployment uses. Keel does NOT invoke commands itself. This module provides observability on top of the existing pattern.
+Suite-wide registry + run log + admin dashboard for scheduled management commands. **GitHub Actions is the suite's canonical scheduler** — every product ships a `.github/workflows/cron.yml` that runs management commands inside its production Railway container via `railway ssh`. Keel does NOT invoke commands itself; this module provides observability on top of the GitHub-Actions-driven pattern. (Earlier deployments used Railway cron services and cron-job.org; both are deprecated for new work.)
 
 **Three pieces:**
 
@@ -532,9 +532,23 @@ Suite-wide registry + run log + admin dashboard for scheduled management command
 
 **Per-service scope:** Each Railway service has its own DB and its own `/scheduling/` showing only that service's jobs. There is no cross-service aggregation in v1; a future Helm "fleet scheduling" view could pull each product's jobs via its helm-feed.
 
-**`enabled` flag is display-only.** Toggling `enabled=False` does NOT pause the cron — only the external scheduler can do that. Use `enabled=False` to mark a job as expected-disabled so the dashboard doesn't flag missing runs.
+**`enabled` flag is display-only.** Toggling `enabled=False` does NOT pause the cron — only GitHub Actions can do that (disable the workflow or comment the schedule line). Use `enabled=False` to mark a job as expected-disabled so the dashboard doesn't flag missing runs.
 
-**Why this exists:** Cron jobs were running in production with no visibility. The old pattern (Beacon's `compute_health_scores`, `generate_cadence_reminders`, `send_adoption_report`) had docstring comments saying "run daily via cron" but no record of whether they actually ran, no error capture, no place to find them all in one view. This module adds that observability without changing how scheduling itself works.
+### GitHub Actions workflow pattern (canonical, every product)
+
+Each product's `.github/workflows/cron.yml` follows this shape. Reference implementations: [`helm/.github/workflows/cron.yml`](../helm/.github/workflows/cron.yml) (smallest) and [`lookout/.github/workflows/cron.yml`](../lookout/.github/workflows/cron.yml) (most schedules — 9 jobs).
+
+1. **`on.schedule:`** — one `cron:` entry per scheduled job. The `github.event.schedule` value at runtime is what the `Pick command` step keys off to choose which `manage.py <cmd>` to run.
+2. **`on.workflow_dispatch:`** — manual trigger with a `command` input so you can fire any registered job on demand from the Actions tab. The choices in the dropdown should mirror the `@scheduled_job` slugs.
+3. **Railway CLI install** — pinned to **v4.36.1**. Newer versions (≥ v4.44.0) ship a broken `railway ssh` that returns Unauthorized for valid project tokens. `railway variables` and `railway status` work fine on the same broken versions; the regression is scoped to ssh. Bypass `install.sh` (always grabs latest) and pull the x86_64 tarball directly.
+4. **Ephemeral SSH key** — `ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -q`. `railway ssh` requires an SSH keypair under `~/.ssh`; the GitHub runner ships without one, so every run must generate a throwaway key first. Without it, `railway ssh` fails with "No SSH keys found in ~/.ssh/", every cron run silently fails, and `flags.cron_silent_24h` trips the canary 24h later.
+5. **The actual command** — `railway ssh --service <product> "cd /app && /opt/venv/bin/python manage.py <cmd>"`. Runs inside the production container, so the command inherits prod env (DATABASE_URL, API keys, etc.) and the prod DB connection without exposing either to the GitHub runner.
+
+**Required GitHub secret per product repo:** `RAILWAY_TOKEN`. This must be a Railway **project token** (Settings → Tokens → Create), scoped to the product's Railway project + production environment. Project tokens auto-target their bound project/env, so no `--project` / `--environment` flags are needed on `railway ssh`. Workspace-scoped tokens won't work — `railway ssh` requires the project binding.
+
+**Demo services are NOT scheduled.** GitHub Actions cron workflows target `--service <product>`, the production service only. Demo seed data is regenerated on each `seed_*` run from `run_startup()`; demo doesn't need its own cron.
+
+**Why this exists:** Cron jobs were running in production with no visibility. The old pattern (Beacon's `compute_health_scores`, `generate_cadence_reminders`, `send_adoption_report`) had docstring comments saying "run daily via cron" but no record of whether they actually ran, no error capture, no place to find them all in one view. Picking GitHub Actions over Railway cron services / cron-job.org also puts the schedule in git — anyone can grep `.github/workflows/cron.yml` to see what's scheduled, see the history of changes, and review schedule edits as PRs. `/scheduling/` adds the runtime observability layer on top.
 
 ## Ops canary (keel.ops)
 
