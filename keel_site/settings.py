@@ -313,6 +313,12 @@ KEEL_NOTIFICATION_PREFERENCE_MODEL = 'keel_accounts.NotificationPreference'
 KEEL_NOTIFICATION_LOG_MODEL = 'keel_accounts.NotificationLog'
 KEEL_API_KEY = os.environ.get('KEEL_API_KEY', '')  # Shared key for product → Keel API (legacy)
 
+# Suite-wide helm-feed bearer used by Keel's /audit/ aggregator when calling
+# each product's /api/v1/audit-feed/ endpoint. Same secret each product accepts
+# (and uses outbound for helm-feed). Without this Keel sends an empty bearer
+# and every product chip in /audit/ shows "unauthorized".
+HELM_FEED_API_KEY = os.environ.get('HELM_FEED_API_KEY', '')
+
 # Per-product API keys — preferred over ``KEEL_API_KEY``. Each product is
 # provisioned its own key so a compromised product container can only
 # forge requests attributed to itself, not to the whole fleet. Format:
