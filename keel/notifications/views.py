@@ -18,11 +18,35 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.module_loading import import_string
 from django.views.decorators.http import require_POST
 
 from .registry import get_types_by_category
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_context_hook():
+    """Resolve the optional KEEL_NOTIFICATION_LIST_CONTEXT_HOOK setting.
+
+    The hook is a dotted path to a callable ``(request) -> dict`` whose
+    result is merged into the inbox template context. Helm uses it to
+    inject the cross-product ``peer_notifications`` stream so the
+    canonical inbox shows the same set of items the dashboard alerts
+    column teases. Empty by default — products that don't aggregate
+    peers see no behavior change.
+    """
+    hook_path = getattr(settings, 'KEEL_NOTIFICATION_LIST_CONTEXT_HOOK', None)
+    if not hook_path:
+        return None
+    try:
+        return import_string(hook_path)
+    except Exception:
+        logger.exception(
+            'KEEL_NOTIFICATION_LIST_CONTEXT_HOOK could not be imported: %s',
+            hook_path,
+        )
+        return None
 
 
 def _get_notification_model():
@@ -75,6 +99,16 @@ def notification_list(request):
         'unread_count': unread_count,
         'filter_status': filter_status,
     }
+
+    hook = _resolve_context_hook()
+    if hook is not None:
+        try:
+            extra = hook(request) or {}
+            if isinstance(extra, dict):
+                context.update(extra)
+        except Exception:
+            logger.exception('Notification list context hook raised')
+
     return render(request, 'notifications/list.html', context)
 
 
