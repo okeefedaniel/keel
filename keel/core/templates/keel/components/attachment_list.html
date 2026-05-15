@@ -1,0 +1,84 @@
+{% comment %}
+Attachment list — renders an AbstractAttachment queryset with optional
+upload form. Distinguishes Manifest-signed PDFs (from the signing
+handoff roundtrip) and internal-vs-external visibility.
+
+Usage:
+    {% include "keel/components/attachment_list.html" with
+        attachments=record.attachments.all
+        upload_action=upload_url
+        csrf_token=csrf_token %}
+
+Each attachment must come from a model extending AbstractAttachment
+(fields: file, filename, content_type, size_bytes, description,
+visibility, source, uploaded_by, uploaded_at, manifest_packet_uuid).
+
+`upload_action` is optional — pass the URL the upload form should POST to,
+or omit to render read-only.
+
+Visibility contract (defense in depth):
+    Callers SHOULD pass a queryset filtered by visibility for the current
+    user (e.g. exclude visibility='internal' for non-staff). The per-row
+    guard below is a SAFETY NET — if the caller forgets, the template
+    still hides internal-flagged rows from non-staff at render time.
+    Requires `django.template.context_processors.request` in TEMPLATES
+    OPTIONS (suite default). If request is missing, `request.user.is_staff`
+    resolves to False — the safe default.
+{% endcomment %}
+{% load humanize %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-bold"><i class="bi bi-paperclip me-1"></i>Attachments</span>
+        {% if attachments %}<span class="badge bg-secondary">{{ attachments|length }}</span>{% endif %}
+    </div>
+    <div class="card-body">
+        {% if attachments %}
+        <ul class="list-group list-group-flush">
+            {% for att in attachments %}
+            {% if att.visibility != 'internal' or request.user.is_staff %}
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2 border-0">
+                <div class="flex-grow-1">
+                    {% if att.source == 'manifest_signed' %}
+                    <i class="bi bi-file-earmark-check text-success me-1"></i>
+                    {% else %}
+                    <i class="bi bi-file-earmark me-1"></i>
+                    {% endif %}
+                    {% if att.file %}
+                    <a href="{{ att.file.url }}">{{ att.filename|default:"file" }}</a>
+                    {% else %}
+                    <span>{{ att.filename|default:"file" }}</span>
+                    {% endif %}
+                    {% if att.size_bytes %}<small class="text-muted ms-1">{{ att.size_bytes|filesizeformat }}</small>{% endif %}
+                    {% if att.source == 'manifest_signed' %}<span class="badge bg-success ms-1">Signed via Manifest</span>{% endif %}
+                    {% if att.visibility == 'internal' %}<span class="badge bg-warning text-dark ms-1">Internal</span>{% endif %}
+                </div>
+                <small class="text-muted">
+                    {% if att.uploaded_at %}{{ att.uploaded_at|naturaltime }}{% endif %}
+                    {% if att.uploaded_by %}by {{ att.uploaded_by.get_full_name|default:att.uploaded_by.username }}{% endif %}
+                </small>
+            </li>
+            {% endif %}
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted small mb-3"><i class="bi bi-cloud-upload me-1"></i>No attachments yet.</p>
+        {% endif %}
+
+        {% if upload_action %}
+        <hr>
+        <form method="post" action="{{ upload_action }}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row g-2 align-items-end">
+                <div class="col">
+                    <input type="file" name="file" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-upload me-1"></i>Upload
+                    </button>
+                </div>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</div>

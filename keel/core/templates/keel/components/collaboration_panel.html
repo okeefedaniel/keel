@@ -1,0 +1,109 @@
+{% comment %}
+Collaboration Panel — the suite-wide per-record diligence surface.
+Composes five existing keel/components/ sub-includes in fixed order:
+
+  1. claim_row.html             (who's the lead)
+  2. collaborator_list.html     (LEAD / CONTRIBUTOR / REVIEWER / OBSERVER)
+  3. comment_section.html       (internal-vs-external notes)
+  4. workflow_transitions.html  (current state + available transitions)
+  5. attachment_list.html       (uploads + Manifest-signed PDFs)
+
+The right-rail Activity + Quick Info are NOT inside this orchestrator —
+the calling detail page composes them separately so product-strength
+content above the panel and chrome around it stay product territory.
+This panel IS the per-record scaffolding underneath; see
+docs/design/collaboration-panel-2026-05.md for the spatial contract.
+
+Usage (caller resolves all URLs via {% url %} since URL names vary
+per product, and pre-filters all querysets for visibility + N+1 prep):
+
+    {% include "keel/components/collaboration_panel.html" with
+        entity=object
+        entity_label="invitation"
+        active_assignment=object.current_assignment
+        is_archived=object.is_archived
+        collaborators=collaborators_qs
+        notes=notes_qs
+        attachments=attachments_qs
+        available_transitions=available_transitions
+        claim_action=claim_url
+        transition_action=transition_url
+        invite_action=invite_url
+        remove_action=remove_url
+        note_form_action=note_form_url
+        attachment_upload_action=upload_url
+        show_internal=request.user.is_staff
+        collapsed=False
+    %}
+
+Skipping sub-sections:
+    To omit a sub-section entirely, omit its data kwarg (the section
+    only renders when its data is provided). Manifest, which has no
+    collaboration semantics by design, does not include this panel
+    at all — that's the right move; the panel is opt-in.
+
+Collapsed-by-default mode (Admiralty carve-out):
+    Pass `collapsed=True` to wrap the whole panel in a <details>
+    element with a single-line summary header. Designed for products
+    where workflow + statutory clock + legal procedure dominate the
+    main column; collaboration is one click away, not zero. See the
+    Admiralty section of docs/design/collaboration-panel-2026-05.md
+    for the rationale (statutory clock pressure, legal defensibility,
+    requester-facing risk — NOT "buyer suspicion of collaboration-first
+    tools", which Codex flagged as the wrong framing).
+
+Visibility / authorization:
+    Callers MUST pass querysets pre-filtered for the current user's
+    visibility. The panel includes defensive filters in
+    comment_section.html and attachment_list.html as a safety net,
+    but those rely on `request.user.is_staff` and are NOT a substitute
+    for view-level ACL.
+{% endcomment %}
+{% load humanize %}
+
+{% if collapsed %}
+<details class="collaboration-panel collaboration-panel--collapsed mb-4">
+    <summary class="card card-body py-2 px-3 bg-white border-0 shadow-sm fw-normal" style="cursor: pointer;">
+        <i class="bi bi-people me-2"></i><strong>Collaboration</strong>
+        <span class="text-muted small ms-2">
+            {% if active_assignment and active_assignment.assigned_to %}Lead: {{ active_assignment.assigned_to.get_full_name|default:active_assignment.assigned_to.username }} ·{% endif %}
+            {% if collaborators %}{{ collaborators|length }} member{{ collaborators|length|pluralize }}{% else %}unclaimed{% endif %}
+            {% if notes %} · {{ notes|length }} note{{ notes|length|pluralize }}{% endif %}
+            {% if attachments %} · {{ attachments|length }} file{{ attachments|length|pluralize }}{% endif %}
+        </span>
+        <span class="text-muted small float-end"><i class="bi bi-chevron-down"></i></span>
+    </summary>
+    <div class="mt-3">
+{% endif %}
+
+<div class="collaboration-panel">
+    {% include "keel/components/claim_row.html" %}
+
+    {% if collaborators is not None %}
+    {% include "keel/components/collaborator_list.html" with assignment=active_assignment %}
+    {% endif %}
+
+    {% if notes is not None %}
+    {% include "keel/components/comment_section.html" with comments=notes form_action=note_form_action %}
+    {% endif %}
+
+    {% if available_transitions %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-bold">
+            <i class="bi bi-arrow-right-circle me-1"></i>Workflow
+        </div>
+        <div class="card-body">
+            {% include "keel/components/workflow_transitions.html" %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if attachments is not None %}
+    {% include "keel/components/attachment_list.html" with upload_action=attachment_upload_action %}
+    {% endif %}
+</div>
+
+{% if collapsed %}
+    </div>
+</details>
+{% endif %}

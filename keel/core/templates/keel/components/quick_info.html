@@ -1,0 +1,71 @@
+{% comment %}
+Quick Info sidebar card — the right-rail metadata summary for record
+detail pages. Suite-shared per the collaboration-panel layout contract:
+status / claimant / principal / timestamps + caller-supplied extra
+fields rendered in the same dl-row visual.
+
+Usage:
+    {% include "keel/components/quick_info.html" with
+        status_label=invitation.get_status_display
+        claimant=invitation.assigned_to
+        principal=invitation.principal_speaker
+        created_at=invitation.created_at
+        updated_at=invitation.updated_at
+        extra_fields=extra_fields %}
+
+Variables (all optional — render only the rows the caller provides):
+    status_label — display string for the current status
+    claimant     — User-like object with get_full_name / username
+    principal    — User-like object (e.g. principal speaker, lead reviewer)
+    created_at   — datetime
+    updated_at   — datetime
+    extra_fields — iterable of (label, value) tuples for product-specific
+                   rows (e.g. ('FOIA #', request.tracking_number))
+
+Uses small-caps muted labels + Bootstrap dl-row layout. Matches the
+Yeoman invitation detail page's canonical Quick Info pattern from
+docs/design/collaboration-panel-2026-05.md.
+{% endcomment %}
+{% load humanize %}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-bold">
+        <i class="bi bi-info-circle me-1"></i>Quick Info
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0 small">
+            {% if status_label %}
+            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Status</dt>
+            <dd class="col-7 mb-2">{{ status_label }}</dd>
+            {% endif %}
+
+            {% if claimant %}
+            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Claimant</dt>
+            <dd class="col-7 mb-2">{{ claimant.get_full_name|default:claimant.username|default:claimant }}</dd>
+            {% endif %}
+
+            {% if principal %}
+            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Principal</dt>
+            <dd class="col-7 mb-2">{{ principal.get_full_name|default:principal.username|default:principal }}</dd>
+            {% endif %}
+
+            {% for label, value in extra_fields %}
+            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">{{ label }}</dt>
+            <dd class="col-7 mb-2">{{ value|default:"—" }}</dd>
+            {% endfor %}
+
+            {% if created_at or updated_at %}
+            <dd class="col-12"><hr class="my-2"></dd>
+            {% endif %}
+
+            {% if created_at %}
+            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Created</dt>
+            <dd class="col-7 mb-2">{{ created_at|naturaltime }}</dd>
+            {% endif %}
+
+            {% if updated_at %}
+            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Updated</dt>
+            <dd class="col-7 mb-0">{{ updated_at|naturaltime }}</dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>

@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    'django.contrib.humanize',  # filters used by keel/components/ templates (naturaltime, filesizeformat-via-humanize)
     # Third party
     'oauth2_provider',  # Phase 2b: Keel as OIDC IdP
     # Keel modules

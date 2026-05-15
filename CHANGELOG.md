@@ -4,6 +4,54 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.44.0 — 2026-05-15
+
+**Wave 1 (collaboration-panel) batch 1.** The orchestrator + the two
+missing sub-includes ship. Wave 2 (Yeoman adoption) can now consume
+this in its detail page.
+
+### Added
+- `keel/core/templates/keel/components/collaboration_panel.html` — the
+  Wave 1 orchestrator. Composes five existing keel/components/ sub-includes
+  in fixed order: claim_row → collaborator_list → comment_section →
+  workflow_transitions → attachment_list. Sub-sections opt out by
+  omitting their data kwarg (e.g. don't pass `notes` to skip the
+  discussion section). Supports `collapsed=True` for the Admiralty
+  carve-out: wraps the whole panel in a `<details>` element with a
+  single-line summary showing claim state + member/note/file counts.
+- `keel/core/templates/keel/components/attachment_list.html` — renders
+  an `AbstractAttachment` queryset with Manifest-signed badge,
+  internal-visibility defensive filter, optional upload form.
+- `keel/core/templates/keel/components/quick_info.html` — right-rail
+  sidebar metadata card (status / claimant / principal / timestamps +
+  caller-supplied extra_fields). Matches the Yeoman canonical detail
+  page Quick Info pattern.
+- `tests/test_collaboration_panel.py` — 15 render tests: 6 for
+  attachment_list (Manifest badge, internal-row visibility, empty state),
+  3 for quick_info (rows, skip-missing, extra_fields), 6 for the
+  orchestrator (all-sections render, claim-row toggle, sub-section
+  opt-out, collapsed mode).
+
+### Fixed
+- `keel_site/settings.py` adds `django.contrib.humanize` to
+  `INSTALLED_APPS`. Production keel templates (`comment_section.html`,
+  `collaborator_list.html`, and the new Wave 1 components) have always
+  used `{% load humanize %}` for `naturaltime` filters; the test settings
+  never installed it, which silently made those templates untestable.
+  Discovered when the Wave 1 render tests first failed. Tests for the
+  defensive `is_internal` filter shipped in 0.40.2 can now actually run.
+
+### Still deferred into a Wave 1 batch 2
+- `{% collaboration_panel object %}` template tag with
+  `get_collaboration_panel_spec(obj, request)` resolver contract (the
+  DX-phase recommendation — replaces the 6-kwarg include API). Current
+  batch ships the include-based contract; the tag wraps it once Wave 2
+  validates real consumption patterns.
+- `python manage.py preview_collaboration_panel` management command —
+  the simplest valuable form is one that takes `--product <name> --pk <id>`
+  and renders that product's actual entity. That requires Wave 2 to ship
+  first so there's a real product wired against the panel.
+
 ## 0.43.0 — 2026-05-14
 
 **Retry command for failed cross-product mention dispatches.** New
