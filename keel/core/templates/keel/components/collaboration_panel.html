@@ -52,12 +52,22 @@ Collapsed-by-default mode (Admiralty carve-out):
     requester-facing risk — NOT "buyer suspicion of collaboration-first
     tools", which Codex flagged as the wrong framing).
 
-Visibility / authorization:
-    Callers MUST pass querysets pre-filtered for the current user's
-    visibility. The panel includes defensive filters in
-    comment_section.html and attachment_list.html as a safety net,
-    but those rely on `request.user.is_staff` and are NOT a substitute
-    for view-level ACL.
+Visibility / authorization (TWO requirements — both must hold):
+    1. Callers **MUST** pass querysets pre-filtered for the current user's
+       visibility. The collapsed-mode summary header (`{{ collaborators|length }}`,
+       `{{ notes|length }}`, `{{ attachments|length }}`) AND the count badges
+       inside each sub-include reflect the INPUT queryset BEFORE row-level
+       guards run. An unfiltered queryset shows "3 members · 2 notes · 1 file"
+       to a non-staff user when internal-only rows make those counts wrong —
+       the user learns staff-only content exists even though contents stay
+       hidden. For external-applicant detail pages (Harbor's applicant portal,
+       future Admiralty requester portal), pre-filter at the view layer.
+
+    2. The defensive per-row filters in `comment_section.html` and
+       `attachment_list.html` are the SAFETY NET for rule 1 — they hide
+       internal row CONTENTS at render time. They do NOT fix count badges
+       or the collapsed-summary header. They rely on
+       `request.user.is_staff` and are NOT a substitute for view-level ACL.
 {% endcomment %}
 {% load humanize %}
 

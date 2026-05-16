@@ -227,10 +227,20 @@ class AbstractActivity(models.Model):
         — the bundled `keel/activity/_panel.html` partial renders only actor / verb /
         created_at / deep_link / source_label / metadata / is_stub. Dereferencing
         ``self.target`` for every row would cost one ContentType + one model lookup
-        per row (N+1) even though the template never reads it. Subclasses that
-        actually need ``target`` in their rendering should override `render_for`
-        and add it back — and pair it with `.prefetch_related('target_ct')` in
-        whatever queryset feeds them, or accept the N+1.
+        per row (N+1) even though the template never reads it.
+
+        Subclasses that actually need ``target`` in their rendering should override
+        `render_for` and add it back — BUT note that `select_related('target_ct')`
+        on the queryset (as `activity_panel` does) only avoids the ContentType
+        lookup; it does NOT prefetch the target object itself. To eliminate the
+        per-row target query, use Django's `GenericPrefetch` (4.2+):
+
+            from django.contrib.contenttypes.prefetch import GenericPrefetch
+            qs = qs.prefetch_related(
+                GenericPrefetch('target', [Project.objects.all(), Bill.objects.all(), ...])
+            )
+
+        Or accept the N+1 if the target list is short.
         """
         if self.visibility == 'stub':
             return {

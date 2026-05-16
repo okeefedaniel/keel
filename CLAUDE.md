@@ -271,7 +271,7 @@ The list view MUST honor the personal-scope query param (e.g. `?mine=1` filters 
 
 Every DockLabs product MUST include:
 
-1. **INSTALLED_APPS:** `keel.core`, `keel.security`, `keel.notifications`
+1. **INSTALLED_APPS:** `keel.core`, `keel.security`, `keel.notifications`, AND `django.contrib.humanize` (shared keel templates — `comment_section.html`, `collaborator_list.html`, `collaboration_panel.html`, `attachment_list.html`, `quick_info.html` — all `{% load humanize %}` for `naturaltime` / `filesizeformat`; product crashes with `TemplateSyntaxError` if humanize isn't in INSTALLED_APPS).
 2. **Middleware (in order):**
    - `keel.security.middleware.SecurityHeadersMiddleware`
    - `keel.security.middleware.FailedLoginMonitor`
@@ -311,6 +311,8 @@ Every DockLabs product MUST include:
 ### Object-scoped roles (`obj=` parameter)
 
 `WorkflowEngine.execute()`, `can_transition()`, and `get_available_transitions()` all pass an `obj=` argument down to `_user_has_role(user, required_roles, obj=None)`. The base implementation ignores it; subclasses use it to resolve roles that depend on the model instance — e.g. Helm's `ProjectWorkflowEngine` resolves the `'lead'` keyword by checking whether the user holds an active `ProjectCollaborator(role=LEAD)` row for the bound project. **Subclasses overriding `_user_has_role` MUST accept the `obj=None` keyword** even if they ignore it, or the engine will raise `TypeError` when keel passes it through.
+
+**`WorkflowModelMixin` forwards `obj=self` to the engine** (since keel 0.40.2). Per-record role checks like `'lead'` would silently fall through to the base `_user_has_role` (which ignores obj) without this forwarding. Pre-0.40.2 the mixin dropped `obj` when calling the engine, so per-record role checks were broken any time they were called via `entity.get_available_transitions(user)` instead of directly against the engine. **Subclasses of `WorkflowEngine` that override `get_available_transitions` or `can_transition` MUST accept the `obj=None` keyword** for the same reason — without it, the mixin's call raises `TypeError`. None of the current product engines override these methods (they all subclass `_user_has_role` only); flag in code review if a future PR adds an override.
 
 ## Archive (keel.core.archive)
 

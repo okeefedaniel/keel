@@ -1,8 +1,11 @@
 {% comment %}
 Workflow transition controls — renders the list of transitions the current
 user has permission to perform, computed by the caller via
-`entity.WORKFLOW.get_available_transitions(user)` (which forwards `obj=entity`
-to the engine for object-scoped role checks; see WorkflowModelMixin).
+`entity.get_available_transitions(user)` — the WorkflowModelMixin method,
+NOT the engine's get_available_transitions (which takes current_status as
+its first positional arg). The mixin's method forwards `obj=self` to the
+engine for object-scoped role checks (see WorkflowModelMixin in
+keel/core/models.py).
 
 This is the parameterized, suite-shared version of Helm's pattern in
 helm/tasks/templates/tasks/partials/_project_transition_controls.html.

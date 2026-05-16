@@ -16,14 +16,23 @@ visibility, source, uploaded_by, uploaded_at, manifest_packet_uuid).
 `upload_action` is optional — pass the URL the upload form should POST to,
 or omit to render read-only.
 
-Visibility contract (defense in depth):
-    Callers SHOULD pass a queryset filtered by visibility for the current
-    user (e.g. exclude visibility='internal' for non-staff). The per-row
-    guard below is a SAFETY NET — if the caller forgets, the template
-    still hides internal-flagged rows from non-staff at render time.
-    Requires `django.template.context_processors.request` in TEMPLATES
-    OPTIONS (suite default). If request is missing, `request.user.is_staff`
-    resolves to False — the safe default.
+Visibility contract (TWO requirements — both must hold):
+    1. Callers **MUST** pass a queryset filtered by visibility for the current
+       user (e.g. `.exclude(visibility='internal')` for non-staff). The count
+       badge `{{ attachments|length }}` reflects the INPUT queryset BEFORE the
+       per-row guard runs — an unfiltered queryset shows "Attachments (5)" to
+       a non-staff user when only 3 will render. That count discrepancy is a
+       metadata leak: the user learns "there are 2 staff-only files I can't
+       see" even though their content is hidden. For external-applicant detail
+       pages this matters; pre-filter or override the badge in your view.
+
+    2. The per-row `{% if att.visibility != 'internal' or request.user.is_staff %}`
+       guard below is the SAFETY NET for rule 1 — if the caller forgets to
+       filter, internal-flagged row CONTENTS stay hidden from non-staff. It
+       does NOT fix the count badge. Requires
+       `django.template.context_processors.request` (suite default). If
+       request is missing, `request.user.is_staff` resolves False — safe
+       default (hide internal).
 {% endcomment %}
 {% load humanize %}
 <div class="card border-0 shadow-sm mb-4">

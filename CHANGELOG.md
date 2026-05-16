@@ -4,6 +4,54 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.44.1 — 2026-05-16
+
+**Post-/review hardening of Wave 1 batch 1.** Codex adversarial review surfaced
+seven findings against the 0.40.2 / 0.41.1 / 0.41.2 / 0.44.0 commits (this
+session's Wave 0 + Wave 1 batch 1 work). Two AUTO-FIXED in template behavior;
+three became durable docstring/CLAUDE.md updates; one (visibility-contract
+docstring tightening on three templates) was applied per user choice on the
+metadata-leak finding; one (`render_for` target removal) skipped after audit
+confirmed no known consumers.
+
+### Fixed
+- `quick_info.html` extra_fields used `|default:"—"` which corrupts valid
+  falsey values (`0`, `False`, empty string). Switched to `|default_if_none:"—"`
+  so only `None` collapses to the dash. Caught by Codex.
+- `workflow_transitions.html` docstring told callers to compute transitions via
+  `entity.WORKFLOW.get_available_transitions(user)` — but that's the engine's
+  signature which takes `current_status` first, not `user`. Following the docstring
+  would silently produce no workflow buttons. Corrected to point at the mixin
+  method `entity.get_available_transitions(user)`. Caught by Codex.
+
+### Documentation
+- `keel/activity/models.py` `render_for` docstring now clarifies that
+  `select_related('target_ct')` on the queryset (as `activity_panel` does) only
+  avoids the ContentType lookup; it does NOT prefetch the target object.
+  Subclasses that re-expose `self.target` need Django 4.2+ `GenericPrefetch` for
+  true zero-N+1 behavior. Caught by Codex.
+- `keel/CLAUDE.md` "Keel Integration (Minimum Required)" now explicitly lists
+  `django.contrib.humanize` as a required `INSTALLED_APPS` entry. Shared keel
+  templates have always `{% load humanize %}` but the convention was implicit.
+  Adopting the new collaboration_panel will crash with `TemplateSyntaxError`
+  in any product that doesn't have it. Caught by Codex.
+- `keel/CLAUDE.md` "Object-scoped roles" section now extends the obj= contract:
+  subclasses of `WorkflowEngine` that override `get_available_transitions` or
+  `can_transition` MUST accept `obj=None`. The existing rule only covered
+  `_user_has_role`. None of the current product engines override these methods
+  (verified), but the contract change in 0.40.2 deserves documentation.
+
+### Known issue (deferred — user decision pending)
+- `comment_section.html`, `attachment_list.html`, and `collaboration_panel.html`'s
+  collapsed-mode summary all show counts (`{{ comments|length }}` etc.) computed
+  against the INPUT queryset, BEFORE the per-row internal-visibility guard runs.
+  If a caller forgets view-level filtering, non-staff users don't see internal
+  row contents but they DO see "Comments (5)" when only 3 are visible — a
+  metadata leak. The defensive filter was designed as second-line defense; the
+  primary contract is caller-side filtering. Fix options under discussion: (a)
+  drop the count badge entirely, (b) require optional `total_count` kwarg, (c)
+  document the contract more aggressively in template comments. Caught by Codex.
+
 ## 0.44.0 — 2026-05-15
 
 **Wave 1 (collaboration-panel) batch 1.** The orchestrator + the two

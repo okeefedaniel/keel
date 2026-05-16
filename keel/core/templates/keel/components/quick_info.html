@@ -50,7 +50,7 @@ docs/design/collaboration-panel-2026-05.md.
 
             {% for label, value in extra_fields %}
             <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">{{ label }}</dt>
-            <dd class="col-7 mb-2">{{ value|default:"—" }}</dd>
+            <dd class="col-7 mb-2">{{ value|default_if_none:"—" }}</dd>
             {% endfor %}
 
             {% if created_at or updated_at %}
