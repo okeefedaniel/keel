@@ -866,6 +866,47 @@ Push the tag in the same operation as the bump commit, or immediately after. **C
 
 **Do NOT use hyphens in arbitrary positions** (e.g. `0.12.0-design-v3-preview`). Pip rejects them with `configuration error: 'project.version' must be pep440` and the product's demo/prod build dies at `Getting requirements to build wheel`. Descriptive version labels belong in commit messages and the plan file, not the version string itself.
 
+### Repo visibility — pre-beta posture
+
+**DockLabs is pre-beta software. The default policy is private.** Only two repos are public: **`keel`** (the shared library) and **`harbor`** (the only product Dan wants on the public showcase surface). The other eight products are private: `admiralty`, `beacon`, `bounty`, `helm`, `lookout`, `manifest`, `purser`, `yeoman`.
+
+**Why keel is public** — structural necessity. Every product's `requirements.txt` pins `keel @ git+https://github.com/okeefedaniel/keel.git@vX.Y.Z`. With keel public, pip resolves anonymously in Railway builds and GitHub Actions CI. No tokens, no per-service secrets, no rotation. The moment keel goes private, **every product's `pip install -r requirements.txt` fails** at build time with `fatal: could not read Username for 'https://github.com'`. Existing containers keep serving (the wheel is baked into the running image), so the failure is latent and lands on the next push — typically hours or days later, often noticed by someone unrelated.
+
+**Why harbor is public** — Dan's product decision. The other agency-facing products carry customer-identifying content (real agency names, deployment runbooks, FOIA workflows) that we keep behind authentication. Harbor is the public-facing showcase.
+
+#### What breaks if you flip the visibility policy
+
+If you ever flip **keel** private (or make a different product the dependency for some new product), four cross-repo references break and must be wired explicitly. Diagnosed live 2026-05-16 when keel was briefly flipped private:
+
+**1. Reusable GitHub Actions workflows (immediate, suite-wide).** Every product's `.github/workflows/ci.yml` references keel's reusable security workflow via `uses: okeefedaniel/keel/.github/workflows/security.yml@vX.Y.Z`. When keel is private, consumer CI can't resolve it unless keel explicitly opts in: **Settings → Actions → General → Access** → "Accessible from repositories owned by the user account 'okeefedaniel'".
+
+**Symptom:** CI runs report `conclusion=failure` with **0 jobs / 0 check runs**, and GitHub displays the workflow `name` as the file path (`.github/workflows/ci.yml`) instead of the declared name (`CI`). That's the canonical signature of a workflow-parse failure on an unresolvable `uses:` reference. Railway's Wait-for-CI gate then silently SKIPs every deploy with `skippedReason="CI check suite failed"` — see the **Railway "Wait for CI" gate** known deviation. **Existing deploys keep serving the previous image**, so prod looks healthy (200 on `/health/`) while every push silently no-ops.
+
+**2. pip install of private keel from product `requirements.txt`.** With keel private, both Railway builds and CI need credentials at build time. The standard fix:
+
+- Create a fine-grained PAT (`okeefedaniel` resource owner, Repository access = `keel` only, Permissions = Contents:Read-only).
+- Store as a GitHub Actions secret named `KEEL_INSTALL_TOKEN` on every consumer repo (8 private products).
+- Store as a Railway env var of the same name on every consumer service (16 services: prod + demo for each product).
+- Rewrite the pin to `keel @ git+https://${KEEL_INSTALL_TOKEN}@github.com/okeefedaniel/keel.git@vX.Y.Z` OR inject auth via `git config --global url."https://${TOKEN}@github.com/".insteadOf "https://github.com/"` before `pip install`.
+
+**Symptom:** `pip install` fails with `fatal: could not read Username for 'https://github.com': No such device or address`. **Action when flipping keel private:** force a redeploy on at least one product immediately so you catch this on day-zero, not on someone else's next push.
+
+**3. Documentation / runbook references.** Markdown files (`keel/CLAUDE.md`, plan files under `~/.claude/plans/`, etc.) embed `github.com/okeefedaniel/<repo>` URLs. They 404 for unauthenticated readers, and Slack/Linear link previews stop unfurling. No code change needed — just know the audience shrinks.
+
+**4. Cross-repo `gh` CLI in CI.** The auto-injected `GITHUB_TOKEN` is scoped to the calling repo. Cross-repo `gh api repos/okeefedaniel/<other>/...` calls need a separate secret. Not currently used (cron and audit-feed workflows are all same-repo), but flag it if a future workflow adds cross-product `gh` calls.
+
+#### Quick audit after any visibility flip
+
+```bash
+# 1. Verify CI passes on every product (catches the reusable-workflow break)
+for p in admiralty beacon bounty harbor helm lookout manifest purser yeoman keel; do
+  gh run list --repo okeefedaniel/$p --limit 1 --json conclusion,name,headSha
+done
+
+# 2. Force a redeploy on one product to surface any pip-install break
+railway link -p yeoman -e production && railway redeploy --service yeoman
+```
+
 ### Railway CLI access
 
 - **The Railway CLI is installed and authenticated** (`railway` command, logged in as `inbox@okeefeweb.com`). Use it for managing env vars, checking deploy status, and triggering deployments across all 10 DockLabs services.
@@ -933,7 +974,7 @@ These items were completed during the Phase 2b OIDC rollout session:
 
 ---
 
-*Last updated: 2026-05-14.*
+*Last updated: 2026-05-16.*
 
 ## Design Partner
 
