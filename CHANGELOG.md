@@ -4,6 +4,35 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.45.0 — 2026-05-16
+
+**Fix the ops canary `is_staff` leak suite-wide.** The historical gate
+(`{% if user.is_staff and canary %}` on dashboards, `@staff_member_required`
+on `/api/v1/metrics/`) was too loose: `seed_keel_users` force-sets
+`is_staff=True` on every demo user so the Django admin works for every
+role flavor, which meant every demo agency_admin / analyst / reviewer
+saw ops infrastructure on their dashboard. Per the suite role rule, only
+Django superuser or product `system_admin` should bypass admin-only UI.
+
+### Added
+- `keel.ops.canary.user_can_view_canary(user)` — single helper that
+  resolves `KEEL_PRODUCT_CODE` and checks for superuser or
+  `system_admin` `ProductAccess`. Re-exported from `keel.ops`.
+
+### Changed
+- `keel.ops.views.canary_view` — session-auth fallback now calls
+  `user_can_view_canary` and returns `HttpResponseForbidden` when
+  denied, instead of `@staff_member_required` which redirected to
+  admin login. Bearer-token path (`KEEL_METRICS_TOKEN`) unchanged.
+- `keel/CLAUDE.md` "Ops canary" section — documents the helper, the
+  `{% if canary %}` template pattern, and the demo `is_staff` rationale.
+
+### Migration for consumers
+Helm and Lookout are the only adopters today. Both update to gate on
+`user_can_view_canary(user)` in the dashboard view and drop `user.is_staff`
+from the template. Future adopters: gate the view (set `canary` in context
+only when the helper returns True) and keep the template dumb (`{% if canary %}`).
+
 ## 0.44.1 — 2026-05-16
 
 **Post-/review hardening of Wave 1 batch 1.** Codex adversarial review surfaced

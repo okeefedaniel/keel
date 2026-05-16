@@ -1,15 +1,18 @@
 """Canary endpoint view.
 
 Mounted by products at their preferred URL (helm uses ``/api/v1/metrics/``).
-Auth: staff session OR ``Authorization: Bearer $KEEL_METRICS_TOKEN``.
+Auth: superuser/system_admin session OR ``Authorization: Bearer
+$KEEL_METRICS_TOKEN``. ``is_staff`` alone is NOT sufficient — demo users
+are seeded with ``is_staff=True`` so the Django admin works for every
+role flavor, and the historical ``is_staff`` gate leaked ops infra to
+every demo agency_admin / analyst / reviewer.
 """
 import hmac
 
 from django.conf import settings
-from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse
 
-from keel.ops.canary import build_canary_payload
+from keel.ops.canary import build_canary_payload, user_can_view_canary
 
 
 def _has_metrics_token(request) -> bool:
@@ -26,6 +29,10 @@ def _has_metrics_token(request) -> bool:
 def canary_view(extras_callable=None):
     """Return a Django view that renders the canary JSON payload.
 
+    Auth: bearer token (``KEEL_METRICS_TOKEN``) for external pollers, OR
+    a logged-in user who passes :func:`keel.ops.canary.user_can_view_canary`
+    (superuser or product ``system_admin``).
+
     Use as::
 
         # product/api/metrics.py
@@ -40,13 +47,10 @@ def canary_view(extras_callable=None):
     def _view(request):
         if _has_metrics_token(request):
             return JsonResponse(build_canary_payload(extras_callable))
-        return _staff_only(request, extras_callable)
+        if user_can_view_canary(request.user):
+            return JsonResponse(build_canary_payload(extras_callable))
+        return HttpResponseForbidden('canary access denied')
     return _view
-
-
-@staff_member_required
-def _staff_only(request, extras_callable):
-    return JsonResponse(build_canary_payload(extras_callable))
 
 
 # Default no-extras endpoint, used by ``include('keel.ops.urls')``.

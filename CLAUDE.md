@@ -595,15 +595,27 @@ Suite-wide JSON metrics endpoint + flag chip partial for detecting silent regres
    path('api/v1/metrics/', include('keel.ops.urls')),
    ```
 
-3. **Inline partial** — `keel/components/canary_flags.html` renders the four flags as colored chips (green = OK, red = tripped) plus a small "raw JSON" link. Staff-only sub-cards on dashboards include this so the same canary state visible to the external poller is visible at a glance in-product:
+3. **Inline partial** — `keel/components/canary_flags.html` renders the four flags as colored chips (green = OK, red = tripped) plus a small "raw JSON" link. Admin-only sub-cards on dashboards include this so the same canary state visible to the external poller is visible at a glance in-product. **Always gate the view (not the template) via `keel.ops.canary.user_can_view_canary(user)`** so the template can stay dumb:
+
+   ```python
+   # product/dashboard/views.py
+   from keel.ops.canary import FLAG_LABELS, build_canary_payload, user_can_view_canary
+   if user_can_view_canary(request.user):
+       try:
+           ctx['canary'] = build_canary_payload(extras_callable=_product_extras)
+           ctx['canary_flag_labels'] = FLAG_LABELS
+       except Exception:
+           ctx['canary'] = None
+           ctx['canary_flag_labels'] = FLAG_LABELS
+   ```
 
    ```django
-   {% if user.is_staff and canary %}
+   {% if canary %}
    {% include "keel/components/canary_flags.html" with canary=canary metrics_url="/api/v1/metrics/" %}
    {% endif %}
    ```
 
-   The view that renders the dashboard must put `canary` and `canary_flag_labels` (= `keel.ops.canary.FLAG_LABELS`) in the context for staff users — building the payload is cheap (4–6 keel queries + extras).
+   The helper returns True only for Django superusers and users carrying a `system_admin` `ProductAccess` role for the current product (resolved via `settings.KEEL_PRODUCT_CODE`). **Do not gate on `user.is_staff`** — `seed_keel_users` force-sets `is_staff=True` on every demo user so the Django admin works for every role flavor, which means the historical `user.is_staff and canary` template gate leaked ops infrastructure to every demo agency_admin / analyst / reviewer. Fixed suite-wide in keel v0.45.0. The `canary_view` endpoint (`/api/v1/metrics/`) applies the same gate to its session-auth fallback path — bearer-token pollers are unchanged.
 
 **Settings:** `KEEL_METRICS_TOKEN` (bearer-auth secret for external pollers). Products can wire their existing env var name into this setting — helm uses `KEEL_METRICS_TOKEN = os.environ.get('HELM_METRICS_TOKEN', '')` so its existing GH Actions secret keeps working without rotation. Reads `KEEL_AUDIT_LOG_MODEL`, `KEEL_NOTIFICATION_MODEL`, `KEEL_NOTIFICATION_LOG_MODEL` (the same standard keel settings used everywhere else) to resolve the canary tables — no new model settings to wire.
 

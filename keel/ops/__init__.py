@@ -31,4 +31,4 @@ Without the token bypass, no external monitoring can reach the canary.
 """
 default_app_config = 'keel.ops.apps.OpsConfig'
 
-from keel.ops.canary import build_canary_payload  # noqa: E402,F401
+from keel.ops.canary import build_canary_payload, user_can_view_canary  # noqa: E402,F401

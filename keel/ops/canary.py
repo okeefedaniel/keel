@@ -20,6 +20,40 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import timezone
 
+from keel.core.utils import get_product_code
+
+
+def user_can_view_canary(user):
+    """Return True iff ``user`` may see the ops canary chip row.
+
+    The historical gate (``user.is_staff``) was too loose: ``seed_keel_users``
+    force-sets ``is_staff=True`` on every demo user so the Django admin
+    works for all role flavors in a demo environment, which means every
+    demo agency_admin / analyst / reviewer would see ops infrastructure
+    on the dashboard. Per the suite role hierarchy rule (only
+    ``system_admin`` and ``is_superuser`` bypass admin-only UI), the
+    correct gate is:
+
+    - Django superuser, OR
+    - ``system_admin`` ``ProductAccess`` role for this product
+      (resolved via ``settings.KEEL_PRODUCT_CODE``).
+
+    Views rendering ``keel/components/canary_flags.html`` should call
+    this helper before populating ``canary`` in the template context,
+    so the template can stay dumb (``{% if canary %}``).
+    """
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if getattr(user, 'is_superuser', False):
+        return True
+    get_role = getattr(user, 'get_product_role', None)
+    if not callable(get_role):
+        return False
+    code = get_product_code()
+    if not code:
+        return False
+    return get_role(code) == 'system_admin'
+
 
 def _safe_count(model_path, **filters):
     """Return a count, or None if the model isn't installed/queryable."""
