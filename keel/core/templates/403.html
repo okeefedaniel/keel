@@ -33,13 +33,27 @@
             </div>
             <h1 class="mb-3">Access denied</h1>
             <p class="mb-4">
-                You don't have permission to access this page.<br>
-                Contact your administrator if you believe this is an error.
+                {% if user.is_authenticated %}
+                    You're signed in as <strong>{{ user.get_username }}</strong>, but this account doesn't have permission to access this page.<br>
+                    Contact your administrator if you believe this is an error, or sign out to switch accounts.
+                {% else %}
+                    You don't have permission to access this page.<br>
+                    Contact your administrator if you believe this is an error.
+                {% endif %}
             </p>
             <div class="d-flex justify-content-center gap-3 mb-4">
-                <a href="/" class="btn btn-primary px-4">
-                    <i class="bi bi-house me-1"></i>Go Home
-                </a>
+                {% if user.is_authenticated %}
+                    <form method="post" action="{% url 'logout' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-box-arrow-right me-1"></i>Sign out
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="/" class="btn btn-primary px-4">
+                        <i class="bi bi-house me-1"></i>Go Home
+                    </a>
+                {% endif %}
                 <a href="javascript:history.back()" class="btn btn-outline-secondary px-4">
                     <i class="bi bi-arrow-left me-1"></i>Go Back
                 </a>
