@@ -822,6 +822,21 @@ version = "0.10.9"
 
 Bump both files in the same commit as the code change, then bump pins in all product `requirements.txt` files referencing the new git commit.
 
+**You MUST also create a git tag matching the version, AND push the tag.** Product `requirements.txt` pins keel by tag (`keel @ git+https://github.com/okeefedaniel/keel.git@v0.44.0`), not by SHA. If the bump commit is on `main` but the matching tag doesn't exist on `origin`, every product that tries to update its keel pin fails CI at the pip checkout step with:
+
+```
+error: pathspec 'v0.44.0' did not match any file(s) known to git
+```
+
+`/ship` automates this — read its workflow if unsure. Manually:
+
+```bash
+git tag -a v0.44.0 <sha> -m "v0.44.0 — <one-line summary>"
+git push origin v0.44.0
+```
+
+Push the tag in the same operation as the bump commit, or immediately after. **Caught on 2026-05-15** during the Helm smoke-test of the Wave 0 / Wave 1 collaboration-panel work: four version bumps shipped to `main` over two sessions without any matching tags. Helm's CI failed at the first attempt to consume `v0.44.0`, surfaced the gap, fixed forward by tagging `v0.40.2` / `v0.41.1` / `v0.41.2` / `v0.44.0` at their corresponding commits. Without the smoke test, the gap would have stayed latent until the next product tried to bump.
+
 **Version strings MUST be valid PEP 440.** Pip's build backend validates `pyproject.toml` version against PEP 440 and fails the wheel build otherwise. Safe forms:
 - Release: `0.11.14`, `0.12.0`
 - Pre-release: `0.12.0a1` (alpha), `0.12.0b1` (beta), `0.12.0rc1` (release candidate)
