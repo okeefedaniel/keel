@@ -544,7 +544,14 @@ Each product's `.github/workflows/cron.yml` follows this shape. Reference implem
 4. **Ephemeral SSH key** — `ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -q`. `railway ssh` requires an SSH keypair under `~/.ssh`; the GitHub runner ships without one, so every run must generate a throwaway key first. Without it, `railway ssh` fails with "No SSH keys found in ~/.ssh/", every cron run silently fails, and `flags.cron_silent_24h` trips the canary 24h later.
 5. **The actual command** — `railway ssh --service <product> "cd /app && /opt/venv/bin/python manage.py <cmd>"`. Runs inside the production container, so the command inherits prod env (DATABASE_URL, API keys, etc.) and the prod DB connection without exposing either to the GitHub runner.
 
-**Required GitHub secret per product repo:** `RAILWAY_TOKEN`. This must be a Railway **project token** (Settings → Tokens → Create), scoped to the product's Railway project + production environment. Project tokens auto-target their bound project/env, so no `--project` / `--environment` flags are needed on `railway ssh`. Workspace-scoped tokens won't work — `railway ssh` requires the project binding.
+**Required GitHub secret per product repo: a Railway token, one of two shapes.** Both work — pick based on what Railway's current dashboard surfaces on your account.
+
+- **Project-scoped token** (older shape; secret name: `RAILWAY_TOKEN`). Created via Project → Settings → Tokens, bound to one project + one environment. Auto-binds at runtime, so `railway ssh --service <product>` works with NO `--project` / `--environment` flags. Reference: [`helm/.github/workflows/cron.yml`](../helm/.github/workflows/cron.yml).
+- **Account-level API token** (current shape; secret name: `RAILWAY_API_TOKEN`). Created via Account → Tokens, one token covers every project under the account. Does NOT auto-bind, so `railway ssh` MUST be passed explicit `--project <uuid> --environment <uuid>` flags. Reference: [`harbor/.github/workflows/cron.yml`](../harbor/.github/workflows/cron.yml).
+
+The CLI distinguishes the two by env var name: `RAILWAY_TOKEN` is validated as a project token (rejected as "Invalid RAILWAY_TOKEN" if it's actually an account token); `RAILWAY_API_TOKEN` is validated as an account token (then needs project flags to disambiguate). Don't try to cross-feed them — the CLI's error message points the wrong direction if you do.
+
+**Operationally, the account-token shape is simpler** for multi-product accounts: one token covers every product, rotates once, set once per repo. The project-token shape is simpler at runtime (no flags in the `railway ssh` line) but requires N tokens to mint, rotate, and audit. The 2026-05-16 onboarding pass (harbor, bounty, yeoman) used the account-token shape because Railway's dashboard now defaults to that flow for accounts without a Pro workspace.
 
 **Demo services are NOT scheduled.** GitHub Actions cron workflows target `--service <product>`, the production service only. Demo seed data is regenerated on each `seed_*` run from `run_startup()`; demo doesn't need its own cron.
 
