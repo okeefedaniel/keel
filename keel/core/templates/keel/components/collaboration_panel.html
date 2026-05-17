@@ -76,8 +76,9 @@ Visibility / authorization (TWO requirements — both must hold):
     <summary class="card card-body py-2 px-3 bg-white border-0 shadow-sm fw-normal" style="cursor: pointer;">
         <i class="bi bi-people me-2"></i><strong>Collaboration</strong>
         <span class="text-muted small ms-2">
-            {% if active_assignment and active_assignment.assigned_to %}Lead: {{ active_assignment.assigned_to.get_full_name|default:active_assignment.assigned_to.username }} ·{% endif %}
-            {% if collaborators %}{{ collaborators|length }} member{{ collaborators|length|pluralize }}{% else %}unclaimed{% endif %}
+            {% if active_assignment and active_assignment.assigned_to %}Lead: {{ active_assignment.assigned_to.get_full_name|default:active_assignment.assigned_to.username }}{% endif %}
+            {% if collaborators %}{% if active_assignment and active_assignment.assigned_to %} · {% endif %}{{ collaborators|length }} member{{ collaborators|length|pluralize }}{% endif %}
+            {% if not active_assignment and not collaborators %}unclaimed{% endif %}
             {% if notes %} · {{ notes|length }} note{{ notes|length|pluralize }}{% endif %}
             {% if attachments %} · {{ attachments|length }} file{{ attachments|length|pluralize }}{% endif %}
         </span>
