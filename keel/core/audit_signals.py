@@ -147,6 +147,13 @@ def _on_save(sender, instance, created, **kwargs):
         return
 
     user, ip = get_audit_context()
+    # Gate: AuditLog is for user actions. Cron / management commands / migrations
+    # / async workers without an established audit_context() leave user=None — those
+    # mutations are not user-attributable and do not belong in the audit trail.
+    # System events with material effects should be captured via Activity (Track B).
+    # See ~/.claude/plans/audit-activity-notifications-rethink.md.
+    if user is None:
+        return
     action = 'create' if created else 'update'
     changes = _compute_changes(instance, entry.skip_fields)
 
@@ -174,6 +181,10 @@ def _on_delete(sender, instance, **kwargs):
         return
 
     user, ip = get_audit_context()
+    # Same gate as _on_save: deletes outside a request context are not
+    # user-attributable. See _on_save docstring.
+    if user is None:
+        return
 
     try:
         from keel.core.audit import log_audit
