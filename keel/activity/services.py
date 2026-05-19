@@ -175,6 +175,142 @@ def record_activity(
     return activity
 
 
+VALID_SYSTEM_EVENT_STATUSES = ('ok', 'warn', 'failed', 'errored')
+
+
+def record_system_event(
+    verb: str,
+    summary: str,
+    *,
+    metadata: Optional[dict] = None,
+    target=None,
+    visibility: str = 'staff',
+    status: str = 'ok',
+):
+    """Record a material system event with a narrative summary.
+
+    Under Approach D (see ``~/.claude/plans/audit-activity-notifications-rethink.md``),
+    system events flow into ``Activity`` ONLY — NOT into ``AuditLog``. AuditLog is the
+    schema-enforced "what users did" surface (``user NOT NULL``); system events have
+    no user and therefore no home there. The Activity stream is the canonical
+    "what happened" log and is the seam that ``dispatch_activity_notifications``
+    fans out from for cron failures.
+
+    Routine ``status='ok'`` rows are pull-only — they appear on the cross-product
+    ``/ops/`` console but the registered NotificationType for routine verbs uses
+    ``channels=[]`` so no inbox push. ``status in ('failed', 'errored')`` rows
+    use the normal notification pipeline and reach product ``system_admin``s.
+
+    Args:
+        verb: dotted snake_case identifier (e.g. ``'grants_gov.polled'``,
+            ``'salesforce.synced'``, ``'foia.cache_refreshed'``). Reuse a registered
+            verb if one already covers this event; the verb is the join key for
+            ``/ops/`` filtering and notification routing.
+        summary: human-readable one-line description. Should include a quantitative
+            count where possible — "Grants.gov poll: +2 new, ~3 updated, 1 closed,
+            312 unchanged" beats "poll complete". Goes into the Activity row's
+            ``source_label`` and is also stored in ``metadata['summary']``.
+        metadata: free-form structured detail (new_ids, duration_ms, source URL,
+            agency code, etc). Merged with the ``summary`` / ``status`` keys this
+            helper sets — caller MUST NOT use ``summary`` or ``status`` keys in
+            its own metadata dict.
+        target: optional GenericForeignKey target. Most cron summaries leave this
+            None (the poll isn't "about" a specific record). Pass a target when
+            the event materially relates to one record — e.g. a webhook retry
+            attached to its source packet.
+        visibility: AbstractActivity.VISIBILITY_CHOICES. Defaults to ``'staff'`` —
+            system events are operational, not collaborator-facing. Cross-product
+            crossings (Yeoman → Beacon contact creation, Bounty → Harbor grant
+            push) may pass ``'agency'`` so per-agency staff see them too.
+        status: one of ``'ok' | 'warn' | 'failed' | 'errored'``. Drives row color
+            on ``/ops/`` Row 2 and gates the failure-notification fan-out.
+
+    Returns the created Activity instance, or None if Activity isn't configured
+    (KEEL_ACTIVITY_MODEL unset — fail-soft for products mid-rollout).
+
+    Raises:
+        ValueError if ``status`` is not a recognized value (catches typos at
+        write time rather than producing un-categorizable rows).
+    """
+    if status not in VALID_SYSTEM_EVENT_STATUSES:
+        raise ValueError(
+            f'record_system_event: status must be one of '
+            f'{VALID_SYSTEM_EVENT_STATUSES!r}, got {status!r}'
+        )
+
+    activity_model_path = getattr(settings, 'KEEL_ACTIVITY_MODEL', '')
+    if not activity_model_path:
+        # No Activity configured on this product — fail-soft, log, return None.
+        # This lets a not-yet-migrated product import this module without
+        # crashing; the cron's run-log still gets the CommandRun row from
+        # @scheduled_job, which is the minimum viable observability.
+        logger.warning(
+            'record_system_event(%r): KEEL_ACTIVITY_MODEL unset, dropping event. '
+            'Configure it to capture system-event narratives.',
+            verb,
+        )
+        return None
+
+    try:
+        Activity = apps.get_model(activity_model_path)
+    except LookupError:
+        logger.exception(
+            'record_system_event(%r): KEEL_ACTIVITY_MODEL=%s did not resolve',
+            verb, activity_model_path,
+        )
+        return None
+
+    # Runtime guard: a request-context call to record_system_event is almost
+    # certainly a mistake — the caller probably wants record_activity() with
+    # actor=request.user. Warn but don't block (some legitimate edge cases:
+    # a user-triggered batch import that emits a per-batch summary).
+    actor = None
+    user, _ip = _maybe_get_audit_context()
+    if user is not None and getattr(user, 'is_authenticated', False):
+        logger.warning(
+            'record_system_event(%r) called inside a request context with '
+            'authenticated user=%r. Did you mean record_activity(actor=user, ...)? '
+            'Continuing with actor=None per the system-event contract.',
+            verb, user,
+        )
+
+    merged_metadata = {'summary': summary, 'status': status, **(metadata or {})}
+
+    target_ct = ContentType.objects.get_for_model(target.__class__) if target else None
+    target_id = target.pk if target else None
+
+    with skip_promotion_guard():
+        with transaction.atomic():
+            activity = Activity.objects.create(
+                actor=actor,
+                verb=verb,
+                target_ct=target_ct,
+                target_id=str(target_id) if target_id is not None else None,
+                visibility=visibility,
+                source_product=getattr(settings, 'KEEL_PRODUCT_CODE', ''),
+                deep_link=build_deep_link(target),
+                source_label=summary,
+                audit_ref=None,
+                metadata=merged_metadata,
+            )
+
+    return activity
+
+
+def _maybe_get_audit_context():
+    """Get the current audit context without importing at module level.
+
+    keel.activity is sometimes installed before keel.core's audit_signals
+    is fully importable (test bootstrap order). Lazy-import inside the
+    function so module load order doesn't matter.
+    """
+    try:
+        from keel.core.audit_signals import get_audit_context
+        return get_audit_context()
+    except Exception:
+        return (None, None)
+
+
 def _entity_type_for_target(target) -> str:
     """Best-effort entity_type string for the AuditLog row. Falls back to the model's
     verbose_name if no audit registry entry exists for it."""

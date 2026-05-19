@@ -8,13 +8,71 @@ Usage in settings.py:
 
     # Tell Keel which AuditLog model to use
     KEEL_AUDIT_LOG_MODEL = 'core.AuditLog'
+
+Outside a request context — Celery tasks, ``./manage.py shell`` mutations, data
+migrations that need user attribution — use the ``audit_context`` context
+manager (below) to set the thread-local user, so auto-audit signal handlers
+attribute the resulting AuditLog rows correctly. Without the context manager,
+the v0.46.3 gate causes non-request mutations to skip audit entirely; the
+context manager is the escape hatch that re-enables audit for explicitly
+user-attributable async / shell work.
 """
 import logging
+from contextlib import contextmanager
 
 from django.apps import apps
 from django.contrib.auth.signals import user_logged_in
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def audit_context(user, ip=''):
+    """Re-establish thread-local audit context outside a request.
+
+    The keel v0.46.3 audit gate makes any mutation with ``user=None`` in
+    thread-local skip the audit row entirely. That is the right default for
+    cron / management / migration contexts, but it's wrong for the narrow
+    case of code that IS doing user-attributable work without a Django
+    request — Celery tasks acting on behalf of a user, shell sessions
+    performing operator interventions, data migrations applying a known
+    operator change.
+
+    Wrap that code in ``with audit_context(user=actor, ip=''): ...`` and the
+    auto-audit signals re-engage for the duration of the block. Thread-local
+    is restored to its prior state on exit, so nesting is safe.
+
+    Examples::
+
+        # Celery task on behalf of a user
+        @shared_task
+        def archive_project(project_id, user_id):
+            user = KeelUser.objects.get(pk=user_id)
+            with audit_context(user=user):
+                project = Project.objects.get(pk=project_id)
+                project.archive()  # signal fires with user attribution
+
+        # Operator shell intervention
+        >>> from keel.core.middleware import audit_context
+        >>> from keel.accounts.models import KeelUser
+        >>> with audit_context(user=KeelUser.objects.get(username='dokadmin')):
+        ...     Application.objects.filter(pk=482).update(status='approved')
+
+    Args:
+        user: KeelUser instance. Must be authenticated for the audit gate
+            to write rows (the signal handlers check ``user.is_authenticated``).
+            Passing None is a no-op (matches the default cron behavior).
+        ip: optional IP string. Defaults to '' (async work has no IP).
+    """
+    # Lazy-import to avoid circular: audit_signals doesn't depend on middleware.
+    from keel.core.audit_signals import set_audit_context, get_audit_context
+
+    prior_user, prior_ip = get_audit_context()
+    set_audit_context(user=user, ip_address=ip)
+    try:
+        yield
+    finally:
+        set_audit_context(user=prior_user, ip_address=prior_ip)
 
 
 def _get_client_ip(request):
