@@ -206,3 +206,110 @@ def fetch_product_audit(
             'error': str(e),
             'duration_ms': duration_ms,
         }
+
+
+# ---------------------------------------------------------------------------
+# Cross-product activity feed client — mirrors fetch_product_audit
+# ---------------------------------------------------------------------------
+
+def fetch_product_activity(
+    feed_url: str,
+    api_key: str,
+    *,
+    window_start: str,
+    window_end: str,
+    q: str = '',
+    verbs: Iterable[str] = (),
+    status: str = 'any',
+    limit: int = 200,
+    timeout=AUDIT_DEFAULT_TIMEOUT,
+) -> dict:
+    """Fetch a single product's /api/v1/activity-feed/ endpoint.
+
+    Same status-enum contract as :func:`fetch_product_audit` (ok / pending /
+    unauthorized / timeout / error). Used by Keel's ``/ops/`` Row 2 to fan
+    out across the suite and assemble the system-event lane.
+
+    Query params:
+        window_start, window_end: ISO-8601 timestamps.
+        q: free-text search on summary / verb / actor.
+        verbs: optional list of verb-string filters (e.g. ``['grants_gov.polled',
+            'salesforce.synced']``).
+        status: ``'ok' | 'warn' | 'failed' | 'errored' | 'any'``. ``'any'`` is
+            the default to keep the simpler 'just give me everything' call site
+            on /ops/ Row 2 working with one parameter.
+        limit: 1-200, default 200.
+
+    Returns the same envelope shape as fetch_product_audit:
+        {'status': <enum>, 'data': <feed payload> | None, 'error': <str>,
+         'duration_ms': <int>}
+    """
+    start = time.monotonic()
+    headers = {}
+    if api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
+
+    params = {
+        'window_start': window_start,
+        'window_end': window_end,
+        'limit': str(limit),
+        'status': status,
+    }
+    if q:
+        params['q'] = q
+    verbs_list = [v for v in verbs if v]
+    if verbs_list:
+        params['verbs'] = ','.join(verbs_list)
+
+    try:
+        resp = _session.get(feed_url, headers=headers, params=params, timeout=timeout)
+        duration_ms = int((time.monotonic() - start) * 1000)
+
+        if resp.status_code == 200:
+            try:
+                data = resp.json()
+            except ValueError as e:
+                return {
+                    'status': 'error', 'data': None,
+                    'error': f'Malformed JSON: {e}', 'duration_ms': duration_ms,
+                }
+            return {
+                'status': 'ok', 'data': data, 'error': '',
+                'duration_ms': duration_ms,
+            }
+        if resp.status_code == 404:
+            return {
+                'status': 'pending', 'data': None,
+                'error': 'Endpoint not mounted (HTTP 404)',
+                'duration_ms': duration_ms,
+            }
+        if resp.status_code in (401, 403):
+            return {
+                'status': 'unauthorized', 'data': None,
+                'error': f'HTTP {resp.status_code}',
+                'duration_ms': duration_ms,
+            }
+        return {
+            'status': 'error', 'data': None,
+            'error': f'HTTP {resp.status_code}: {resp.text[:200]}',
+            'duration_ms': duration_ms,
+        }
+
+    except requests.ConnectionError as e:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        return {
+            'status': 'pending', 'data': None,
+            'error': f'Connection error: {e}', 'duration_ms': duration_ms,
+        }
+    except requests.Timeout:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        return {
+            'status': 'timeout', 'data': None,
+            'error': f'Timeout after {timeout}s', 'duration_ms': duration_ms,
+        }
+    except Exception as e:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        return {
+            'status': 'error', 'data': None,
+            'error': str(e), 'duration_ms': duration_ms,
+        }

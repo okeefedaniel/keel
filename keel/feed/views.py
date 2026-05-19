@@ -165,6 +165,86 @@ AUDIT_FEED_DEFAULT_LIMIT = 200
 AUDIT_FEED_MAX_LIMIT = 200
 
 
+def activity_feed_view(build_activity_func):
+    """Decorator that turns a ``build_activity(request) -> dict`` into a secured
+    ``/api/v1/activity-feed/`` endpoint. Mirrors :func:`audit_feed_view`
+    line-for-line — same bearer auth, same rate limit, same per-query-param
+    cache. Cleaved as a sibling rather than a parameterized factory so each
+    feed kind has its own cache namespace and the contracts can evolve
+    independently.
+
+    The wrapped function should read ``window_start``, ``window_end``, ``q``,
+    ``verbs`` (comma-separated verb filter), ``status`` (``ok|warn|failed|errored|any``),
+    and ``limit`` from ``request.GET`` and return a dict::
+
+        {
+            "items": [<row dict>, ...],
+            "total_in_window": <int>,
+            "capped": <bool>,
+            "window": [<iso>, <iso>],
+            "fetched_at": <iso>,
+            "product": <product code>,
+        }
+
+    The per-row shape (matches the AbstractActivity fields callers actually need)::
+
+        {
+            "id": str, "timestamp": iso, "verb": str, "summary": str,
+            "status": str, "actor_username": str | "",
+            "target_type": str | "", "target_id": str | "",
+            "visibility": str, "deep_link": str, "metadata": dict,
+            "product": str,
+        }
+
+    Used by Keel's ``/ops/`` console to roll up the cross-product system-event
+    lane (Row 2). Per-product implementations are 25-line wrappers — see
+    ``keel/feed/activity_feed_example.py``.
+    """
+
+    @csrf_exempt
+    @require_GET
+    @functools.wraps(build_activity_func)
+    def wrapper(request):
+        if not _accepted_keys(demo_mode=getattr(settings, 'DEMO_MODE', False)):
+            return JsonResponse(
+                {'error': 'Activity feed not configured (HELM_FEED_API_KEY missing).'},
+                status=503,
+            )
+
+        matched = _authenticate_helm_bearer(request)
+        if matched is None:
+            return JsonResponse({'error': 'Invalid API key.'}, status=401)
+
+        if _rate_limited(matched):
+            return JsonResponse({'error': 'Rate limit exceeded.'}, status=429)
+
+        qs = request.GET.urlencode()
+        # Distinct cache namespace from audit-feed so the two endpoints
+        # never collide even though their query strings overlap.
+        cache_key = f'keel:activity_feed_cache:{request.path}?{qs}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return JsonResponse(cached)
+
+        try:
+            payload = build_activity_func(request)
+        except Exception:
+            logger.exception('Error building activity feed for %s', request.path)
+            return JsonResponse(
+                {'error': 'Internal error building activity feed.'}, status=500,
+            )
+
+        if not payload.get('fetched_at'):
+            payload['fetched_at'] = timezone.now().isoformat()
+        if not payload.get('product'):
+            payload['product'] = get_product_code()
+
+        cache.set(cache_key, payload, timeout=AUDIT_FEED_CACHE_TTL_SECONDS)
+        return JsonResponse(payload)
+
+    return wrapper
+
+
 def audit_feed_view(build_audit_func):
     """Decorator that turns a ``build_audit(request) -> dict`` into a secured
     /api/v1/audit-feed/ endpoint.
