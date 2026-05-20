@@ -12,9 +12,10 @@ Every candidate subscriber is checked against ``Activity.is_visible_to_user(user
 before a notification fires. This is the gate that prevents stub-tier rows from leaking
 to external watchers in Beacon's zone-bridge scenario.
 
-Dedup: per-product Notification has ``UniqueConstraint(['user', 'activity_ref'])`` (added
-in Phase 1A keel.notifications change). Duplicate fan-out attempts no-op via the
-constraint; ``notify()`` uses ``get_or_create`` semantics.
+Dedup of activity-driven notifications via ``Notification.activity_ref`` is tracked as
+a follow-up — today ``notify()`` doesn't accept an ``activity`` kwarg, so duplicate
+fan-out attempts produce duplicate notification rows. Callers that care about dedup
+should guard upstream.
 """
 from __future__ import annotations
 
@@ -78,9 +79,6 @@ def dispatch_activity_notifications(activity) -> None:
     if not visible_subscribers:
         return
 
-    # Hand off to keel.notifications.notify(). Pass the activity so the notification row
-    # gets activity_ref populated for dedup and so the notification can render with the
-    # activity's deep_link / source_label.
     _fan_out(visible_subscribers, activity)
 
 
@@ -170,46 +168,22 @@ def _get_recipient_resolver(verb: str):
 
 
 def _fan_out(users: Iterable, activity) -> None:
-    """Call keel.notifications.notify() for each user. Idempotent via UniqueConstraint."""
+    """Call keel.notifications.notify() for each user."""
     try:
         from keel.notifications.dispatch import notify
     except ImportError:
         logger.error('keel.notifications not installed; cannot dispatch activity notifications')
         return
 
-    notification_type = f'activity.{activity.verb}'
+    event = f'activity.{activity.verb}'
     for user in users:
         try:
             notify(
-                user=user,
-                notification_type=notification_type,
-                # ``activity`` kwarg is read by the modified notify() to populate
-                # Notification.activity_ref. Older notify() implementations that
-                # don't accept the kwarg will TypeError; the keel.notifications.dispatch
-                # change in Phase 1A adds the kwarg.
-                activity=activity,
+                event=event,
+                recipients=[user],
+                title=activity.source_label,
                 link=activity.deep_link,
-                label=activity.source_label,
             )
-        except TypeError as e:
-            # notify() doesn't yet accept `activity` kwarg (Phase 1A keel.notifications
-            # change not landed yet). Fall back to no-activity-ref notification.
-            logger.warning(
-                'notify() does not accept activity kwarg yet (%s); falling back without activity_ref',
-                e,
-            )
-            try:
-                notify(
-                    user=user,
-                    notification_type=notification_type,
-                    link=activity.deep_link,
-                    label=activity.source_label,
-                )
-            except Exception:
-                logger.exception(
-                    'notify() fallback also failed for user pk=%s activity pk=%s',
-                    user.pk, activity.pk,
-                )
         except Exception:
             logger.exception(
                 'notify() raised for user pk=%s activity pk=%s verb=%r',
