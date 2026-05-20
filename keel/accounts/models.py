@@ -1351,8 +1351,9 @@ class AuditLog(models.Model):
         LOGIN = 'login', _('Login')
         EXPORT = 'export', _('Export')
         VIEW = 'view', _('View')
-        LOGIN_FAILED = 'login_failed', _('Login Failed')
-        SECURITY_EVENT = 'security_event', _('Security Event')
+        # NOTE: LOGIN_FAILED and SECURITY_EVENT were removed in v0.46.0
+        # (Approach D). Those events route to Activity via
+        # record_system_event(verb='auth.login_failed' / 'security.*').
         ROLE_GRANT_DENIED = 'role_grant_denied', _('Role Grant Denied')
         # Logged by /api/v1/ai/key/ on every fetch (success and failure).
         # Plaintext keys are NEVER recorded — only the last-4 hint and
@@ -1361,8 +1362,10 @@ class AuditLog(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        KeelUser, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='audit_logs',
+        KeelUser, on_delete=models.PROTECT,
+        null=False, blank=False, related_name='audit_logs',
+        help_text='Required — AuditLog is user-only under Approach D '
+                  '(see AbstractAuditLog docstring).',
     )
     action = models.CharField(max_length=25, choices=Action.choices)
     entity_type = models.CharField(max_length=100)
@@ -1376,6 +1379,12 @@ class AuditLog(models.Model):
     class Meta:
         db_table = 'keel_audit_log'
         ordering = ['-timestamp']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(user__isnull=False),
+                name='auditlog_user_required',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if self.pk and type(self).objects.filter(pk=self.pk).exists():

@@ -116,14 +116,30 @@ class TestAuditLogActions:
         assert 'unarchive' in values
 
     def test_existing_action_choices_unchanged(self):
-        """Regression — additive only; no existing action removed."""
+        """Regression — additive only for the user-action choices.
+
+        v0.46.0 (Approach D) intentionally removed ``login_failed`` and
+        ``security_event`` from the choices list — those events route to
+        Activity now, not AuditLog. The rest of the list stays stable.
+        """
         values = {c[0] for c in AbstractAuditLog.Action.choices}
         for required in [
             'create', 'update', 'delete', 'status_change', 'submit',
             'approve', 'reject', 'login', 'export', 'view',
-            'login_failed', 'security_event',
         ]:
             assert required in values, f'lost existing action: {required}'
+
+    def test_login_failed_and_security_event_removed_in_v0_46(self):
+        """v0.46.0 (Approach D) — those choices migrated to Activity verbs."""
+        values = {c[0] for c in AbstractAuditLog.Action.choices}
+        assert 'login_failed' not in values, (
+            'login_failed must route to Activity verb auth.login_failed '
+            '(Approach D, v0.46.0).'
+        )
+        assert 'security_event' not in values, (
+            'security_event must route to Activity verbs security.* '
+            '(Approach D, v0.46.0).'
+        )
 
 
 # --- WorkflowEngine.obj parameter (regression for keel.core.archive contract)
