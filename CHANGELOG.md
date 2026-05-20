@@ -4,7 +4,7 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
-## 0.48.0 — 2026-05-19
+## 0.48.0 — 2026-05-20
 
 **Audit / Activity / Notifications rethink — Approach D ships.** Forced by Bounty's
 audit-log disk exhaustion (2026-05-18: `bounty_core_auditlog` at 2368 MB / 98% of DB;
@@ -85,6 +85,29 @@ happened" stream including system events. See the parallel plan at
    for a "security events this week" stat. Those queries now return 0 since no
    new rows of those action values can be written. UI fix is part of the Phase 4A
    `/ops/` redesign (separate session), not this release.
+
+## 0.47.2 — 2026-05-20
+
+**Fix `_fan_out` calling `notify()` with kwargs that don't exist.** Notification
+fan-out from `record_activity()` silently failed for every workflow transition
+in v0.47.0 / v0.47.1. `keel.activity.dispatch._fan_out` called
+`notify(user=..., notification_type=..., label=..., activity=...)`, but the
+real signature is `notify(event=..., recipients=..., title=..., link=...)`.
+Both the primary call and the TypeError fallback used the wrong kwargs, so
+every call raised `TypeError` and was swallowed by the outer `except Exception`
+— no notifications fired from any product since v0.47.0.
+
+### Fixed
+- `keel.activity.dispatch._fan_out` now calls `notify()` with `event=`,
+  `recipients=[user]`, `title=activity.source_label`, `link=activity.deep_link`.
+- Removed the stale `except TypeError` fallback — once the signature is right,
+  TypeError is a programmer error, not a runtime branch.
+- Dropped the `activity=activity` kwarg; `notify()` doesn't support
+  `activity_ref` population. Tracked as a follow-up.
+
+### Added
+- `keel/activity/tests/test_dispatch.py` — regression coverage for the call
+  shape, the loop-per-user behavior, and the swallow-exceptions contract.
 
 ## 0.45.0 — 2026-05-16
 
