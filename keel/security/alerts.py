@@ -47,11 +47,60 @@ class SecurityAlert:
         return f'[{self.severity.upper()}] {self.event_type}: {self.description}'
 
 
-def check_failed_logins(audit_log_model, window_minutes=15, threshold=5):
-    """Detect IPs with excessive failed login attempts."""
+def check_failed_logins(audit_log_model=None, window_minutes=15, threshold=5,
+                        activity_model=None):
+    """Detect IPs with excessive failed login attempts.
+
+    Under Approach D (v0.46.0), failed-login rows live in Activity, NOT
+    AuditLog. This function now reads ``Activity(verb='auth.login_failed')``
+    by default. The ``audit_log_model`` parameter is retained for backwards
+    compatibility — if callers pass it without an ``activity_model``, the
+    function falls back to the legacy ``AuditLog(action='login_failed')``
+    query, which returns 0 rows on v0.46.0+ deployments.
+    """
     alerts = []
     since = timezone.now() - timedelta(minutes=window_minutes)
 
+    # Prefer Activity (Approach D pathway). Resolve lazily so this module
+    # imports cleanly on products that haven't wired keel.activity yet.
+    Activity = activity_model
+    if Activity is None:
+        from django.apps import apps
+        model_path = getattr(settings, 'KEEL_ACTIVITY_MODEL', '')
+        if model_path:
+            try:
+                Activity = apps.get_model(model_path)
+            except LookupError:
+                Activity = None
+
+    if Activity is not None:
+        login_attempts = (
+            Activity.objects
+            .filter(
+                verb='auth.login_failed',
+                created_at__gte=since,
+            )
+            .values('metadata__ip')
+            .annotate(count=Count('id'))
+            .filter(count__gte=threshold)
+        )
+        for entry in login_attempts:
+            ip = entry.get('metadata__ip') or 'unknown'
+            alerts.append(SecurityAlert(
+                severity=SecurityAlert.SEVERITY_WARNING,
+                event_type='excessive_login_attempts',
+                description=(
+                    f'IP {ip} had {entry["count"]} login attempts in '
+                    f'{window_minutes} minutes'
+                ),
+                details={'ip': ip, 'count': entry['count']},
+            ))
+        return alerts
+
+    # Legacy fallback — AuditLog reads. Returns 0 on v0.46.0+ since the
+    # login_failed action choice was removed.
+    if audit_log_model is None:
+        return alerts
     login_attempts = (
         audit_log_model.objects
         .filter(
@@ -67,7 +116,10 @@ def check_failed_logins(audit_log_model, window_minutes=15, threshold=5):
         alerts.append(SecurityAlert(
             severity=SecurityAlert.SEVERITY_WARNING,
             event_type='excessive_login_attempts',
-            description=f'IP {entry["ip_address"]} had {entry["count"]} login attempts in {window_minutes} minutes',
+            description=(
+                f'IP {entry["ip_address"]} had {entry["count"]} login '
+                f'attempts in {window_minutes} minutes'
+            ),
             details={'ip': entry['ip_address'], 'count': entry['count']},
         ))
 
