@@ -1,6 +1,6 @@
 """Canary payload builder.
 
-The four core flags read entirely from keel-shipped tables:
+The five core flags read entirely from keel-shipped tables:
 
 - ``audit_silent_24h`` — no AuditLog rows in 24h (resolved via
   ``settings.KEEL_AUDIT_LOG_MODEL``).
@@ -9,6 +9,11 @@ The four core flags read entirely from keel-shipped tables:
 - ``notifications_failing`` — at least one NotificationLog with
   ``success=False`` (resolved via ``settings.KEEL_NOTIFICATION_LOG_MODEL``;
   silently skipped if unset).
+- ``audit_constraint_present`` — the DB-level ``auditlog_user_required``
+  CheckConstraint exists. If missing, the schema's last line of defense
+  against NULL-user audit rows is gone (Approach D guarantee broken).
+  Resolved via ``information_schema.check_constraints``; ``None`` on
+  non-Postgres backends or query failure (gauge disabled, no flag).
 
 A ``None`` counter (model not installed, table missing, query error)
 disables its corresponding flag — better to surface "not measured" than
@@ -18,6 +23,7 @@ from datetime import timedelta
 
 from django.apps import apps
 from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 
 from keel.core.utils import get_product_code
@@ -65,6 +71,49 @@ def _safe_count(model_path, **filters):
         return None
     try:
         return Model.objects.filter(**filters).count()
+    except Exception:
+        return None
+
+
+def _check_audit_constraint_present():
+    """Return True/False/None for the AuditLog ``auditlog_user_required`` constraint.
+
+    True means the CheckConstraint exists in the DB. False means the
+    expected constraint is missing — the canary should flag, because the
+    schema's structural guarantee that AuditLog never carries a NULL-user
+    row is gone. None means the gauge couldn't be measured (model not
+    installed, non-Postgres backend, query failure) and the flag should
+    stay False (no false positives).
+    """
+    audit_path = getattr(settings, 'KEEL_AUDIT_LOG_MODEL', 'core.AuditLog')
+    if not audit_path:
+        return None
+    try:
+        Model = apps.get_model(audit_path)
+    except (LookupError, ValueError):
+        return None
+    table = Model._meta.db_table
+    vendor = getattr(connection, 'vendor', '')
+    # information_schema.check_constraints is a Postgres / standard-SQL
+    # surface; SQLite doesn't expose constraints there. On non-Postgres
+    # vendors we can't verify and disable the gauge.
+    if vendor != 'postgresql':
+        return None
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM information_schema.table_constraints tc
+                WHERE tc.constraint_type = 'CHECK'
+                  AND tc.table_name = %s
+                  AND tc.constraint_name = 'auditlog_user_required'
+                LIMIT 1
+                """,
+                [table],
+            )
+            row = cursor.fetchone()
+        return row is not None
     except Exception:
         return None
 
@@ -131,6 +180,9 @@ def build_canary_payload(extras_callable=None):
         except Exception:
             pass
 
+    audit_constraint_present = _check_audit_constraint_present()
+    payload['audit_constraint_present'] = audit_constraint_present
+
     flags = {
         'audit_silent_24h': (
             payload['audit_log_writes_24h'] is not None
@@ -147,6 +199,12 @@ def build_canary_payload(extras_callable=None):
             notifications_failed_24h is not None
             and notifications_failed_24h > 0
         ),
+        # Approach D structural guarantee: the auditlog_user_required
+        # CheckConstraint MUST be present. Only flag when we measured
+        # False (constraint missing); None disables the flag entirely.
+        'audit_constraint_missing': (
+            audit_constraint_present is False
+        ),
     }
     payload['flags'] = flags
     payload['healthy'] = not any(flags.values())
@@ -158,4 +216,5 @@ FLAG_LABELS = {
     'cron_silent_24h': 'Cron silent (24h)',
     'cron_failures_24h': 'Cron failures (24h)',
     'notifications_failing': 'Notifications failing',
+    'audit_constraint_missing': 'Audit constraint missing',
 }
