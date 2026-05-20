@@ -166,6 +166,28 @@ class FailedLoginMonitor:
         failures.append(now)
         cache.set(key, failures, timeout=self.lockout_window)
 
+        # Approach D (v0.46.0): emit one Activity row per failed login so
+        # /ops/ and security alerts have a queryable signal. AuditLog used
+        # to carry these rows with user_id=NULL; under D the schema rejects
+        # NULL-user audit writes, so the event lives in Activity instead.
+        # Best-effort — never let an emission failure block the request.
+        try:
+            from keel.activity.services import record_system_event
+            record_system_event(
+                verb='auth.login_failed',
+                summary=f'Login attempt failed from {ip}',
+                status='warn',
+                metadata={
+                    'ip': ip,
+                    'failures_in_window': len(failures),
+                    'window_seconds': self.lockout_window,
+                },
+            )
+        except Exception:
+            logger.exception(
+                'Failed to record auth.login_failed activity for ip=%s', ip,
+            )
+
         if len(failures) >= self.max_failures:
             cache.set(self._lockout_key(ip), True, timeout=self.lockout_duration)
             logger.critical(
@@ -177,6 +199,28 @@ class FailedLoginMonitor:
                     'security_event': 'login_lockout',
                 },
             )
+            # Companion Activity row for the lockout itself. ``status='failed'``
+            # so the routine notification pipeline fans this out to product
+            # system_admins through the Activity → Notification seam.
+            try:
+                from keel.activity.services import record_system_event
+                record_system_event(
+                    verb='security.account_locked',
+                    summary=f'IP {ip} locked out after {len(failures)} '
+                            f'failed attempts in {self.lockout_window}s',
+                    status='failed',
+                    metadata={
+                        'ip': ip,
+                        'failures': len(failures),
+                        'window_seconds': self.lockout_window,
+                        'lockout_seconds': self.lockout_duration,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    'Failed to record security.account_locked activity '
+                    'for ip=%s', ip,
+                )
 
     def _clear_failures(self, ip):
         cache.delete(self._cache_key(ip))
@@ -234,6 +278,24 @@ class AdminIPAllowlistMiddleware:
                     ip, request.path,
                     extra={'ip': ip, 'security_event': 'admin_access_denied'},
                 )
+                # Activity row so /ops/ surfaces the denied access (Approach D).
+                try:
+                    from keel.activity.services import record_system_event
+                    record_system_event(
+                        verb='security.suspicious_activity',
+                        summary=f'Admin access denied for IP {ip}',
+                        status='warn',
+                        metadata={
+                            'ip': ip,
+                            'path': request.path,
+                            'event_type': 'admin_access_denied',
+                        },
+                    )
+                except Exception:
+                    logger.exception(
+                        'Failed to record security.suspicious_activity '
+                        'activity for ip=%s', ip,
+                    )
                 return HttpResponseForbidden('Access denied.', content_type='text/plain')
 
         return self.get_response(request)

@@ -7,6 +7,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models import CheckConstraint, Q
 from django.utils.translation import gettext_lazy as _
 
 from keel.security.scanning import FileSecurityValidator
@@ -51,10 +52,30 @@ class AbstractAuditLog(models.Model):
     Records cannot be modified or deleted through the Django ORM.
     This ensures audit trail integrity for FOIA and compliance.
 
+    **AuditLog is exclusively for user actions** (Approach D, v0.46.0). The
+    schema enforces ``user IS NOT NULL`` both via Django's ``null=False`` and
+    a DB-level ``CheckConstraint``. System events — cron poll summaries,
+    cache refreshes, batch imports, failed logins, lockout events — flow
+    through ``keel.activity.services.record_system_event()`` into the
+    ``Activity`` stream instead. See
+    ``~/.claude/plans/audit-activity-notifications-rethink.md`` for the
+    canonical spec.
+
+    Outside a request context (Celery tasks, ``./manage.py shell`` mutations,
+    user-attributable RunPython migrations), wrap the work in
+    ``keel.core.middleware.audit_context(user=...)`` to re-establish the
+    thread-local so signal-based auto-audit can attribute the row. Without
+    that context, the gate in ``keel/core/audit_signals.py:_on_save`` drops
+    the would-be NULL-user row before it hits the schema constraint.
+
     Subclass and extend Action choices per product:
 
         class Action(AbstractAuditLog.Action):
             FOIA_SEARCH = 'foia_search', 'FOIA Search'
+
+    The ``LOGIN_FAILED`` and ``SECURITY_EVENT`` choices were removed in
+    v0.46.0 — those events route to Activity now (verbs ``auth.login_failed``,
+    ``security.account_locked``, ``security.suspicious_activity``).
     """
 
     class Action(models.TextChoices):
@@ -68,8 +89,11 @@ class AbstractAuditLog(models.Model):
         LOGIN = 'login', _('Login')
         EXPORT = 'export', _('Export')
         VIEW = 'view', _('View')
-        LOGIN_FAILED = 'login_failed', _('Login Failed')
-        SECURITY_EVENT = 'security_event', _('Security Event')
+        # NOTE: LOGIN_FAILED and SECURITY_EVENT were removed in v0.46.0
+        # (Approach D). Those events now write to Activity via
+        # record_system_event(verb='auth.login_failed' / 'security.*'), not
+        # AuditLog. Successful logins still write AuditLog (LOGIN above) —
+        # the user attribution naturally satisfies the NOT NULL constraint.
         ARCHIVE = 'archive', _('Archive')
         UNARCHIVE = 'unarchive', _('Unarchive')
         ROLE_GRANT_DENIED = 'role_grant_denied', _('Role Grant Denied')
@@ -79,8 +103,10 @@ class AbstractAuditLog(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='%(app_label)s_audit_logs',
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=False, blank=False, related_name='%(app_label)s_audit_logs',
+        help_text='The user who performed the action. AuditLog is user-only '
+                  'under Approach D — system events go through Activity.',
     )
     action = models.CharField(max_length=25, choices=Action.choices)
     entity_type = models.CharField(max_length=100)
@@ -111,6 +137,17 @@ class AbstractAuditLog(models.Model):
     class Meta:
         abstract = True
         ordering = ['-timestamp']
+        constraints = [
+            # Defense-in-depth against the Django ORM accidentally creating a
+            # NULL-user audit row even though null=False is declared above:
+            # a DB-level check that rejects any user_id IS NULL insert. Named
+            # so the canary 'audit_constraint_present' gauge can verify the
+            # constraint is live in information_schema.check_constraints.
+            CheckConstraint(
+                check=Q(user__isnull=False),
+                name='auditlog_user_required',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         # Audit logs are append-only: prevent updates to existing records

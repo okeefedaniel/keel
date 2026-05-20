@@ -4,6 +4,88 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.48.0 — 2026-05-20
+
+**Audit / Activity / Notifications rethink — Approach D ships.** Forced by Bounty's
+audit-log disk exhaustion (2026-05-18: `bounty_core_auditlog` at 2368 MB / 98% of DB;
+1.27M rows, 99.996% with `user_id IS NULL` from cron-driven `update` events). Approach
+D commits to schema-enforced separation: `AuditLog` becomes the legally defensible
+"who did what" log with `user NOT NULL`; `Activity` becomes the canonical "what
+happened" stream including system events. See the parallel plan at
+`~/.claude/plans/audit-activity-notifications-rethink.md` for the full design.
+
+### Added
+- **`AbstractAuditLog.user` is now `null=False, on_delete=PROTECT`** with a
+  `CheckConstraint(check=Q(user__isnull=False), name='auditlog_user_required')`
+  for defense in depth (DB-level enforcement matching the Django-level constraint).
+  `keel.accounts.AuditLog` (concrete subclass) mirrors the constraint on its own
+  `Meta.constraints` because Django doesn't propagate `Meta.constraints` from
+  abstract bases to concrete subclasses.
+- **Source-scoped verb catalog** in `keel/activity/verbs.py` — 12 new verbs:
+  `grants_gov.polled`, `salesforce.synced`, `openstates.polled`, `foia.cache_refreshed`,
+  `invitations.pulled`, `webhook.retried`, `health.computed`, `tasks.notified`,
+  `auth.login_failed`, `auth.login_succeeded`, `security.account_locked`,
+  `security.suspicious_activity`. Each defaults to `default_visibility='staff'`,
+  `default_notify=False`. `VERB_DESCRIPTIONS` dict for `/ops/` tooltip rendering.
+- **`audit_constraint_present` canary gauge** in `keel.ops.canary` — queries
+  `information_schema.check_constraints` for the `auditlog_user_required` constraint
+  on the AuditLog table. Three-state gauge (True / False / None). Flag triggers
+  only on explicit False (gauge measured + constraint absent). None on non-postgres
+  or query failure → flag stays False (no false positives).
+- **Per-product `AuditLog.user` NOT NULL migration** —
+  `keel/accounts/migrations/0022_auditlog_user_required.py` alters
+  `keel.accounts.AuditLog.user` to NOT NULL + PROTECT, adds the CheckConstraint,
+  drops `LOGIN_FAILED` and `SECURITY_EVENT` from `Action` choices. **Migration is
+  self-gating:** if any product (or keel's own AuditLog) has `user_id IS NULL`
+  rows at apply time, it raises `NotNullViolation` and the deploy fails loudly.
+  This is the desired safety net.
+
+### Changed
+- **Failed-login + security events route to Activity, not AuditLog.**
+  `FailedLoginMonitor._record_failure` emits `auth.login_failed` (status=warn) on
+  every recorded failure. Lockout threshold trip emits `security.account_locked`
+  (status=failed) so the Activity → Notification seam fans the row out to product
+  `system_admin`s. `AdminIPAllowlistMiddleware` emits `security.suspicious_activity`
+  (status=warn) on 403. All emission paths wrapped try/except — a broken Activity
+  write never breaks the middleware's primary job. Successful logins still write
+  `AuditLog(action='login', user=actual_user)` — they naturally satisfy the
+  `user NOT NULL` constraint.
+- **`keel.security.alerts.check_failed_logins`** rewritten to read Activity
+  (`verb='auth.login_failed'`) by default when `KEEL_ACTIVITY_MODEL` is configured,
+  with legacy-AuditLog fallback for mid-rollout products / existing tests.
+  Signature backwards-compatible.
+- **`AbstractAuditLog.Action.choices`** drops `LOGIN_FAILED` and `SECURITY_EVENT`
+  (now Activity verbs).
+
+### Breaking changes (consumer action required)
+**Before bumping the keel pin in any product:**
+1. **Prune null-user audit rows.** Run on each product's database:
+   ```sql
+   SELECT count(*) FROM <product>_core_auditlog WHERE user_id IS NULL;
+   -- If > 0, prune via copy-and-swap (parallel plan §3.4):
+   BEGIN;
+   CREATE TABLE <product>_core_auditlog_keep AS
+     SELECT * FROM <product>_core_auditlog WHERE user_id IS NOT NULL;
+   TRUNCATE <product>_core_auditlog;
+   INSERT INTO <product>_core_auditlog SELECT * FROM <product>_core_auditlog_keep;
+   DROP TABLE <product>_core_auditlog_keep;
+   COMMIT;
+   ```
+   `TRUNCATE` is sub-second `ACCESS EXCLUSIVE` lock; no `VACUUM FULL` needed
+   (deallocates physical pages directly). Bounty's prune is the only one with
+   significant row volume; other products should be <1000 rows total each.
+2. **After pruning, run `manage.py makemigrations`** to generate the per-product
+   `AlterField` migration that propagates NOT NULL + CheckConstraint to the
+   product's concrete `AuditLog` subclass. Apply with `manage.py migrate`.
+3. **Rewrite bulk-upsert crons** to use the existing
+   `@scheduled_job(emits='verb.name')` decorator from `keel.scheduling` and return
+   a structured dict from `handle()` (see `keel.activity.services.record_system_event`).
+   Bounty's `sync_federal_grants` is the reference consumer.
+4. **Note:** `keel_site/dashboard.py:76-82` queries `AuditLog.objects.filter(action__in=['login_failed', 'security_event'])`
+   for a "security events this week" stat. Those queries now return 0 since no
+   new rows of those action values can be written. UI fix is part of the Phase 4A
+   `/ops/` redesign (separate session), not this release.
+
 ## 0.47.2 — 2026-05-20
 
 **Fix `_fan_out` calling `notify()` with kwargs that don't exist.** Notification

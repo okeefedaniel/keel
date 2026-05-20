@@ -185,6 +185,79 @@ _register(Verb('system.aggregator_imported', 'Helm aggregator import',
                description='ONE row per RUN, not per record. metadata.count = N.'))
 
 
+# ── Source-scoped system-event verbs (Approach D, v0.46.0) ────────────────
+# Naming convention: `<source>.<verb>` — the source segment identifies the
+# upstream system or subsystem, the verb segment is past-tense third-person.
+# These are *advisory* — verb is a CharField, products may add ad-hoc verbs
+# without re-releasing keel. Reuse a registered verb if one already covers
+# the event; new sources should pick a name and stick to it.
+_register(Verb('grants_gov.polled', 'Grants.gov polled',
+               default_visibility='staff', default_notify=False,
+               description='Bounty hourly poll of simpler.grants.gov. '
+                           'metadata: {new, updated, closed, unchanged, duration_ms}.'))
+_register(Verb('salesforce.synced', 'Salesforce synced',
+               default_visibility='staff', default_notify=False,
+               description='Beacon Salesforce contact sync. '
+                           'metadata: {created, updated, duration_ms}.'))
+_register(Verb('openstates.polled', 'OpenStates polled',
+               default_visibility='staff', default_notify=False,
+               description='Lookout OpenStates bill poll. '
+                           'metadata: {new_bills, status_changes, duration_ms}.'))
+_register(Verb('foia.cache_refreshed', 'FOIA cache refreshed',
+               default_visibility='staff', default_notify=False,
+               description='Admiralty refresh of upstream FOIA caches.'))
+_register(Verb('invitations.pulled', 'Invitations pulled',
+               default_visibility='staff', default_notify=False,
+               description='Yeoman external-invitation sync.'))
+_register(Verb('webhook.retried', 'Webhook retried',
+               default_visibility='staff', default_notify=False,
+               description='Manifest outbound webhook retry pass.'))
+_register(Verb('health.computed', 'Health scores computed',
+               default_visibility='staff', default_notify=False,
+               description='Helm compute-health-scores run.'))
+_register(Verb('tasks.notified', 'Task notifications sent',
+               default_visibility='staff', default_notify=False,
+               description='Harbor / Helm due-task notification pass.'))
+
+
+# ── Authentication & security verbs (Approach D, v0.46.0) ─────────────────
+# These verbs replace the legacy ``AuditLog.action='login_failed' /
+# 'security_event'`` writes. Under Approach D, failed-login and lockout
+# rows live in Activity, not AuditLog (the latter is user-only and
+# schema-enforces user IS NOT NULL). Successful logins still write AuditLog.
+_register(Verb('auth.login_failed', 'Login failed',
+               default_visibility='staff', default_notify=False,
+               description='A login attempt failed credentials check. '
+                           'actor=None, metadata: {attempted_username, ip}.'))
+_register(Verb('auth.login_succeeded', 'Login succeeded',
+               default_visibility='staff', default_notify=False,
+               description='Optional companion to auth.login_failed. Most '
+                           'products rely on AuditLog.action=login for '
+                           'successful-login provenance; this verb exists '
+                           'for products that prefer the unified Activity '
+                           'stream.'))
+_register(Verb('security.account_locked', 'Account locked',
+               default_visibility='staff', default_notify=False,
+               description='FailedLoginMonitor tripped — IP / account locked '
+                           'after N failed attempts. metadata: {ip, failures, '
+                           'window_seconds, lockout_seconds}.'))
+_register(Verb('security.suspicious_activity', 'Suspicious activity',
+               default_visibility='staff', default_notify=False,
+               description='Generic security-event signal — admin allowlist '
+                           'rejection, role-grant denied, etc. metadata: '
+                           '{event_type, details}.'))
+
+
+# Human-readable verb descriptions, indexed by verb code. Used by the
+# verb-catalog UI and by /ops/ tooltip rendering. A lookup miss falls back
+# to the Verb.description on the Verb object.
+VERB_DESCRIPTIONS: dict[str, str] = {
+    code: verb.description
+    for code, verb in VERB_CATALOG.items()
+    if verb.description
+}
+
+
 def get_verb(code: str) -> Optional[Verb]:
     """Look up a verb by code. Returns None if not registered."""
     return VERB_CATALOG.get(code)
