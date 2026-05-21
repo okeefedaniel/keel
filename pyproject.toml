@@ -21,7 +21,7 @@ dependencies = [
 sso = ["django-allauth>=65.0"]
 avatars-s3 = ["django-storages[s3]>=1.14"]  # S3 avatar storage; unset KEEL_AVATAR_BUCKET falls back to local FS
 foia = ["anthropic>=0.40"]
-alerts = ["requests>=2.30"]  # for webhook notifications
+alerts = ["requests>=2.34.2"]  # for webhook notifications
 sms = ["twilio>=9.0"]  # for SMS notifications
 calendar = ["msal>=1.28"]  # for Microsoft Graph calendar integration
 encryption = ["cryptography>=42"]  # for keel.security.encryption (data-at-rest KEK)
