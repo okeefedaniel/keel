@@ -4,6 +4,17 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.48.1 — 2026-05-21
+
+**Packaging fix — `keel.accounts` static files now ship in the wheel.** The
+`/settings/account/` page in every product loaded a broken `<script src="…/keel/accounts/js/username-check.js">` because that file existed in source but was excluded from the built wheel: `pyproject.toml`'s `[tool.setuptools.package-data]` list for `keel.accounts` was missing the `static/**/*` glob. Three sibling packages with static dirs (`keel.core`, `keel.search`, `keel.mentions`) include it; `keel.accounts` was the only gap. Caught by lookout's nightly QA agent on its first run.
+
+### Fixed
+- `pyproject.toml`: add `"static/**/*"` to `keel.accounts` package-data so the
+  username-availability JS (and any future static assets under `keel/accounts/static/`)
+  ships in the wheel. Existing static dirs in `keel.core`, `keel.search`, and
+  `keel.mentions` were already wired correctly — this brings `keel.accounts` in line.
+
 ## 0.48.0 — 2026-05-20
 
 **Audit / Activity / Notifications rethink — Approach D ships.** Forced by Bounty's
