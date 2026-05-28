@@ -4,6 +4,22 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.47.3 — 2026-05-27 (maintenance backport from main v0.48.1)
+
+**Packaging fix — `keel.accounts` static files now ship in the wheel.** Backport of
+the v0.48.1 fix to the 0.47.x line so consumers that aren't ready for v0.48.0's
+AuditLog NOT NULL migration can still pick up the `/settings/account/`
+`username-check.js` 404 fix. `pyproject.toml`'s `[tool.setuptools.package-data]`
+list for `keel.accounts` was missing the `static/**/*` glob, so the JS file
+existed in source but was excluded from the built wheel. Three sibling packages
+with static dirs (`keel.core`, `keel.search`, `keel.mentions`) already include
+it; `keel.accounts` was the only gap. Originally caught by lookout's nightly
+QA agent.
+
+### Fixed
+- `pyproject.toml`: add `"static/**/*"` to `keel.accounts` package-data.
+  Identical change to v0.48.1 on main, cut against v0.47.2.
+
 ## 0.47.2 — 2026-05-20
 
 **Fix `_fan_out` calling `notify()` with kwargs that don't exist.** Notification
