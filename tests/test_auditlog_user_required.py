@@ -45,36 +45,55 @@ def test_auditlog_user_required_check_constraint_declared():
     """The defense-in-depth constraint must be declared on Meta.constraints.
 
     Without it, a raw SQL insert bypassing the Django ORM could still create
-    a NULL-user audit row, undoing the Approach D guarantee. The constraint
-    is named ``auditlog_user_required`` so the canary gauge can verify it
-    in information_schema.check_constraints on live deployments.
+    a NULL-user audit row, undoing the Approach D guarantee. The name is
+    TEMPLATED (``%(app_label)s_%(class)s_user_required``) so every concrete
+    subclass gets a globally-unique constraint name and no two AuditLog
+    subclasses collide under Django E032 (fixed in v0.48.1 — a hardcoded
+    name made every consumer's makemigrations fail against keel.accounts.
+    AuditLog's identically-named constraint).
     """
     constraints = AbstractAuditLog._meta.constraints
     matching = [
         c for c in constraints
-        if isinstance(c, CheckConstraint) and c.name == 'auditlog_user_required'
+        if isinstance(c, CheckConstraint)
+        and c.name == '%(app_label)s_%(class)s_user_required'
     ]
     assert matching, (
         'AbstractAuditLog.Meta.constraints must include a CheckConstraint '
-        'named auditlog_user_required.'
+        'named %(app_label)s_%(class)s_user_required (templated so concrete '
+        'subclasses get unique names — see v0.48.1 E032 fix).'
     )
 
 
-def test_concrete_keel_accounts_auditlog_carries_constraint():
-    """The shipping concrete model must inherit / re-declare the constraint.
+def test_concrete_subclasses_get_distinct_constraint_names():
+    """Two concrete AuditLog subclasses must NOT share a constraint name.
 
-    Concrete subclasses don't auto-inherit Meta.constraints from an abstract
-    base, so each AuditLog subclass needs to either re-declare or rely on
-    a migration that re-adds the constraint. keel.accounts.AuditLog
-    re-declares it in its own Meta — pin that to prevent drift.
+    This is the regression test for the v0.48.0 → v0.48.1 E032 bug: a
+    hardcoded constraint name on the abstract meant the moment a consumer's
+    concrete AuditLog inherited it AND keel.accounts.AuditLog also carried
+    one, ``makemigrations`` failed project-wide. The templated name resolves
+    per-subclass; keel.accounts.AuditLog keeps its own explicit name for
+    migration-history stability. Either way, the two names differ.
     """
     from keel.accounts.models import AuditLog as KeelAuditLog
-    names = {c.name for c in KeelAuditLog._meta.constraints
-             if isinstance(c, CheckConstraint)}
-    assert 'auditlog_user_required' in names, (
-        'keel.accounts.AuditLog must declare the auditlog_user_required '
-        'CheckConstraint on its own Meta — abstract constraints do not '
-        'auto-propagate to concrete subclasses.'
+    keel_names = {
+        c.name for c in KeelAuditLog._meta.constraints
+        if isinstance(c, CheckConstraint) and 'user_required' in c.name
+    }
+    # keel.accounts.AuditLog declares its own name (kept stable across the
+    # v0.48.1 fix so its already-applied migration 0022 needs no rename).
+    assert keel_names, (
+        'keel.accounts.AuditLog must carry a user_required CheckConstraint.'
+    )
+    # The abstract's templated name resolves to something app-specific for a
+    # consumer subclass — it must NOT equal keel.accounts.AuditLog's name.
+    abstract_template = next(
+        c.name for c in AbstractAuditLog._meta.constraints
+        if isinstance(c, CheckConstraint) and 'user_required' in c.name
+    )
+    assert abstract_template not in keel_names, (
+        'Abstract constraint name must be templated so it cannot collide '
+        'with keel.accounts.AuditLog (the E032 bug this fix closes).'
     )
 
 

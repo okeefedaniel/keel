@@ -140,12 +140,21 @@ class AbstractAuditLog(models.Model):
         constraints = [
             # Defense-in-depth against the Django ORM accidentally creating a
             # NULL-user audit row even though null=False is declared above:
-            # a DB-level check that rejects any user_id IS NULL insert. Named
-            # so the canary 'audit_constraint_present' gauge can verify the
-            # constraint is live in information_schema.check_constraints.
+            # a DB-level check that rejects any user_id IS NULL insert.
+            #
+            # The name is TEMPLATED (%(app_label)s_%(class)s) so each concrete
+            # subclass gets a globally-unique constraint name — e.g.
+            # bounty_core_auditlog_user_required. A hardcoded name here triggers
+            # Django E032 (constraint names must be unique across all models in
+            # a project): the moment a consumer's concrete AuditLog inherits
+            # this constraint AND keel.accounts.AuditLog also carries one,
+            # makemigrations fails. Templating is what Django provides abstract
+            # bases for. The canary's audit_constraint_present gauge verifies
+            # the protection via column nullability, not the constraint name,
+            # so per-product name variation is harmless.
             CheckConstraint(
                 check=Q(user__isnull=False),
-                name='auditlog_user_required',
+                name='%(app_label)s_%(class)s_user_required',
             ),
         ]
 

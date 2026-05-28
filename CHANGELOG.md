@@ -4,6 +4,45 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.48.2 — 2026-05-28
+
+**Two consumer-blocking bugs in the v0.48.0 Approach D rollout.** Both surfaced
+when Bounty became the first product to adopt the new audit/activity pattern —
+they would have tripped every one of the remaining 7 product retrofits.
+
+### Fixed
+- **E032 constraint-name collision (every consumer's `makemigrations` failed).**
+  `AbstractAuditLog.Meta.constraints` hardcoded `name='auditlog_user_required'`.
+  Django requires constraint names to be globally unique across all models in a
+  project. The moment a consumer's concrete `AuditLog(AbstractAuditLog)` inherited
+  that constraint AND `keel.accounts.AuditLog` also carried one, `makemigrations`
+  aborted with `models.E032`. The abstract name is now TEMPLATED
+  (`%(app_label)s_%(class)s_user_required`) so each concrete subclass gets a
+  unique name (`bounty_core_auditlog_user_required`, etc.). `keel.accounts.AuditLog`
+  keeps its existing explicit `auditlog_user_required` name so its already-applied
+  migration `0022` needs no rename. **Consumers no longer need to override the
+  constraint name** — inherit and move on.
+- **`@scheduled_job(emits=...)` crashed every emitting cron at runtime.** The
+  decorator returned the handler's structured dict, which Django's
+  `BaseCommand.execute()` passes to `self.stdout.write()` →
+  `AttributeError: 'dict' object has no attribute 'endswith'`. The wrapper now
+  returns `None` on the `emits` path (after consuming the dict for the Activity
+  row). Non-emits commands keep returning their `handle()` value unchanged.
+  **Consumers no longer need a custom `Command.execute()` override.**
+- **`@scheduled_job` crashed when `keel.scheduling` wasn't in `INSTALLED_APPS`.**
+  The lazy `from keel.scheduling.models import …` ran outside the try/except, so a
+  consumer that forgot to add the app got a `RuntimeError` that killed the cron
+  instead of the intended graceful "no run-log" degradation. Import moved inside
+  the try. (Adding `keel.scheduling` to `INSTALLED_APPS` is still required to get
+  `CommandRun` observability — it just no longer hard-crashes without it.)
+
+### Changed
+- **`audit_constraint_present` canary now checks column nullability, not the
+  constraint name.** Since the constraint name is templated per-product, a
+  name-based `information_schema` lookup would need each product's app_label.
+  The gauge now queries `information_schema.columns.is_nullable` on the AuditLog
+  `user_id` column — the actual protection, name-independent, more robust.
+
 ## 0.48.1 — 2026-05-21
 
 **Packaging fix — `keel.accounts` static files now ship in the wheel.** The

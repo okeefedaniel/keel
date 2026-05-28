@@ -76,14 +76,20 @@ def _safe_count(model_path, **filters):
 
 
 def _check_audit_constraint_present():
-    """Return True/False/None for the AuditLog ``auditlog_user_required`` constraint.
+    """Return True/False/None for the AuditLog NULL-user protection.
 
-    True means the CheckConstraint exists in the DB. False means the
-    expected constraint is missing — the canary should flag, because the
-    schema's structural guarantee that AuditLog never carries a NULL-user
-    row is gone. None means the gauge couldn't be measured (model not
-    installed, non-Postgres backend, query failure) and the flag should
-    stay False (no false positives).
+    True means the AuditLog table's ``user_id`` column is NOT NULL — the
+    Approach D structural guarantee that no audit row can exist without a
+    user. False means the column still allows NULL — the canary should flag,
+    because the protection is gone. None means the gauge couldn't be measured
+    (model not installed, non-Postgres backend, column/query failure) and the
+    flag should stay False (no false positives).
+
+    NOTE: this checks COLUMN NULLABILITY, not a named CheckConstraint. The
+    constraint name is templated per concrete subclass
+    (``%(app_label)s_%(class)s_user_required``), so a name-based lookup would
+    have to know each product's app_label. Column nullability is the actual
+    protection and is name-independent — a more robust signal anyway.
     """
     audit_path = getattr(settings, 'KEEL_AUDIT_LOG_MODEL', 'core.AuditLog')
     if not audit_path:
@@ -94,26 +100,28 @@ def _check_audit_constraint_present():
         return None
     table = Model._meta.db_table
     vendor = getattr(connection, 'vendor', '')
-    # information_schema.check_constraints is a Postgres / standard-SQL
-    # surface; SQLite doesn't expose constraints there. On non-Postgres
-    # vendors we can't verify and disable the gauge.
+    # information_schema.columns is a Postgres / standard-SQL surface; SQLite
+    # doesn't expose it the same way. On non-Postgres vendors we can't verify
+    # and disable the gauge.
     if vendor != 'postgresql':
         return None
     try:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT 1
-                FROM information_schema.table_constraints tc
-                WHERE tc.constraint_type = 'CHECK'
-                  AND tc.table_name = %s
-                  AND tc.constraint_name = 'auditlog_user_required'
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_name = %s
+                  AND column_name = 'user_id'
                 LIMIT 1
                 """,
                 [table],
             )
             row = cursor.fetchone()
-        return row is not None
+        if row is None:
+            # Column not found — can't measure; don't false-positive.
+            return None
+        return row[0] == 'NO'
     except Exception:
         return None
 

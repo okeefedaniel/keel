@@ -197,12 +197,15 @@ def scheduled_job(
 
             @functools.wraps(original_handle)
             def wrapped_handle(self, *args, **opts):
-                # Lazy imports — apps may not be ready when the decorator
-                # fires at module load time.
-                from keel.scheduling.models import CommandRun, ScheduledJob
-
                 run = None
                 try:
+                    # Lazy imports — apps may not be ready when the decorator
+                    # fires at module load time. Kept INSIDE the try so a
+                    # consumer that forgot to add 'keel.scheduling' to
+                    # INSTALLED_APPS degrades to "no run-log" rather than
+                    # crashing the cron with a RuntimeError on the import.
+                    from keel.scheduling.models import CommandRun, ScheduledJob
+
                     job = ScheduledJob.objects.filter(slug=slug).first()
                     if job is not None:
                         run = CommandRun.objects.create(
@@ -210,8 +213,9 @@ def scheduled_job(
                             status=CommandRun.Status.RUNNING,
                         )
                 except Exception:
-                    # DB not ready (migrate hasn't run, test setup, etc.) —
-                    # never let the run-log machinery break the actual job.
+                    # DB not ready (migrate hasn't run, test setup, etc.) or
+                    # keel.scheduling not installed — never let the run-log
+                    # machinery break the actual job.
                     run = None
 
                 started = timezone.now() if run is None else run.started_at
@@ -243,6 +247,18 @@ def scheduled_job(
                                 'event was dropped.',
                                 slug, emits,
                             )
+                        # An emits-handler returns a structured dict for the
+                        # Activity row — NOT console output. Django's
+                        # BaseCommand.execute() does `if output:
+                        # self.stdout.write(output)`, which calls
+                        # str.endswith() and crashes on a dict
+                        # (AttributeError: 'dict' object has no attribute
+                        # 'endswith'). We've already consumed `result` for the
+                        # emit above, so swallow it here and return None.
+                        # Non-emits commands keep returning `result` unchanged
+                        # (backwards-compatible — their handle() returns None or
+                        # a string per Django convention).
+                        return None
                     return result
                 except Exception as e:
                     if run is not None:
