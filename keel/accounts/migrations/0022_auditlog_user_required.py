@@ -58,7 +58,8 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name='auditlog',
             constraint=models.CheckConstraint(
-                check=models.Q(user__isnull=False),
+                # `condition=` is the Django 5.2+ name (`check=` removed in 6.0).
+                condition=models.Q(user__isnull=False),
                 name='auditlog_user_required',
             ),
         ),
