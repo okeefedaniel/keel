@@ -1381,7 +1381,8 @@ class AuditLog(models.Model):
         ordering = ['-timestamp']
         constraints = [
             models.CheckConstraint(
-                check=models.Q(user__isnull=False),
+                # `condition=` is the Django 5.2+ name (`check=` removed in 6.0).
+                condition=models.Q(user__isnull=False),
                 name='auditlog_user_required',
             ),
         ]

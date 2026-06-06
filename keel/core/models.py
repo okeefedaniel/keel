@@ -153,7 +153,8 @@ class AbstractAuditLog(models.Model):
             # the protection via column nullability, not the constraint name,
             # so per-product name variation is harmless.
             CheckConstraint(
-                check=Q(user__isnull=False),
+                # `condition=` is the Django 5.2+ name (`check=` removed in 6.0).
+                condition=Q(user__isnull=False),
                 name='%(app_label)s_%(class)s_user_required',
             ),
         ]
