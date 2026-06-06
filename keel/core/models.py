@@ -153,8 +153,14 @@ class AbstractAuditLog(models.Model):
             # the protection via column nullability, not the constraint name,
             # so per-product name variation is harmless.
             CheckConstraint(
-                # `condition=` is the Django 5.2+ name (`check=` removed in 6.0).
-                condition=Q(user__isnull=False),
+                # Stay on the deprecated `check=` here to avoid forcing a
+                # state-only ``makemigrations`` round across every consumer
+                # at the same time as the v0.49.x rollout. The concrete
+                # ``keel.accounts.AuditLog`` (which actually crashed under
+                # Django 6.0) already moved to ``condition=``; consumers
+                # that hit Django 6.0 first can flip their concrete
+                # subclasses then. ``check=`` still works on Django 5.2.
+                check=Q(user__isnull=False),
                 name='%(app_label)s_%(class)s_user_required',
             ),
         ]
