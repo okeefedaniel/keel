@@ -4,14 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keel"
-version = "0.49.4"
+version = "0.49.5"
 description = "Shared Django platform layer for DockLabs products"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Proprietary"}
 authors = [{name = "Daniel O'Keefe"}]
 dependencies = [
-    "Django>=5.2",
+    # Django 6.0 removed ``CheckConstraint(check=...)``; the migration churn
+    # to flip every consumer's concrete AuditLog to ``condition=`` is queued
+    # but not done. Hold the line on 5.2.x until per-product Approach D
+    # rollouts catch up (then bump to ``>=6.0`` in a coordinated keel release).
+    "Django>=5.2,<6.0",
     "django-oauth-toolkit>=2.4",
     "nh3>=0.2",  # parser-based HTML sanitizer (keel.comms)
     "Pillow>=10.0",  # avatar image processing (resize, EXIF strip, WebP encode)
