@@ -87,6 +87,24 @@ def _keel_oidc_login_url(request):
         return None
 
 
+def csp_nonce_context(request):
+    """Expose the per-request CSP nonce to every template.
+
+    Set by ``keel.security.middleware.SecurityHeadersMiddleware`` before
+    the view runs. Templates use it on inline blocks::
+
+        <script nonce="{{ csp_nonce }}">...</script>
+        <style nonce="{{ csp_nonce }}">...</style>
+
+    When ``KEEL_CSP_POLICY`` includes ``'nonce-{nonce}'`` in
+    ``script-src`` / ``style-src``, only inline blocks carrying the
+    matching nonce are executed by the browser. Returns an empty string
+    when the middleware isn't installed (graceful degradation — inline
+    blocks just render without the attribute).
+    """
+    return {'csp_nonce': getattr(request, 'csp_nonce', '')}
+
+
 def site_context(request):
     """Inject site-wide template variables into every template context.
 
@@ -250,6 +268,31 @@ def fleet_context(request):
         ]
     """
     products = getattr(settings, 'KEEL_FLEET_PRODUCTS', [])
+
+    # Filter to products the user actually has access to. Superusers see
+    # the full fleet (admin convenience); unauthenticated requests see
+    # nothing (the sidebar itself is gated on is_authenticated upstream,
+    # so this is defensive). Without this filter, every product surfaces
+    # all 9 fleet chips to every user, including beta users entitled to
+    # only one product — clicking a chip would just hit the ProductAccess
+    # gate on the destination.
+    user = getattr(request, 'user', None) if request is not None else None
+    if user is not None and user.is_authenticated and not user.is_superuser:
+        try:
+            accessible = set(user.get_products())
+        except AttributeError:
+            # Non-KeelUser auth model — leave the full list alone.
+            accessible = None
+        if accessible is not None:
+            current = getattr(settings, 'KEEL_PRODUCT_CODE', '')
+            # Always keep the current product in the list so the
+            # expanded view still shows the "you are here" row.
+            products = [
+                p for p in products
+                if p.get('code') in accessible or p.get('code') == current
+            ]
+    elif user is None or not user.is_authenticated:
+        products = []
 
     # Rewrite fleet URLs when serving a demo hostname so users stay
     # within the demo ecosystem. Production hosts are left alone.

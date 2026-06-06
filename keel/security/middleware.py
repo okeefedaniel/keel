@@ -2,7 +2,7 @@
 Keel Security Middleware — shared across all DockLabs products.
 
 Provides:
-- SecurityHeadersMiddleware: CSP, Permissions-Policy, and other security headers
+- SecurityHeadersMiddleware: CSP (with per-request nonce), Permissions-Policy, and other security headers
 - FailedLoginMonitor: Detects brute-force login attempts
 - AdminIPAllowlistMiddleware: Restricts /admin/ access by IP
 
@@ -21,9 +21,26 @@ Usage in settings.py:
     KEEL_LOGIN_MAX_FAILURES = 10
     KEEL_LOGIN_LOCKOUT_WINDOW = 900  # seconds
     KEEL_LOGIN_LOCKOUT_DURATION = 1800  # seconds
+
+    # KEEL_CSP_POLICY may include the literal ``{nonce}`` placeholder, which
+    # SecurityHeadersMiddleware substitutes per request. Pair with
+    # ``keel.core.context_processors.csp_nonce_context`` so templates can
+    # read ``{{ csp_nonce }}``. Example policy:
+    #
+    #     KEEL_CSP_POLICY = (
+    #         "default-src 'self'; "
+    #         "script-src 'self' 'nonce-{nonce}' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    #         "style-src  'self' 'nonce-{nonce}' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    #         ...
+    #     )
+    #
+    # Keep ``'unsafe-inline'`` while migrating templates; once every inline
+    # ``<script>`` / ``<style>`` carries ``nonce="{{ csp_nonce }}"``, drop
+    # ``'unsafe-inline'`` from the policy to actually enforce strict-dynamic.
 """
 import ipaddress
 import logging
+import secrets
 import time
 
 from django.conf import settings
@@ -63,19 +80,43 @@ def get_client_ip(request):
 _get_client_ip = get_client_ip
 
 
+def generate_csp_nonce():
+    """Return a fresh, URL-safe nonce suitable for CSP3 ``'nonce-X'``.
+
+    16 bytes → 22 base64url chars. Per CSP3 spec the nonce must be at
+    least 128 bits of unguessable entropy.
+    """
+    return secrets.token_urlsafe(16)
+
+
 class SecurityHeadersMiddleware:
-    """Adds security headers beyond what Django's SecurityMiddleware provides."""
+    """Adds security headers beyond what Django's SecurityMiddleware provides.
+
+    Per-request CSP nonce: stamps ``request.csp_nonce`` BEFORE the view runs
+    so templates / context processors can read it, then substitutes any
+    ``{nonce}`` placeholder in ``KEEL_CSP_POLICY`` with that value when
+    setting the Content-Security-Policy header. If the policy doesn't
+    contain ``{nonce}``, the nonce is still attached to the request for any
+    callers that need it but the policy ships unchanged.
+    """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        # Stamp the nonce on the request before the view runs so context
+        # processors and templates can resolve {{ csp_nonce }} from the
+        # request object. Use a fresh nonce per request.
+        request.csp_nonce = generate_csp_nonce()
+
         response = self.get_response(request)
 
         # Content Security Policy — restrictive default, products can override
         if not response.has_header('Content-Security-Policy'):
             csp = getattr(settings, 'KEEL_CSP_POLICY', None)
             if csp:
+                if '{nonce}' in csp:
+                    csp = csp.replace('{nonce}', request.csp_nonce)
                 response['Content-Security-Policy'] = csp
 
         # Permissions-Policy — disable dangerous browser features
