@@ -98,7 +98,29 @@ class SecurityHeadersMiddleware:
     setting the Content-Security-Policy header. If the policy doesn't
     contain ``{nonce}``, the nonce is still attached to the request for any
     callers that need it but the policy ships unchanged.
+
+    **Nonce enforcement is opt-in per product** via
+    ``KEEL_CSP_NONCE_ENABLED = True``. The Wave 4 rollout shipped the
+    ``'nonce-{nonce}'`` token in every product's KEEL_CSP_POLICY alongside
+    ``'unsafe-inline'`` as a transitional fallback — but per the CSP3 spec
+    browsers IGNORE ``'unsafe-inline'`` the moment any ``'nonce-X'`` token
+    appears in the same directive. With templates not yet tagged
+    (task #39), this silently blocked every inline ``<script>`` and
+    ``<style>`` across the suite — Bootstrap dropdowns, tooltips,
+    inline status-pill styles, htmx handlers — 100+ CSP violations per
+    page load, a fleet-wide UX regression masked by 200s on /health/.
+    The default is now OFF: the middleware strips the entire
+    ``'nonce-{nonce}'`` token from each directive so ``'unsafe-inline'``
+    actually works. Products that have tagged every inline tag with
+    ``nonce="{{ csp_nonce }}"`` opt in by setting
+    ``KEEL_CSP_NONCE_ENABLED = True``, AND also dropping ``'unsafe-inline'``
+    from their policy at the same time.
     """
+
+    # Match ``'nonce-{nonce}'`` (with optional surrounding whitespace) so we
+    # can excise the token without disturbing the rest of the directive.
+    # Defined at class level so the regex compiles once per process.
+    _NONCE_TOKEN_RE = None  # populated lazily in __call__
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -116,7 +138,21 @@ class SecurityHeadersMiddleware:
             csp = getattr(settings, 'KEEL_CSP_POLICY', None)
             if csp:
                 if '{nonce}' in csp:
-                    csp = csp.replace('{nonce}', request.csp_nonce)
+                    if getattr(settings, 'KEEL_CSP_NONCE_ENABLED', False):
+                        # Product has opted in: every inline <script>/<style>
+                        # carries nonce="{{ csp_nonce }}" and 'unsafe-inline'
+                        # has been dropped from KEEL_CSP_POLICY.
+                        csp = csp.replace('{nonce}', request.csp_nonce)
+                    else:
+                        # Default: excise the entire ``'nonce-{nonce}'`` token
+                        # from each directive so 'unsafe-inline' actually
+                        # works. Inline ``re.sub`` keeps the patch contained.
+                        import re
+                        # Strip token along with any preceding whitespace.
+                        csp = re.sub(r"\s*'nonce-\{nonce\}'", "", csp)
+                        # Collapse any doubled whitespace left in the wake
+                        # of the excision (e.g. ``script-src  'self'``).
+                        csp = re.sub(r"  +", " ", csp).strip()
                 response['Content-Security-Policy'] = csp
 
         # Permissions-Policy — disable dangerous browser features
