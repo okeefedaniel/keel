@@ -317,18 +317,15 @@ def _complete_packet(packet):
             'signed_ip': step.signed_ip or '',
         })
 
-    log_audit(
-        user=None,
-        action=get_audit_action().STATUS_CHANGE,
-        entity_type='SigningPacket',
-        entity_id=str(packet.pk),
-        description=f'Signing packet "{packet.title}" completed — all signatures collected.',
-        changes={
-            'completed_at': packet.completed_at.isoformat(),
-            'initiated_by': packet.initiated_by.get_full_name() if packet.initiated_by else '',
-            'signatures': signature_summary,
-        },
-    )
+    # Approach D (keel v0.46.x+): system events do not write AuditLog.
+    # Packet completion is system-triggered (the last signer's complete_step
+    # finalizes the packet, but the audit row for that final signature is
+    # written from the user-attributed log_audit on line 209-219 above —
+    # the per-packet completion row would have user=None and violate the
+    # AuditLog.user NOT NULL constraint). The Track B activity emission
+    # below carries the same content into the Activity stream where it
+    # belongs.
+    _ = signature_summary  # kept for downstream callers; activity metadata uses signer_count
 
     # Track B: packet completion. Notifies collaborators that all signatures are in.
     _emit_activity(

@@ -131,29 +131,45 @@ def record_activity(
 
     with skip_promotion_guard():
         with transaction.atomic():
-            # AuditLog gets the metadata in the new ``metadata`` field (added to
-            # AbstractAuditLog as part of Phase 1A). ``changes`` stays empty for
-            # explicit record_activity() calls — it carries diff semantics that the
-            # audit-signal pathway populates for plain saves, and we don't want to
-            # pollute that channel with free-form context.
-            audit_kwargs = dict(
-                user=actor,
-                action=audit_action,
-                entity_type=_entity_type_for_target(target),
-                entity_id=str(target_id) if target_id is not None else '',
-                description=source_label,
-                changes={},
-                ip_address=None,  # record_activity() may run outside a request context
-            )
-            # AbstractAuditLog now carries metadata + deep_link_snapshot fields
-            # (added in Phase 1A keel.core change). Be defensive in case the field
-            # is missing on a not-yet-migrated product.
-            if hasattr(AuditLog, 'metadata') or 'metadata' in [f.name for f in AuditLog._meta.fields]:
-                audit_kwargs['metadata'] = metadata
-            if 'deep_link_snapshot' in [f.name for f in AuditLog._meta.fields]:
-                audit_kwargs['deep_link_snapshot'] = deep_link
+            # Approach D (keel v0.46.x+): AuditLog is strictly user-attributed —
+            # ``user IS NOT NULL`` is enforced both via ``null=False`` and a
+            # CheckConstraint on every product's concrete AuditLog. System
+            # events (``actor=None``) MUST NOT write AuditLog or the INSERT
+            # raises IntegrityError, the transaction aborts, and every
+            # subsequent ORM call in this atomic block fails with
+            # ``TransactionManagementError: You can't execute queries until
+            # the end of the 'atomic' block``. Pre-0.51.1 callers like the
+            # signing flow's ``signing.next_signer_active`` /
+            # ``signing.packet_completed`` events all hit this — they pass
+            # ``actor=None`` because the packet is advancing on its own, not
+            # because a specific user clicked a button.
+            #
+            # When actor is None we skip the AuditLog write entirely; Activity
+            # becomes the durable record. ``audit_ref`` is None on the row,
+            # which is fine because the per-app
+            # ``<product>_activity_aud_uniq`` constraint is a partial unique
+            # ``WHERE audit_ref IS NOT NULL``.
+            if actor is None:
+                audit = None
+            else:
+                audit_kwargs = dict(
+                    user=actor,
+                    action=audit_action,
+                    entity_type=_entity_type_for_target(target),
+                    entity_id=str(target_id) if target_id is not None else '',
+                    description=source_label,
+                    changes={},
+                    ip_address=None,  # record_activity() may run outside a request context
+                )
+                # AbstractAuditLog now carries metadata + deep_link_snapshot fields
+                # (added in Phase 1A keel.core change). Be defensive in case the field
+                # is missing on a not-yet-migrated product.
+                if hasattr(AuditLog, 'metadata') or 'metadata' in [f.name for f in AuditLog._meta.fields]:
+                    audit_kwargs['metadata'] = metadata
+                if 'deep_link_snapshot' in [f.name for f in AuditLog._meta.fields]:
+                    audit_kwargs['deep_link_snapshot'] = deep_link
 
-            audit = AuditLog.objects.create(**audit_kwargs)
+                audit = AuditLog.objects.create(**audit_kwargs)
 
             activity = Activity.objects.create(
                 actor=actor,
