@@ -51,7 +51,7 @@
   {% endfor %}
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
   (function () {
     // Show a manual continue link if the redirect hasn't fired in 5s
     // (slow product responses, blocked network, etc.) so the user is

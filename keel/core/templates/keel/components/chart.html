@@ -7,7 +7,7 @@ Usage:
 The calling template must:
 1. Include chart_scripts.html in the page (once, for Chart.js CDN)
 2. Embed chart data via: {{ chart_data|json_script:"statusChart-data" }}
-3. Initialize the chart in a <script> block using DockLabs.initChart() or raw Chart.js
+3. Initialize the chart in a <script nonce="{{ csp_nonce }}"> block using DockLabs.initChart() or raw Chart.js
 
 Height defaults to 300px. chart_id must be unique per page.
 {% endcomment %}

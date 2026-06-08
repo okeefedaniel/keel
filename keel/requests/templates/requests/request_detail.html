@@ -3,7 +3,7 @@
 {% block title %}{{ cr.title }}{% endblock %}
 
 {% block extra_css %}
-<style>
+<style nonce="{{ csp_nonce }}">
   .prompt-box {
     background: #1a1a2e;
     color: #e0e0e0;
@@ -188,7 +188,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function copyPrompt() {
   const text = document.getElementById('promptText').innerText;
   navigator.clipboard.writeText(text).then(() => {

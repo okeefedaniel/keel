@@ -200,7 +200,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   const master = document.getElementById('inv-master');
   const rows = document.querySelectorAll('.inv-product-row');

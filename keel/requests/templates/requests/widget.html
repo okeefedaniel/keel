@@ -72,7 +72,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   var LOCAL = {{ local_submit|yesno:"true,false" }};
   var KEEL_API = '{{ keel_api_url }}';

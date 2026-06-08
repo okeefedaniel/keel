@@ -11,7 +11,7 @@
   </button>
 </form>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   document.querySelectorAll('.foia-export-form').forEach(function(form) {
     form.addEventListener('submit', function(e) {

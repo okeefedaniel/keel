@@ -22,7 +22,7 @@ users should see one consistent entry point.
 {% endcomment %}
 {% load keel_demo %}
 
-<style>
+<style nonce="{{ csp_nonce }}">
     .login-card { max-width: 450px; margin: 0 auto; }
 </style>
 

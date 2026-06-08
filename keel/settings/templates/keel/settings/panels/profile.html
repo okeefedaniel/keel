@@ -150,7 +150,7 @@
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js" defer></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   'use strict';
 

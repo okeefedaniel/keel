@@ -5,7 +5,7 @@ Usage (in your template's extra_js block or at bottom of body):
     {% include "keel/components/chart_scripts.html" %}
 {% endcomment %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     // DockLabs Chart.js v3 defaults
     // Labels/legend in Instrument Sans; palette reads from CSS tokens
     // so any token retokening propagates to every chart automatically.

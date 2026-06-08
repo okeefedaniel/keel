@@ -247,7 +247,7 @@ Products extend this and override blocks:
   <script src="{% static 'js/docklabs-v2.js' %}"></script>
 
   <!-- ⌘K / Ctrl+K → open the search modal -->
-  <script>
+  <script nonce="{{ csp_nonce }}">
     (function () {
       var modal = document.getElementById('keelSearchModal');
       if (!modal) return;

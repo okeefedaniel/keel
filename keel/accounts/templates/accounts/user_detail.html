@@ -136,7 +136,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   const PRODUCT_ROLES = {{ product_roles_json|safe }};
 
