@@ -861,12 +861,17 @@ def accept_invitation(request, token):
                     'invitation': invitation,
                 })
 
+            # Pass organization at create-time so the model's auto-fallback
+            # to docklabs-internal doesn't pre-empt the inviter's org. The
+            # save-hook only fires when organization_id is None, so once we
+            # set it here the invitee lands in the inviter's org as intended.
             user = KeelUser.objects.create_user(
                 username=username,
                 email=email,
                 password=password,
                 first_name=first_name,
                 last_name=last_name,
+                organization=invitation.organization,
             )
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
