@@ -18,8 +18,15 @@ Height defaults to 300px. chart_id must be unique per page.
     </div>
     {% endif %}
     <div class="card-body">
-        <div style="position: relative; height: {{ height|default:'300' }}px;">
+        {% comment %}
+        Height is caller-supplied (dynamic), so it can't be a static class.
+        A CSP nonce CAN authorize a <style> element (unlike an inline style=""
+        attribute), so we scope the per-instance height to this chart's id
+        through a nonce'd <style> block — CSP-clean under a strict style-src.
+        {% endcomment %}
+        <div class="dl-chart-canvas" id="{{ chart_id }}-wrap">
             <canvas id="{{ chart_id }}"></canvas>
         </div>
+        <style nonce="{{ csp_nonce }}">#{{ chart_id }}-wrap{height:{{ height|default:'300' }}px}</style>
     </div>
 </div>

@@ -4,6 +4,39 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.51.3 — 2026-06-22
+
+**Stop the suite-wide CSP inline-style console violations.** Every authenticated
+page across the suite logged repeated "Applying inline style violates the
+following Content-Security-Policy directive" warnings: the shared chrome carried
+static inline `style=""` attributes, and a CSP nonce can authorize a `<style>` /
+`<script>` *element* but NEVER an inline `style=""` *attribute*. Under a strict
+`style-src` (no `'unsafe-inline'`), those attributes were silently dropped on
+every render. Fixed by moving the static inline styles into CSS classes in the
+shared `docklabs-v2.css` rather than relaxing the policy — no `'unsafe-inline'`
+added, XSS protection unchanged.
+
+### Fixed
+- **Shared layouts** (`app.html`, `public.html`, `auth.html`): skip-link
+  `z-index`, search-icon sizing, and the auth-shell background/min-height now use
+  `.dl-skip-link`, `.dl-search-icon`, `.dl-auth-body`.
+- **Shared chrome** (`sidebar.html`, `topbar.html`): search-icon sizing →
+  `.dl-search-icon`.
+- **Shared components** (`quick_info`, `collaborator_list`, `comment_section`,
+  `canary_flags`, `collaboration_panel`, `workflow_transitions`): metadata
+  labels → `.dl-meta-label`, avatars → `.dl-avatar-sm` / `.dl-avatar-md`, canary
+  chips → `.dl-chip-xs`, collapsed-panel summary cursor and transition-control
+  widths → dedicated classes.
+- **`chart.html`**: the per-instance (dynamic) chart height now ships through a
+  nonce'd `<style>` element scoped to the chart id — the CSP-clean path for
+  legitimately-dynamic styling — instead of an inline `style=""` attribute.
+
+### Notes
+- Email templates (`accounts/emails/`) intentionally keep inline styles — mail
+  clients strip `<head>`/`<style>` and require inline styling, and CSP does not
+  apply to rendered email. The accounts auth/invitation pages still carry some
+  brand-color one-offs; those are a smaller, lower-frequency follow-up.
+
 ## 0.48.2 — 2026-05-28
 
 **Two consumer-blocking bugs in the v0.48.0 Approach D rollout.** Both surfaced

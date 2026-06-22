@@ -41,7 +41,7 @@ Visibility contract (TWO requirements — both must hold):
             {% if not comment.is_internal or request.user.is_staff %}
             <div class="d-flex mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
                 <div class="flex-shrink-0 me-3">
-                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 0.85rem;">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center dl-avatar-md">
                         {{ comment.author.first_name|default:comment.author.username|first|upper }}
                     </div>
                 </div>
