@@ -4,6 +4,36 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.52.0 — 2026-06-22
+
+Fleet logo refresh (v3 "Civic Institution").
+
+### Changed
+- **New fleet logo set.** Replaced all product marks in
+  `keel/core/static/img/fleet/*.svg` with a redesigned, cohesive set: navy field
+  (`#0A2B4E`, the v3 institutional navy — was `#00214D`), a paper-white maritime
+  mark (1.6px stroke, round joins), and exactly one luminous-brass accent
+  (`#D8A43C`) per mark. Marks read down to 20px (the fleet-switcher chip size).
+  - Helm (ship's wheel), Harbor (portico/treasury), Beacon (lighthouse),
+    Lookout (binoculars), Bounty (globe), Admiralty (shield + key),
+    Purser (strongbox), Manifest (document + signature), Yeoman (calendar),
+    Keel (hull frame).
+- Added `fleet/docklabs.svg` — a suite/master mark (dock + waterline) for
+  marketing and cross-product surfaces.
+
+### Added
+- Per-product favicon assets (`<product>/static/img/favicon.svg` + 32px / 180px
+  PNG fallbacks) derived from each product's new mark. These ship in per-product
+  repo PRs, not keel — see `MIGRATION.md` in the asset bundle.
+
+### Migration
+- No template changes required: the fleet switcher and dashboards already resolve
+  `img/fleet/{code}.svg` by product code, and filenames are unchanged.
+- Re-pin `keel @ git+https://github.com/okeefedaniel/keel.git@v0.52.0` in each
+  product's `requirements.txt`. Run `collectstatic` and cache-bust on deploy.
+- Rollback is a static-asset revert + prior keel tag re-pin — no data or
+  template migration.
+
 ## 0.48.2 — 2026-05-28
 
 **Two consumer-blocking bugs in the v0.48.0 Approach D rollout.** Both surfaced

@@ -1,19 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#00214D"/>
-  <g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Lighthouse body -->
-    <path d="M13 26h6l1-12h-8z"/>
-    <!-- Lighthouse top/lamp -->
-    <rect x="14" y="11" width="4" height="3" rx="0.5"/>
-    <!-- Light beams -->
-    <line x1="11" y1="12.5" x2="8" y2="11"/>
-    <line x1="21" y1="12.5" x2="24" y2="11"/>
-    <line x1="11" y1="12.5" x2="8" y2="14"/>
-    <line x1="21" y1="12.5" x2="24" y2="14"/>
-    <!-- Dome -->
-    <path d="M14 11l2-4 2 4"/>
-    <!-- Stripes -->
-    <line x1="13.6" y1="20" x2="18.4" y2="20"/>
-    <line x1="13.3" y1="23" x2="18.7" y2="23"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Beacon">
+  <rect width="32" height="32" rx="6" fill="#0A2B4E"></rect>
+  
+  <g fill="none" stroke="#FBF7EF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13.2 24 L13.9 16 L18.1 16 L18.8 24 Z"></path>
+    <path d="M13.6 13 L16 10.5 L18.4 13"></path>
+    <line x1="11" y1="24" x2="21" y2="24" stroke-width="2"></line>
+    <line x1="13.9" y1="16" x2="18.1" y2="16"></line>
+  </g>
+  <circle cx="16" cy="14" r="1.6" fill="#D8A43C"></circle>
+  <g stroke="#D8A43C" stroke-width="1.5" stroke-linecap="round">
+    <line x1="12.6" y1="12.4" x2="10.2" y2="11.3"></line>
+    <line x1="19.4" y1="12.4" x2="21.8" y2="11.3"></line>
   </g>
 </svg>
