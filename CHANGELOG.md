@@ -4,6 +4,30 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.52.2 — 2026-06-22
+
+**Wire PNG + apple-touch favicon fallbacks into the shared `<head>`.** Completes
+the v0.52.0/v0.52.1 brand refresh: products now ship per-product `favicon.svg` +
+`favicon-32.png` + `apple-touch-icon.png`, but the shared layouts only referenced
+the SVG. This adds the two missing `<link>` lines so old browsers get a PNG
+favicon and iOS home-screen bookmarks get a proper touch icon.
+
+### Added
+- **`<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">`**
+  and **`<link rel="apple-touch-icon" href="img/apple-touch-icon.png">`** in the
+  three shared layouts (`app.html`, `public.html`, `auth.html`), alongside the
+  existing SVG favicon link.
+- **keel default `favicon-32.png` + `apple-touch-icon.png`** in
+  `keel/core/static/img/` (the Keel hull mark) so a product that hasn't shipped
+  its own PNGs falls back to a Keel-branded icon instead of a 404 — same
+  override pattern as the existing `favicon.svg`.
+
+### Migration
+- Re-pin `keel @ git+https://github.com/okeefedaniel/keel.git@v0.52.2`. Products
+  that already shipped `static/img/favicon-32.png` + `apple-touch-icon.png` (the
+  v3 favicon PRs) need no other change; the new `<head>` links resolve to those
+  per-product files. `collectstatic` + cache-bust on deploy.
+
 ## 0.52.1 — 2026-06-22
 
 **Deliver the CSP inline-style fix on top of the v0.52.0 fleet-logo refresh.**

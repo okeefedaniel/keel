@@ -23,6 +23,8 @@ Products extend this and override blocks:
   {% block meta_description %}{% endblock %}
 
   <link rel="icon" type="image/svg+xml" href="{% block favicon %}{% static 'img/favicon.svg' %}{% endblock %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
 
   <!-- Preload v3 fonts for fastest first paint (latin subsets — browsers fetch latin-ext on demand) -->
   <link rel="preload" href="{% static 'fonts/fraunces-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
