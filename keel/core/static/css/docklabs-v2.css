@@ -380,6 +380,25 @@ code, kbd, samp, pre,
     font-size: 13px;
     color: white;
     font-weight: 700;
+    overflow: hidden;
+}
+
+/* Brand mark: the product's fleet SVG fills the tile (its navy field IS the
+   tile). If the SVG is missing, the inline onerror swaps in the per-product
+   Bootstrap glyph, which renders on the navy background above. */
+.sidebar-brand-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Login-card hero brand mark (keel/login_card.html). */
+.login-brand-img {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    object-fit: cover;
 }
 
 .sidebar-brand-text {

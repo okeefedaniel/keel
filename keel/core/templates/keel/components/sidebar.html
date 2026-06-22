@@ -2,12 +2,16 @@
 Sidebar — Notion-style workspace navigator.
 Used by keel/layouts/app.html. Products override blocks to customize.
 {% endcomment %}
+{% load static %}
 <aside class="dl-sidebar" id="dl-sidebar">
   <!-- Header: brand + collapse -->
   <div class="sidebar-header">
     <a class="sidebar-brand" href="{% block sidebar_brand_href %}/{% endblock %}">
       <div class="sidebar-brand-icon">
-        <i class="bi {% block sidebar_brand_icon %}bi-gear{% endblock %}"></i>
+        {% comment %}Brand mark: the product's fleet SVG fills the tile; falls back to the per-product Bootstrap glyph if the SVG is missing.{% endcomment %}
+        <img src="{% static 'img/fleet/' %}{% block sidebar_brand_code %}{{ CURRENT_PRODUCT|default:'docklabs' }}{% endblock %}.svg"
+             class="sidebar-brand-img" alt=""
+             onerror="this.outerHTML='<i class=&quot;bi {% block sidebar_brand_icon %}bi-gear{% endblock %}&quot;></i>'">
       </div>
       <div class="sidebar-brand-text">{% block sidebar_brand_name %}{{ SITE_NAME|default:"DockLabs" }}{% endblock %}</div>
     </a>

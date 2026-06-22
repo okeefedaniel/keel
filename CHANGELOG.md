@@ -4,6 +4,31 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.52.3 — 2026-06-22
+
+**Render the v3 fleet marks in the brand chrome, not just the fleet switcher.**
+The v0.52.0 logo refresh updated `img/fleet/*.svg`, but the prominent brand
+surfaces — the top-left sidebar brand, the public top-bar brand, and the
+login-card hero — still rendered a per-product **Bootstrap glyph**
+(`bi-bank2`, `bi-hexagon`, …), so the suite still looked like the old UI. Those
+three surfaces now render the current product's `img/fleet/<code>.svg` (resolved
+from `CURRENT_PRODUCT` = `KEEL_PRODUCT_CODE`), matching the fleet switcher.
+
+### Changed
+- **`app.html`, `public.html`, `components/sidebar.html`** — `.sidebar-brand-icon`
+  now renders `<img class="sidebar-brand-img" src="…/fleet/<code>.svg">` filling
+  the tile (the SVG's navy field becomes the tile).
+- **`login_card.html`** — the hero icon now renders the fleet mark.
+- Each surface keeps the per-product Bootstrap glyph as an `onerror` fallback
+  (same pattern as the fleet switcher), so a missing SVG degrades gracefully and
+  the `sidebar_brand_icon` block products already set still works. A new optional
+  `sidebar_brand_code` block lets a product override the mark's product code.
+- **`docklabs-v2.css`** — adds `.sidebar-brand-img` / `.login-brand-img` sizing;
+  `.sidebar-brand-icon` gains `overflow: hidden` to clip the mark to the tile.
+
+No per-product template changes required — products inherit the marks by bumping
+their keel pin to v0.52.3.
+
 ## 0.52.2 — 2026-06-22
 
 **Wire PNG + apple-touch favicon fallbacks into the shared `<head>`.** Completes

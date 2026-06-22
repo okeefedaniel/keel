@@ -20,7 +20,7 @@ When both keel_login_url and microsoft_login_url are available, only the
 Keel button is shown: the suite flow is product → Keel → Microsoft and
 users should see one consistent entry point.
 {% endcomment %}
-{% load keel_demo %}
+{% load keel_demo static %}
 
 <style nonce="{{ csp_nonce }}">
     .login-card { max-width: 450px; margin: 0 auto; }
@@ -32,7 +32,10 @@ users should see one consistent entry point.
             {# ── Header ── #}
             <div class="text-center mb-4">
                 <div class="mb-3">
-                    <i class="bi {{ PRODUCT_ICON }} display-4 text-primary"></i>
+                    {% comment %}Brand mark: the product's fleet SVG; falls back to the Bootstrap glyph if the SVG is missing.{% endcomment %}
+                    <img src="{% static 'img/fleet/' %}{{ CURRENT_PRODUCT|default:'docklabs' }}.svg"
+                         class="login-brand-img" alt=""
+                         onerror="this.outerHTML='<i class=&quot;bi {{ PRODUCT_ICON }} display-4 text-primary&quot;></i>'">
                 </div>
                 <h2 class="fw-bold">{{ SITE_NAME }}</h2>
                 {% if PRODUCT_SUBTITLE %}
