@@ -40,7 +40,7 @@ Products extend this and override blocks:
 </head>
 <body data-product="{% block product_code %}{{ CURRENT_PRODUCT|default:'docklabs' }}{% endblock %}">
   <!-- WCAG 2.1 AA: Skip navigation -->
-  <a href="#main-content" class="visually-hidden-focusable bg-primary text-white p-2 position-absolute" style="z-index:9999">Skip to main content</a>
+  <a href="#main-content" class="visually-hidden-focusable bg-primary text-white p-2 position-absolute dl-skip-link">Skip to main content</a>
 
   <div class="dl-app">
     {% if user.is_authenticated %}
@@ -60,7 +60,7 @@ Products extend this and override blocks:
 
       <div class="sidebar-quick">
         <button class="sidebar-quick-btn" title="Search" onclick="document.querySelector('.search-trigger')?.click()">
-          <i class="bi bi-search" style="font-size:11px"></i> Search
+          <i class="bi bi-search dl-search-icon"></i> Search
         </button>
         {% block sidebar_quick_new %}{% endblock %}
       </div>
@@ -116,7 +116,7 @@ Products extend this and override blocks:
         <div class="topbar-actions">
           <button type="button" class="search-trigger" title="Search (⌘K)"
                   data-bs-toggle="modal" data-bs-target="#keelSearchModal">
-            <i class="bi bi-search" style="font-size:11px"></i>&nbsp;Search&hellip;
+            <i class="bi bi-search dl-search-icon"></i>&nbsp;Search&hellip;
             <span class="search-kbd">&thinsp;&#8984;K&thinsp;</span>
           </button>
 

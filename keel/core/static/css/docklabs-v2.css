@@ -2632,3 +2632,48 @@ summary:focus-visible,
     .dl-filters-collapse[open] .audit-filter-bar,
     .dl-filters-collapse .audit-filter-bar { display: flex; }
 }
+
+/* ───────────────────────────────────────────────
+   CSP-safe chrome utilities
+   --------------------------------------------------
+   These replace static inline `style=""` attributes in the shared
+   keel chrome and components. A CSP nonce can authorize <style>/<script>
+   *elements*, but it can NEVER authorize an inline `style=""` *attribute*
+   — so under a strict `style-src` (no 'unsafe-inline'), inline style
+   attributes are silently dropped and log a console violation on every
+   page. Moving them to classes here keeps the chrome styled under strict
+   CSP without weakening the policy. Legitimately-dynamic styling (e.g.
+   the per-instance chart height) uses a nonce'd <style> element instead.
+   ─────────────────────────────────────────────── */
+
+/* Skip-navigation link must float above all chrome (app + public layouts). */
+.dl-skip-link { z-index: 9999; }
+
+/* Compact search-trigger icon — sidebar + topbar search buttons. */
+.dl-search-icon { font-size: 11px; }
+
+/* Small-caps muted metadata labels — Quick Info rows, collaborator group
+   headers, assignment-type captions. */
+.dl-meta-label { font-size: 0.7rem; letter-spacing: 0.05em; }
+
+/* Circular initial/icon avatars. Pair with Bootstrap's
+   `rounded-circle d-flex align-items-center justify-content-center`. */
+.dl-avatar-sm { width: 32px; height: 32px; font-size: 0.8rem; }
+.dl-avatar-md { width: 36px; height: 36px; font-size: 0.85rem; }
+
+/* Extra-small chip text — inline canary flag pills. */
+.dl-chip-xs { font-size: 0.65rem; }
+
+/* Full-height centered auth shell (login / signup / password reset). */
+.dl-auth-body { min-height: 100vh; background: var(--ct-light-gray, #f8f9fa); }
+
+/* Collapsed collaboration panel — the <summary> is the click target. */
+.collaboration-panel--collapsed > summary { cursor: pointer; }
+
+/* Inline workflow-transition controls. */
+.dl-transition-status { width: auto; }
+.dl-transition-comment { width: 14rem; }
+
+/* Chart canvas wrapper — height is set per-instance via a nonce'd <style>
+   element in chart.html (the height is caller-supplied / dynamic). */
+.dl-chart-canvas { position: relative; }

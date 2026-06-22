@@ -34,22 +34,22 @@ docs/design/collaboration-panel-2026-05.md.
     <div class="card-body">
         <dl class="row mb-0 small">
             {% if status_label %}
-            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Status</dt>
+            <dt class="col-5 text-muted text-uppercase fw-normal dl-meta-label">Status</dt>
             <dd class="col-7 mb-2">{{ status_label }}</dd>
             {% endif %}
 
             {% if claimant %}
-            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Claimant</dt>
+            <dt class="col-5 text-muted text-uppercase fw-normal dl-meta-label">Claimant</dt>
             <dd class="col-7 mb-2">{{ claimant.get_full_name|default:claimant.username|default:claimant }}</dd>
             {% endif %}
 
             {% if principal %}
-            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Principal</dt>
+            <dt class="col-5 text-muted text-uppercase fw-normal dl-meta-label">Principal</dt>
             <dd class="col-7 mb-2">{{ principal.get_full_name|default:principal.username|default:principal }}</dd>
             {% endif %}
 
             {% for label, value in extra_fields %}
-            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">{{ label }}</dt>
+            <dt class="col-5 text-muted text-uppercase fw-normal dl-meta-label">{{ label }}</dt>
             <dd class="col-7 mb-2">{{ value|default_if_none:"—" }}</dd>
             {% endfor %}
 
@@ -58,12 +58,12 @@ docs/design/collaboration-panel-2026-05.md.
             {% endif %}
 
             {% if created_at %}
-            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Created</dt>
+            <dt class="col-5 text-muted text-uppercase fw-normal dl-meta-label">Created</dt>
             <dd class="col-7 mb-2">{{ created_at|naturaltime }}</dd>
             {% endif %}
 
             {% if updated_at %}
-            <dt class="col-5 text-muted text-uppercase fw-normal" style="font-size:0.7rem; letter-spacing:0.05em;">Updated</dt>
+            <dt class="col-5 text-muted text-uppercase fw-normal dl-meta-label">Updated</dt>
             <dd class="col-7 mb-0">{{ updated_at|naturaltime }}</dd>
             {% endif %}
         </dl>

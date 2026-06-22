@@ -22,12 +22,12 @@ invited_at, accepted_at, is_active, is_external, is_pending).
         {% if assignment and assignment.assigned_to %}
         <div class="d-flex align-items-center mb-3 pb-3 border-bottom">
             <div class="flex-shrink-0 me-2">
-                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center dl-avatar-sm">
                     <i class="bi bi-flag-fill"></i>
                 </div>
             </div>
             <div class="flex-grow-1 small">
-                <div class="text-muted text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ assignment.get_assignment_type_display }}</div>
+                <div class="text-muted text-uppercase dl-meta-label">{{ assignment.get_assignment_type_display }}</div>
                 <div><strong>{{ assignment.assigned_to.get_full_name|default:assignment.assigned_to.username }}</strong>
                   <span class="text-muted">— {{ assignment.get_status_display|lower }}</span></div>
             </div>
@@ -39,13 +39,13 @@ invited_at, accepted_at, is_active, is_external, is_pending).
         {% regroup collaborators by role as role_groups %}
         {% for group in role_groups %}
         <div class="mb-3">
-            <div class="text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+            <div class="text-muted text-uppercase mb-2 dl-meta-label">
                 {{ group.grouper|title }}{% if group.list|length > 1 %}s{% endif %}
             </div>
             {% for c in group.list %}
             <div class="d-flex align-items-center mb-2 {% if not forloop.last %}{% endif %}">
                 <div class="flex-shrink-0 me-2">
-                    <div class="rounded-circle {% if c.role == 'lead' %}bg-primary{% elif c.role == 'reviewer' %}bg-info{% elif c.role == 'observer' %}bg-secondary{% else %}bg-dark{% endif %} text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                    <div class="rounded-circle {% if c.role == 'lead' %}bg-primary{% elif c.role == 'reviewer' %}bg-info{% elif c.role == 'observer' %}bg-secondary{% else %}bg-dark{% endif %} text-white d-flex align-items-center justify-content-center dl-avatar-sm">
                         {% if c.user %}{{ c.user.first_name|default:c.user.username|first|upper }}{% else %}{{ c.name|default:c.email|first|upper }}{% endif %}
                     </div>
                 </div>
