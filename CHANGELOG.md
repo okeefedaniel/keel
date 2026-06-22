@@ -4,6 +4,16 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.52.1 — 2026-06-22
+
+**Deliver the CSP inline-style fix on top of the v0.52.0 fleet-logo refresh.**
+v0.51.3 (CSP fix) and v0.52.0 (logo refresh) shipped as divergent siblings off
+`7cb1dc5`; products adopted v0.52.0 and so were missing the CSP fix. This release
+merges both lines so consumers get the new logos AND the CSP-clean chrome from a
+single tag. No functional change beyond the union of the two — see the 0.52.0 and
+0.51.3 entries below for details. Re-pin
+`keel @ git+https://github.com/okeefedaniel/keel.git@v0.52.1` in each product.
+
 ## 0.51.3 — 2026-06-22
 
 **Stop the suite-wide CSP inline-style console violations.** Every authenticated
@@ -36,6 +46,36 @@ added, XSS protection unchanged.
   clients strip `<head>`/`<style>` and require inline styling, and CSP does not
   apply to rendered email. The accounts auth/invitation pages still carry some
   brand-color one-offs; those are a smaller, lower-frequency follow-up.
+
+## 0.52.0 — 2026-06-22
+
+Fleet logo refresh (v3 "Civic Institution").
+
+### Changed
+- **New fleet logo set.** Replaced all product marks in
+  `keel/core/static/img/fleet/*.svg` with a redesigned, cohesive set: navy field
+  (`#0A2B4E`, the v3 institutional navy — was `#00214D`), a paper-white maritime
+  mark (1.6px stroke, round joins), and exactly one luminous-brass accent
+  (`#D8A43C`) per mark. Marks read down to 20px (the fleet-switcher chip size).
+  - Helm (ship's wheel), Harbor (portico/treasury), Beacon (lighthouse),
+    Lookout (binoculars), Bounty (globe), Admiralty (shield + key),
+    Purser (strongbox), Manifest (document + signature), Yeoman (calendar),
+    Keel (hull frame).
+- Added `fleet/docklabs.svg` — a suite/master mark (dock + waterline) for
+  marketing and cross-product surfaces.
+
+### Added
+- Per-product favicon assets (`<product>/static/img/favicon.svg` + 32px / 180px
+  PNG fallbacks) derived from each product's new mark. These ship in per-product
+  repo PRs, not keel — see `MIGRATION.md` in the asset bundle.
+
+### Migration
+- No template changes required: the fleet switcher and dashboards already resolve
+  `img/fleet/{code}.svg` by product code, and filenames are unchanged.
+- Re-pin `keel @ git+https://github.com/okeefedaniel/keel.git@v0.52.0` in each
+  product's `requirements.txt`. Run `collectstatic` and cache-bust on deploy.
+- Rollback is a static-asset revert + prior keel tag re-pin — no data or
+  template migration.
 
 ## 0.48.2 — 2026-05-28
 
