@@ -13,6 +13,10 @@ Context:
   accept_url          — fully-qualified link to /invite/<token>/
   expiry_days         — int, days until link stops working
   site_name           — branding label (default DockLabs)
+  any_beta            — bool, ≥1 invitation in the batch grants beta-tester
+  any_ai              — bool, ≥1 invitation in the batch grants AI access
+  ai_settings_url     — absolute URL to the user's AI-key settings panel
+  anthropic_console_url — Anthropic console keys page for BYO-key walkthrough
 {% endcomment %}<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
@@ -120,6 +124,60 @@ Context:
               <p style="margin:8px 0 0 0;font-size:12px;color:#8A8275;">
                 This link expires in {{ expiry_days }} day{{ expiry_days|pluralize }}.
               </p>
+
+              {% if any_beta %}
+              {# Beta tester callout — feedback via the in-app chat widget. #}
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0"
+                     style="margin-top:28px;border:1px solid #E8E2D4;border-radius:6px;background-color:#F7F4EE;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 8px 0;font-size:13px;font-weight:600;color:#0A2B4E;text-transform:uppercase;letter-spacing:0.04em;">
+                      &#9733; You're a beta tester
+                    </p>
+                    <p style="margin:0;font-size:14px;line-height:1.6;color:#1A1A1A;">
+                      You've been given early access while we refine the product. Your feedback
+                      shapes what ships next. Spot a bug, have an idea, or something feels off?
+                      Click the <strong>feedback button</strong> in the bottom-right corner of any
+                      page to send us a note — it goes straight to the team.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+
+              {% if any_ai %}
+              {# AI access — user must bring their own Anthropic API key. #}
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0"
+                     style="margin-top:16px;border:1px solid #E8E2D4;border-radius:6px;background-color:#F7F4EE;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 8px 0;font-size:13px;font-weight:600;color:#0A2B4E;text-transform:uppercase;letter-spacing:0.04em;">
+                      &#10024; AI features are enabled for you
+                    </p>
+                    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.6;color:#1A1A1A;">
+                      AI features run on your own Anthropic API key, so usage is billed to your
+                      account — not shared. It takes a couple of minutes to set up:
+                    </p>
+                    <ol style="margin:0 0 12px 0;padding-left:20px;font-size:14px;line-height:1.7;color:#1A1A1A;">
+                      <li>Create an Anthropic account at
+                        <a href="{{ anthropic_console_url }}" style="color:#0A2B4E;">console.anthropic.com</a>
+                        (or sign in if you already have one).</li>
+                      <li>Add a payment method under <strong>Billing</strong> — AI usage is pay-as-you-go.</li>
+                      <li>Go to
+                        <a href="{{ anthropic_console_url }}" style="color:#0A2B4E;">API Keys</a>,
+                        click <strong>Create Key</strong>, and copy the key
+                        (it starts with <code style="background-color:#F1ECE2;padding:1px 5px;border-radius:3px;">sk-ant-</code>).</li>
+                      <li>{% if ai_settings_url %}Paste it into your
+                        <a href="{{ ai_settings_url }}" style="color:#0A2B4E;">AI settings</a>{% else %}Paste it into your AI settings (Settings &rarr; AI){% endif %}
+                        and save.</li>
+                    </ol>
+                    <p style="margin:0;font-size:12px;color:#8A8275;">
+                      Your key is stored encrypted and is only ever used for your own requests.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
             </td>
           </tr>
 
