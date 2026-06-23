@@ -89,6 +89,22 @@ bring-your-own AI-key walkthrough.**
   into their AI settings (`/settings/?panel=ai`). Both HTML and plaintext
   bodies updated; sections are omitted entirely when their flag is unset.
 
+## 0.52.4 — 2026-06-23
+
+**Render the fleet switcher's brand tiles at full opacity (navy, not grey).**
+The fleet switcher dimmed its chip images to `opacity: 0.55` (collapsed rail) and
+inherited `opacity: 0.7` from `.sb-icon` (expanded list). That treatment was
+designed for the old faint monochrome glyphs; against the v3 full-color navy
+tiles it washed the navy `#0A2B4E` out to a muted grey-blue, so the refreshed
+logos read as "old / greyed-out." Verified in a headless browser: the SVGs load
+200 and render correctly, but the dimming made them look grey.
+
+### Fixed
+- `.fleet-logo-chip img` now renders at `opacity: 1`; only the monochrome glyph
+  fallback (`.fleet-logo-chip > i`, for products without an SVG) stays recessed.
+- `.sb-icon.fleet-icon-img` overrides the nav-glyph `opacity: 0.7` so the
+  expanded-list brand tiles also render at full strength.
+
 ## 0.52.3 — 2026-06-22
 
 **Render the v3 fleet marks in the brand chrome, not just the fleet switcher.**
