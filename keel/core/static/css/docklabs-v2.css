@@ -670,13 +670,17 @@ code, kbd, samp, pre,
     display: block;
     border-radius: 5px;
     object-fit: contain;
-    opacity: 0.55;
     transition: opacity 0.12s ease, transform 0.12s ease;
     font-size: 14px;
     line-height: 24px;
     text-align: center;
     color: var(--text-tertiary);
 }
+/* The v3 brand SVG is a full-color navy tile — render it at full strength
+   (dimming washes the navy out to grey). Only the monochrome glyph fallback
+   (products without an SVG) stays recessed in the collapsed rail. */
+.fleet-logo-chip img { opacity: 1; }
+.fleet-logo-chip > i { opacity: 0.55; }
 .fleet-logo-chip:hover img,
 .fleet-logo-chip:hover > i {
     opacity: 1;
@@ -722,6 +726,9 @@ code, kbd, samp, pre,
     display: block;
     object-fit: contain;
 }
+/* Un-dim the expanded-list brand tiles: the .sb-icon wrapper sets
+   opacity:0.7 for nav glyphs, which greys out the full-color fleet marks. */
+.sb-icon.fleet-icon-img { opacity: 1; }
 
 /* Backwards-compat alias — earlier templates may still reference
    .fleet-icon-chip. Remove in Phase E. */
