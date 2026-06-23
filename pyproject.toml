@@ -4,18 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keel"
-version = "0.53.0"
+version = "0.54.0"
 description = "Shared Django platform layer for DockLabs products"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Proprietary"}
 authors = [{name = "Daniel O'Keefe"}]
 dependencies = [
-    # Django 6.0 removed ``CheckConstraint(check=...)``; the migration churn
-    # to flip every consumer's concrete AuditLog to ``condition=`` is queued
-    # but not done. Hold the line on 5.2.x until per-product Approach D
-    # rollouts catch up (then bump to ``>=6.0`` in a coordinated keel release).
-    "Django>=5.2,<6.0",
+    # No upper cap — keel tracks the current Django. (5.2 is the floor:
+    # the oldest release keel is tested against.) Django 6.0 removed
+    # ``CheckConstraint(check=...)``; keel now uses ``condition=`` everywhere
+    # (source + migrations) and runs cleanly on it. When a future Django
+    # major lands, test keel against it rather than re-adding a ceiling.
+    "Django>=5.2",
     "django-oauth-toolkit>=2.4",
     "nh3>=0.2",  # parser-based HTML sanitizer (keel.comms)
     "Pillow>=10.0",  # avatar image processing (resize, EXIF strip, WebP encode)

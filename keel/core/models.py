@@ -153,16 +153,16 @@ class AbstractAuditLog(models.Model):
             # the protection via column nullability, not the constraint name,
             # so per-product name variation is harmless.
             CheckConstraint(
-                # Stay on the deprecated ``check=`` because flipping to
-                # ``condition=`` requires every consumer to ship a state-
-                # only ``makemigrations`` round for their concrete
-                # AuditLog subclass, AND many consumers' AuditLog tables
-                # still allow null user (Approach D not yet rolled out
-                # per-product). ``check=`` works on Django 5.2.x; the
-                # ``Django<6.0`` pin in pyproject.toml keeps consumers on
-                # the deprecated-but-working path until the per-product
-                # Approach D rollouts catch up.
-                check=Q(user__isnull=False),
+                # ``condition=`` is the Django 5.1+ name; ``check=`` was
+                # removed entirely in Django 6.0, where it raises a
+                # ``TypeError`` at class-definition time and takes every
+                # keel import down with it. The two kwargs are otherwise
+                # interchangeable — Django stores both as ``self.condition``
+                # and ``deconstruct()`` emits ``condition=`` regardless — so
+                # this flip is migration-churn-free: a consumer's concrete
+                # AuditLog subclass deconstructs identically and
+                # ``makemigrations`` detects no change.
+                condition=Q(user__isnull=False),
                 name='%(app_label)s_%(class)s_user_required',
             ),
         ]

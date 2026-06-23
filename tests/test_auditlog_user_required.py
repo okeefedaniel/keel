@@ -4,7 +4,7 @@ v0.46.0 enforces ``AuditLog.user IS NOT NULL`` two ways:
 
 1. ``null=False`` on the ForeignKey — Django ORM raises ``IntegrityError``
    at save time.
-2. ``CheckConstraint(check=Q(user__isnull=False), name='auditlog_user_required')`` —
+2. ``CheckConstraint(condition=Q(user__isnull=False), name='auditlog_user_required')`` —
    DB-level guard so a raw INSERT can't sneak past the ORM either.
 
 The constraint is also visible in ``information_schema.check_constraints``
