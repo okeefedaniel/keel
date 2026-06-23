@@ -4,6 +4,32 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.54.1 — 2026-06-23
+
+**Fix unreadable `text-bg-info` pills (dark-on-dark).**
+
+Section 2 remaps `--bs-info-rgb` from stock Bootstrap's light cyan to a dark
+navy (`#2C5F8D`). Bootstrap's `.text-bg-info` utility bakes in `color: #000` at
+compile time — chosen against the *original* light cyan — so the remap silently
+left black text on a dark navy background (contrast 3.1, unreadable). Surfaced
+as the "grants.gov" source pill on bounty's opportunities list, which renders
+`<span class="badge rounded-pill text-bg-info">`.
+
+The existing `.pill.bg-*` correction (section 21) only covers keel's own `.pill`
+component, never Bootstrap's `.text-bg-*` utility — which is why this recurred.
+
+### Fixed
+- **`.text-bg-info` now forces `color: #fff`** (`keel/core/static/css/
+  docklabs-v2.css`), colocated with the `--bs-*-rgb` remap that causes the
+  mismatch. Info is the only utility that flips: warning's brass keeps readable
+  black; primary/secondary/success/danger stay white, matching Bootstrap.
+
+### Added
+- **`.pill-submitted_for_approval` status-pill alias** (brass/review group in
+  `docklabs-v2.css`), for products with an explicit "submit for approval"
+  workflow gate (Bounty's OpportunityClaim). Renders the same brass treatment
+  as `.pill-submitted` / `.pill-pending`.
+
 ## 0.54.0 — 2026-06-22
 
 **Django 6.0 compatibility: drop the last `CheckConstraint(check=...)`.**
