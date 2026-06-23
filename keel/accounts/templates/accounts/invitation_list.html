@@ -56,16 +56,17 @@
       {% else %}
       <form method="post" action="{% url 'keel_accounts:send_invitation' %}">
         {% csrf_token %}
-        <div class="row g-3 mb-3">
-          <div class="col-md-6">
-            <label class="form-label small text-muted">Email</label>
-            <input type="email" name="email" class="form-control" placeholder="user@example.com" required>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small text-muted">CC <span class="text-muted">(optional)</span></label>
-            <input type="email" name="cc_email" class="form-control" placeholder="you@example.com">
-            <div class="form-text">Copies this address on the invitation email — useful for watching what beta invitees receive.</div>
-          </div>
+        <div class="mb-3">
+          <label class="form-label small text-muted">Email</label>
+          <input type="email" name="email" class="form-control" placeholder="user@example.com" required>
+        </div>
+
+        <div class="form-check mb-3">
+          <input type="checkbox" name="cc_me" value="1" class="form-check-input" id="inv-cc-me">
+          <label class="form-check-label small" for="inv-cc-me">
+            CC me on this invitation
+            <span class="text-muted">— sends a copy to dok@dok.net so I can see what the invitee receives.</span>
+          </label>
         </div>
 
         <table class="table table-sm align-middle mb-3">

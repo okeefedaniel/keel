@@ -93,6 +93,10 @@ def _resolve_inviter_org(request):
 
 logger = logging.getLogger(__name__)
 
+# TEMPORARY (pre-real-users): address the "CC me" invitation checkbox copies to.
+# Remove the checkbox + this constant once beta invites go to real customers.
+_BETA_CC_EMAIL = 'dok@dok.net'
+
 
 def _admin_check(user):
     """Check if user is a Keel admin.
@@ -428,17 +432,11 @@ def send_invitation(request):
         messages.error(request, 'Select at least one product.')
         return redirect('keel_accounts:invitation_list')
 
-    # Optional CC address — lets the inviting admin receive a copy of the
-    # exact invitation email the invitee gets. Validated so a typo doesn't
-    # silently swallow the CC or throw at send time.
-    cc_email = request.POST.get('cc_email', '').strip().lower()
-    if cc_email:
-        from django.core.validators import validate_email
-        try:
-            validate_email(cc_email)
-        except ValidationError:
-            messages.error(request, f'CC address "{cc_email}" is not a valid email.')
-            return redirect('keel_accounts:invitation_list')
+    # TEMPORARY (remove once there are real users): a "CC me" checkbox that
+    # copies the invitation email to dok@dok.net so Dan can see exactly what
+    # beta invitees receive. Hardcoded to the superuser's address on purpose —
+    # no free-form CC field, so there's no way to misdirect the accept token.
+    cc_email = _BETA_CC_EMAIL if request.POST.get('cc_me') == '1' else ''
 
     # Server-side subscription validation (CSO finding S5). Filter the
     # POSTed list against the org's active subscription set; record any
@@ -567,7 +565,6 @@ def send_invitation(request):
             role=role,
             is_beta_tester=is_beta,
             ai_enabled=ai_enabled,
-            cc_email=cc_email,
             batch_id=batch_id,
             invited_by=request.user,
             organization=target_org,

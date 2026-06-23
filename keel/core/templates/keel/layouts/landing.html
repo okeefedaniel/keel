@@ -1,10 +1,12 @@
 {% extends "keel/layouts/public.html" %}
 {% load static %}
-{# DockLabs Shared Landing Layout — extends keel/layouts/public.html.
-   Each product extends this template and overrides:
-     landing_hero_description, landing_stats, landing_features,
-     landing_how_it_works, landing_extra, landing_demo, landing_cta
-   All branding flows from KEEL_PRODUCT_* settings via site_context. #}
+{% comment %}
+DockLabs Shared Landing Layout — extends keel/layouts/public.html.
+Each product extends this template and overrides:
+  landing_hero_description, landing_stats, landing_features,
+  landing_how_it_works, landing_extra, landing_demo, landing_cta
+All branding flows from KEEL_PRODUCT_* settings via site_context.
+{% endcomment %}
 
 {% block title %}{{ SITE_NAME|default:"DockLabs" }} | {% block landing_page_title %}{{ PRODUCT_SUBTITLE|default:"" }}{% endblock %}{% endblock %}
 

@@ -66,10 +66,12 @@
   </div>
 
   {% if peer_notifications %}
-  {# Cross-product notifications, injected by KEEL_NOTIFICATION_LIST_CONTEXT_HOOK.
-     Only Helm sets this hook today; other products render nothing here. Each item
-     deep-links into the originating product — mark-read isn't wired because
-     that's a product-local action on the peer's own Notification row. #}
+  {% comment %}
+  Cross-product notifications, injected by KEEL_NOTIFICATION_LIST_CONTEXT_HOOK.
+  Only Helm sets this hook today; other products render nothing here. Each item
+  deep-links into the originating product — mark-read isn't wired because
+  that's a product-local action on the peer's own Notification row.
+  {% endcomment %}
   <div class="mb-4">
     <div class="text-uppercase fw-semibold text-muted mb-2" style="font-size:.7rem; letter-spacing:.05em;">
       <i class="bi bi-collection me-1"></i>From other products

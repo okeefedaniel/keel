@@ -164,6 +164,55 @@ jobs:
           print('No hardcoded secrets detected')
           PY
 
+      - name: Guard against multi-line Django {# … #} comments
+        run: |
+          # Django's template lexer only strips a {# … #} comment when its
+          # open and close tokens sit on the SAME physical line. A {# … #}
+          # that spans a newline is emitted as LITERAL TEXT into the rendered
+          # HTML — a silent, recurring footgun (the keel notifications inbox
+          # leaked one to production on 2026-06-23). Use {% comment %} … {%
+          # endcomment %} for anything multi-line.
+          #
+          # This step lives in keel's reusable security workflow so it runs on
+          # keel's own templates (this workflow triggers on push/PR to keel's
+          # main) AND in every product's CI via `uses: …/security.yml@vX`,
+          # which checks out the calling repo. One guard, suite-wide coverage.
+          python <<'PY'
+          import os, re, sys
+          SKIP_DIRS = {
+              'venv', '.venv', 'env', '.git', 'node_modules', 'staticfiles',
+              'static', '__pycache__', 'site-packages', 'worktrees', '.claude',
+              'migrations',
+          }
+          offenders = []
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+              for fname in files:
+                  if not fname.endswith('.html'):
+                      continue
+                  fpath = os.path.join(root, fname)
+                  try:
+                      txt = open(fpath, encoding='utf-8').read()
+                  except (UnicodeDecodeError, PermissionError):
+                      continue
+                  for m in re.finditer(r'\{#', txt):
+                      start = m.start()
+                      end = txt.find('#}', start)
+                      if end == -1:
+                          continue
+                      if '\n' in txt[start:end]:
+                          line = txt.count('\n', 0, start) + 1
+                          offenders.append(f'{fpath}:{line}')
+          if offenders:
+              print(f'::error::Found {len(offenders)} multi-line {{# … #}} '
+                    'Django comment(s). Django renders these as literal text — '
+                    'use {% comment %} … {% endcomment %} instead:')
+              for o in offenders:
+                  print(f'  {o}')
+              sys.exit(1)
+          print('No multi-line {# … #} Django comments found')
+          PY
+
       - name: Upload security reports
         if: always()
         uses: actions/upload-artifact@v4

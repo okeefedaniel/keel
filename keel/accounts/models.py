@@ -1004,14 +1004,6 @@ class Invitation(models.Model):
         ),
     )
 
-    cc_email = models.EmailField(
-        blank=True,
-        help_text=_(
-            'Optional address CC\'d on the invitation email so an admin can '
-            'see exactly what the invitee received. Recorded per batch.'
-        ),
-    )
-
     batch_id = models.UUIDField(
         null=True, blank=True, db_index=True,
         help_text=_(

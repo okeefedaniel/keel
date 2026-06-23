@@ -1,9 +1,10 @@
-"""Tests for the invitation CC address and the beta / AI email sections.
+"""Tests for the invitation "CC me" checkbox and the beta / AI email sections.
 
 Covers three additions to ``send_invitation``:
 
-1. An optional ``cc_email`` is validated, persisted on every Invitation row
-   in the batch, and added to the outgoing email's CC list.
+1. A TEMPORARY "CC me" checkbox (``cc_me``) that, when checked, copies the
+   invitation email to the hardcoded beta address (``dok@dok.net``). When
+   unchecked, the email has no CC.
 2. A batch granting beta-tester status renders the "you're a beta tester /
    send feedback via the bottom-right chat" section.
 3. A batch granting AI access renders the bring-your-own Anthropic API key
