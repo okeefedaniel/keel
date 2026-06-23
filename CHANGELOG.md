@@ -4,6 +4,28 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.53.0 — 2026-06-22
+
+**Invitation email enhancements: optional CC, beta-tester callout, and a
+bring-your-own AI-key walkthrough.**
+
+### Added
+- **Optional CC address on invitations.** The invite matrix form now has a
+  `cc_email` field. When set, the address is validated, persisted on every
+  `Invitation` row in the batch (new `Invitation.cc_email` field +
+  migration `0023`), and added to the outgoing email's CC list — so an admin
+  can watch exactly what a (beta) invitee receives. Surfaced in the Django
+  admin list view and searchable.
+- **Beta-tester section in the invitation email.** When any product in the
+  batch grants beta-tester status (`any_beta`), the email tells the invitee
+  they're a beta tester and to submit feedback via the bottom-right feedback
+  button (the `keel.requests` widget).
+- **AI bring-your-own-key walkthrough.** When any product in the batch grants
+  AI access (`any_ai`), the email walks the invitee through creating an
+  Anthropic account, adding billing, generating an API key, and pasting it
+  into their AI settings (`/settings/?panel=ai`). Both HTML and plaintext
+  bodies updated; sections are omitted entirely when their flag is unset.
+
 ## 0.52.3 — 2026-06-22
 
 **Render the v3 fleet marks in the brand chrome, not just the fleet switcher.**

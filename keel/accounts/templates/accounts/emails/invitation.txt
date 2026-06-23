@@ -13,7 +13,22 @@ Accept your invitation:
 {{ accept_url }}
 
 This link expires in {{ expiry_days }} day{{ expiry_days|pluralize }}.
-
+{% if any_beta %}
+* YOU'RE A BETA TESTER *
+You've been given early access while we refine the product. Your feedback
+shapes what ships next. Spot a bug, have an idea, or something feels off?
+Click the feedback button in the bottom-right corner of any page to send us
+a note — it goes straight to the team.
+{% endif %}{% if any_ai %}
+* AI FEATURES ARE ENABLED FOR YOU *
+AI features run on your own Anthropic API key, so usage is billed to your
+account — not shared. To set it up:
+  1. Create an Anthropic account at {{ anthropic_console_url }} (or sign in).
+  2. Add a payment method under Billing — AI usage is pay-as-you-go.
+  3. Go to API Keys, click Create Key, and copy the key (starts with sk-ant-).
+  4. Paste it into your AI settings{% if ai_settings_url %} ({{ ai_settings_url }}){% else %} (Settings -> AI){% endif %} and save.
+Your key is stored encrypted and is only ever used for your own requests.
+{% endif %}
 ---
 DockLabs is a software suite built for state & local government.
 Once you accept, you'll land on your dashboard with everything ready to go.

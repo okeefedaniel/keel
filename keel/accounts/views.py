@@ -428,6 +428,18 @@ def send_invitation(request):
         messages.error(request, 'Select at least one product.')
         return redirect('keel_accounts:invitation_list')
 
+    # Optional CC address — lets the inviting admin receive a copy of the
+    # exact invitation email the invitee gets. Validated so a typo doesn't
+    # silently swallow the CC or throw at send time.
+    cc_email = request.POST.get('cc_email', '').strip().lower()
+    if cc_email:
+        from django.core.validators import validate_email
+        try:
+            validate_email(cc_email)
+        except ValidationError:
+            messages.error(request, f'CC address "{cc_email}" is not a valid email.')
+            return redirect('keel_accounts:invitation_list')
+
     # Server-side subscription validation (CSO finding S5). Filter the
     # POSTed list against the org's active subscription set; record any
     # tampered/stale entries as ``unsubscribed`` for a clean error.
@@ -555,6 +567,7 @@ def send_invitation(request):
             role=role,
             is_beta_tester=is_beta,
             ai_enabled=ai_enabled,
+            cc_email=cc_email,
             batch_id=batch_id,
             invited_by=request.user,
             organization=target_org,
@@ -634,6 +647,18 @@ def send_invitation(request):
         try:
             inviter_name = request.user.get_full_name() or request.user.email
             expiry_days = getattr(settings, 'KEEL_INVITATION_EXPIRY_DAYS', 7)
+            # Beta / AI sections render only when at least one product in the
+            # batch carries that flag. Beta → feedback-via-chat callout; AI →
+            # bring-your-own Anthropic key walkthrough.
+            any_beta = any(inv.is_beta_tester for inv in created_invitations)
+            any_ai = any(inv.ai_enabled for inv in created_invitations)
+            from django.urls import NoReverseMatch, reverse
+            try:
+                ai_settings_url = request.build_absolute_uri(
+                    reverse('keel_settings:index') + '?panel=ai'
+                )
+            except NoReverseMatch:
+                ai_settings_url = ''
             ctx = {
                 'inviter_name': inviter_name,
                 'invitee_email': email,
@@ -641,6 +666,10 @@ def send_invitation(request):
                 'accept_url': accept_url,
                 'expiry_days': expiry_days,
                 'site_name': 'DockLabs',
+                'any_beta': any_beta,
+                'any_ai': any_ai,
+                'ai_settings_url': ai_settings_url,
+                'anthropic_console_url': 'https://console.anthropic.com/settings/keys',
             }
             text_body = render_to_string('accounts/emails/invitation.txt', ctx)
             html_body = render_to_string('accounts/emails/invitation.html', ctx)
@@ -653,6 +682,7 @@ def send_invitation(request):
                 body=text_body,
                 from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
                 to=[email],
+                cc=[cc_email] if cc_email else None,
             )
             mail.attach_alternative(html_body, 'text/html')
             mail.send(fail_silently=False)
@@ -664,7 +694,8 @@ def send_invitation(request):
         if email_sent:
             messages.success(
                 request,
-                f'Sent invitation email to {email} → {product_names}.',
+                f'Sent invitation email to {email} → {product_names}.'
+                + (f' CC\'d {cc_email}.' if cc_email else ''),
             )
         else:
             messages.warning(

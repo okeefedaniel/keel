@@ -105,10 +105,10 @@ class ProductAccessAdmin(admin.ModelAdmin):
 class InvitationAdmin(admin.ModelAdmin):
     list_display = (
         'email', 'product', 'role', 'status', 'ai_enabled',
-        'invited_by', 'created_at', 'expires_at',
+        'cc_email', 'invited_by', 'created_at', 'expires_at',
     )
     list_filter = ('status', 'product', 'ai_enabled')
-    search_fields = ('email',)
+    search_fields = ('email', 'cc_email')
     raw_id_fields = ('invited_by', 'accepted_by')
     readonly_fields = ('token',)
 
