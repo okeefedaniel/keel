@@ -834,34 +834,57 @@ When one DockLabs product creates a record in another (e.g., Yeoman creates a Co
 
   **Why this is worth the 5-minute onboarding cost:** the Lookout `regexp_replace` test failure (2026-05-02) was the clearest symptom — production code that's been working fine for months suddenly looked broken because the test runner happened to default to SQLite. The fix isn't to refactor every Postgres-specific feature out (impossible — search, FTS, and JSONB are foundational), it's to stop pretending the dev environment is engine-agnostic.
 
-### Keel version bumping — the pip cache trap
+### Keel releases — fragments, one-step cut, immutable tags
 
-**Every meaningful change to Keel MUST bump `keel.__version__` AND `pyproject.toml` version.** Pip's `git+https://...@<commit>` resolver caches by package name+version (`keel==X.Y.Z`), not by git ref. If you push a new commit but don't bump the version, products that rebuild on Railway see `Requirement already satisfied: keel==X.Y.Z` and happily reuse the stale wheel from the previous build. Symptom: deploys "succeed" but production is still running code from hours or days ago.
+Keel ships to every product via an immutable git **tag** pin
+(`keel @ git+https://github.com/okeefedaniel/keel.git@vX.Y.Z`). Two rules keep
+this sane, and `scripts/release.py` enforces both. This replaces the old
+"bump `__version__` + `pyproject.toml` in every commit" rule — that was a
+workaround for the cache trap (below) that made every parallel keel branch fight
+over the next version number and conflict on the top of `CHANGELOG.md`.
 
-```python
-# keel/__init__.py
-__version__ = '0.10.9'
-
-# pyproject.toml
-version = "0.10.9"
-```
-
-Bump both files in the same commit as the code change, then bump pins in all product `requirements.txt` files referencing the new git commit.
-
-**You MUST also create a git tag matching the version, AND push the tag.** Product `requirements.txt` pins keel by tag (`keel @ git+https://github.com/okeefedaniel/keel.git@v0.44.0`), not by SHA. If the bump commit is on `main` but the matching tag doesn't exist on `origin`, every product that tries to update its keel pin fails CI at the pip checkout step with:
-
-```
-error: pathspec 'v0.44.0' did not match any file(s) known to git
-```
-
-`/ship` automates this — read its workflow if unsure. Manually:
+**1. During development, add a changelog fragment — do NOT touch the version
+files or `CHANGELOG.md`.** Drop one file under `changes.d/<slug>.<category>.md`,
+or run:
 
 ```bash
-git tag -a v0.44.0 <sha> -m "v0.44.0 — <one-line summary>"
-git push origin v0.44.0
+python scripts/release.py note fixed "**\`.foo\`** no longer NPEs on bar"
 ```
 
-Push the tag in the same operation as the bump commit, or immediately after. **Caught on 2026-05-15** during the Helm smoke-test of the Wave 0 / Wave 1 collaboration-panel work: four version bumps shipped to `main` over two sessions without any matching tags. Helm's CI failed at the first attempt to consume `v0.44.0`, surfaced the gap, fixed forward by tagging `v0.40.2` / `v0.41.1` / `v0.41.2` / `v0.44.0` at their corresponding commits. Without the smoke test, the gap would have stayed latent until the next product tried to bump.
+Parallel branches each add their own fragment file, so they never collide on the
+version number or the changelog. See `changes.d/README.md`.
+
+**2. Cut a release with one command (maintainer; serialize — one cut at a time):**
+
+```bash
+python scripts/release.py cut patch --summary "One-line headline."   # 0.54.2 -> 0.54.3
+python scripts/release.py cut patch --dry-run                        # preview first
+```
+
+`cut` collates the fragments into a new `## vX.Y.Z` CHANGELOG section, bumps
+`keel/__init__.py` + `pyproject.toml` together, commits `release: keel vX.Y.Z`,
+tags `vX.Y.Z`, and pushes the branch + tag.
+
+**Why the tag is load-bearing — the pip cache trap.** Pip's `git+https://...`
+resolver caches a keel install by package name+version (`keel==X.Y.Z`), not by
+git ref. If a consumer pinned a *branch*, or a ref was re-pushed without a new
+version, products rebuilding on Railway see `Requirement already satisfied:
+keel==X.Y.Z` and reuse the stale wheel — deploys "succeed" but run code from days
+ago. An immutable **tag per release** defeats this: the version moves, the cache
+key changes, the wheel rebuilds. So **every shipping change reaches consumers
+only through a tagged release, and consumers pin tags — never a branch, never an
+untagged SHA.** The release tool always tags; never hand-bump and forget to tag.
+**Caught 2026-05-15**: four bumps shipped to `main` over two sessions with no
+matching tags; Helm CI failed consuming `v0.44.0` with `pathspec 'v0.44.0' did
+not match any file(s)` until they were tagged after the fact. (An untagged
+`main` bump fails consumers the same way today — that's why `cut` does the tag.)
+
+**Consumers bump their pin in their own PR — not in keel, not bundled into a
+feature PR.** A product's `requirements.txt` pin update is a per-app change gated
+by that app's own CI; bundling it into a feature PR is what makes
+`requirements.txt` conflict across parallel app work. Target end state: auto-bump
+PRs (Renovate) so every app tracks the latest keel tag automatically and its CI
+gates each bump; until that lands, bump pins in small dedicated PRs, landed last.
 
 **Version strings MUST be valid PEP 440.** Pip's build backend validates `pyproject.toml` version against PEP 440 and fails the wheel build otherwise. Safe forms:
 - Release: `0.11.14`, `0.12.0`
