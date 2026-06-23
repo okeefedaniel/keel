@@ -71,12 +71,14 @@ venvs had pulled Django 6.0.3 because an older keel pin predated the `<6.0` cap.
 bring-your-own AI-key walkthrough.**
 
 ### Added
-- **Optional CC address on invitations.** The invite matrix form now has a
-  `cc_email` field. When set, the address is validated, persisted on every
-  `Invitation` row in the batch (new `Invitation.cc_email` field +
-  migration `0023`), and added to the outgoing email's CC list — so an admin
-  can watch exactly what a (beta) invitee receives. Surfaced in the Django
-  admin list view and searchable.
+- **TEMPORARY "CC me" checkbox on invitations.** The invite matrix form has a
+  `cc_me` checkbox; when ticked, the invitation email is CC'd to the hardcoded
+  beta address `dok@dok.net` so Dan can see exactly what a beta invitee
+  receives. No free-form CC field — the address is fixed to the superuser, so
+  there's no way to misdirect the accept token. No model field and no
+  migration; the address lives in a `_BETA_CC_EMAIL` constant in
+  `keel/accounts/views.py`. **Remove the checkbox + constant once invites go to
+  real customers.**
 - **Beta-tester section in the invitation email.** When any product in the
   batch grants beta-tester status (`any_beta`), the email tells the invitee
   they're a beta tester and to submit feedback via the bottom-right feedback
