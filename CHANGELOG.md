@@ -4,6 +4,40 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.53.0 — 2026-06-23
+
+**Django 6.0 compatibility: drop the last `CheckConstraint(check=...)`.**
+
+Django 6.0 removed the deprecated `check=` kwarg on `CheckConstraint` (renamed
+to `condition=` in 5.1). One abstract base — `AbstractAuditLog` — was still on
+`check=`, so the moment a consumer's environment resolved Django 6.0.x, *every*
+keel import died at class-definition time with `TypeError: CheckConstraint.
+__init__() got an unexpected keyword argument 'check'`. Hit live in helm, whose
+venvs had pulled Django 6.0.3 because an older keel pin predated the `<6.0` cap.
+
+### Fixed
+- **`AbstractAuditLog` now uses `condition=` instead of `check=`** (`keel/core/
+  models.py`). This was the only remaining `check=` site in keel source; all
+  other models (`KeelUser`, `MentionDelivery`, `keel.accounts.AuditLog`) and all
+  migration files already used `condition=`. The flip is **migration-churn-free**:
+  Django 5.1+ stores both kwargs as `self.condition` and `deconstruct()` emits
+  `condition=` regardless, so consumers' concrete `AuditLog` subclasses
+  deconstruct identically and `makemigrations` detects no change.
+
+### Changed
+- **Django upper cap removed — pin is now `Django>=5.2`** (was `<6.0`). keel
+  tracks the current Django; 5.2 is the floor (oldest tested release). Verified
+  against **Django 6.0.6**: `manage.py check` clean, `makemigrations --check`
+  reports no changes, and the full keel test suite (472 tests) passes
+  identically to 5.2.13. When a future Django major lands, test keel against it
+  rather than re-adding a ceiling.
+
+### Consumer note
+- A product whose *own* concrete `AuditLog` migration file was generated under
+  Django ≤5.0 may still serialize `check=` in that committed migration, which
+  Django 6.0 also rejects when loading. That's outside keel — regenerate or
+  hand-edit the offending migration to `condition=` if it surfaces.
+
 ## 0.52.4 — 2026-06-23
 
 **Render the fleet switcher's brand tiles at full opacity (navy, not grey).**
