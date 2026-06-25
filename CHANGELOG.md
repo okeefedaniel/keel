@@ -4,7 +4,66 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
-## 0.53.0 — 2026-06-23
+## 0.55.0 — 2026-06-25
+
+**Reconcile the divergent `v0.54.x` release line with `main`.** The `v0.54.0`–
+`v0.54.2` tags branched off `v0.52.3` and never received two fixes that had
+landed on `main`: the fleet-switcher full-opacity override (`v0.52.4`) and the
+`keel.requests` admin-scope security fix (`v0.53.1`). Any product pinning a
+`v0.54.x` tag therefore rendered greyed-out fleet logos and shipped the
+cross-product `_admin_check` hole. This release carries **both** lines: every
+`v0.54.x` workflow/CSS fix **and** the two `main`-only fixes, cherry-picked onto
+the `v0.54` tip. `0.55.0` is the single line going forward — pin all products
+here.
+
+### Fixed
+- **Fleet switcher renders v3 brand tiles at full opacity** (cherry-picked from
+  `v0.52.4` / `9ad48e6`). `.fleet-logo-chip img` and `.sb-icon.fleet-icon-img`
+  override the nav-glyph dimming so the full-color navy `#0A2B4E` tiles no
+  longer wash out to grey. Only the monochrome glyph fallback stays recessed.
+- **`keel.requests` `_admin_check` is scoped to the current product**
+  (cherry-picked from `v0.53.1` / `502fdcb`). The change-request admin console
+  now requires `is_superuser` OR an active `system_admin` `ProductAccess` for
+  `get_product_code()`, instead of any product's `admin`/`system_admin` — closing
+  the peer-mount approval hole flagged by the `/cso` audit.
+
+### Included (from the `v0.54.x` line)
+- `v0.54.2` — multi-line `{# … #}` comment conversion + centralized CI guard
+  (`5f260db`).
+- `v0.54.1` — readable `.text-bg-info` (white text) + `.pill-submitted_for_approval`
+  alias (`5d7adc0`).
+- `v0.54.0` — Django 6.0 compatibility: `CheckConstraint(condition=…)`, Django
+  upper cap dropped (`b836c7c`).
+- `v0.53.0` — invitation CC, beta-tester callout, AI-key walkthrough + CC-me
+  checkbox test coverage (`0e335d4`, `5ee3785`).
+
+## 0.54.1 — 2026-06-23
+
+**Fix unreadable `text-bg-info` pills (dark-on-dark).**
+
+Section 2 remaps `--bs-info-rgb` from stock Bootstrap's light cyan to a dark
+navy (`#2C5F8D`). Bootstrap's `.text-bg-info` utility bakes in `color: #000` at
+compile time — chosen against the *original* light cyan — so the remap silently
+left black text on a dark navy background (contrast 3.1, unreadable). Surfaced
+as the "grants.gov" source pill on bounty's opportunities list, which renders
+`<span class="badge rounded-pill text-bg-info">`.
+
+The existing `.pill.bg-*` correction (section 21) only covers keel's own `.pill`
+component, never Bootstrap's `.text-bg-*` utility — which is why this recurred.
+
+### Fixed
+- **`.text-bg-info` now forces `color: #fff`** (`keel/core/static/css/
+  docklabs-v2.css`), colocated with the `--bs-*-rgb` remap that causes the
+  mismatch. Info is the only utility that flips: warning's brass keeps readable
+  black; primary/secondary/success/danger stay white, matching Bootstrap.
+
+### Added
+- **`.pill-submitted_for_approval` status-pill alias** (brass/review group in
+  `docklabs-v2.css`), for products with an explicit "submit for approval"
+  workflow gate (Bounty's OpportunityClaim). Renders the same brass treatment
+  as `.pill-submitted` / `.pill-pending`.
+
+## 0.54.0 — 2026-06-22
 
 **Django 6.0 compatibility: drop the last `CheckConstraint(check=...)`.**
 
@@ -37,6 +96,31 @@ venvs had pulled Django 6.0.3 because an older keel pin predated the `<6.0` cap.
   Django ≤5.0 may still serialize `check=` in that committed migration, which
   Django 6.0 also rejects when loading. That's outside keel — regenerate or
   hand-edit the offending migration to `condition=` if it surfaces.
+
+
+## 0.53.0 — 2026-06-22
+
+**Invitation email enhancements: optional CC, beta-tester callout, and a
+bring-your-own AI-key walkthrough.**
+
+### Added
+- **TEMPORARY "CC me" checkbox on invitations.** The invite matrix form has a
+  `cc_me` checkbox; when ticked, the invitation email is CC'd to the hardcoded
+  beta address `dok@dok.net` so Dan can see exactly what a beta invitee
+  receives. No free-form CC field — the address is fixed to the superuser, so
+  there's no way to misdirect the accept token. No model field and no
+  migration; the address lives in a `_BETA_CC_EMAIL` constant in
+  `keel/accounts/views.py`. **Remove the checkbox + constant once invites go to
+  real customers.**
+- **Beta-tester section in the invitation email.** When any product in the
+  batch grants beta-tester status (`any_beta`), the email tells the invitee
+  they're a beta tester and to submit feedback via the bottom-right feedback
+  button (the `keel.requests` widget).
+- **AI bring-your-own-key walkthrough.** When any product in the batch grants
+  AI access (`any_ai`), the email walks the invitee through creating an
+  Anthropic account, adding billing, generating an API key, and pasting it
+  into their AI settings (`/settings/?panel=ai`). Both HTML and plaintext
+  bodies updated; sections are omitted entirely when their flag is unset.
 
 ## 0.52.4 — 2026-06-23
 

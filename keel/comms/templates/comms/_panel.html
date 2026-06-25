@@ -1,8 +1,9 @@
 {% load humanize %}
-{# Reusable comms panel — include in any product detail template.
-   Required context: mailbox, threads
-   Usage: {% include "comms/_panel.html" with mailbox=grant.comms_mailbox threads=grant.comms_threads %}
-#}
+{% comment %}
+Reusable comms panel — include in any product detail template.
+Required context: mailbox, threads
+Usage: {% include "comms/_panel.html" with mailbox=grant.comms_mailbox threads=grant.comms_threads %}
+{% endcomment %}
 
 <div id="comms-panel" class="card">
   <div class="card-header d-flex justify-content-between align-items-center">

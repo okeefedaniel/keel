@@ -188,6 +188,19 @@
 .bg-warning   { background-color: rgba(var(--bs-warning-rgb),   var(--bs-bg-opacity, 1)) !important; }
 .bg-danger    { background-color: rgba(var(--bs-danger-rgb),    var(--bs-bg-opacity, 1)) !important; }
 .bg-info      { background-color: rgba(var(--bs-info-rgb),      var(--bs-bg-opacity, 1)) !important; }
+
+/* Bootstrap text-bg-* contrast correction. `.text-bg-*` bakes in a
+   black-or-white text color at COMPILE time, chosen against stock
+   Bootstrap's palette. Remapping --bs-*-rgb above (info cyan -> dark
+   navy) silently invalidates that baked color: text-bg-info ships
+   color:#000, which lands black-on-navy and unreadable (the grants.gov
+   source pill bug). Re-assert the correct contrast text for any utility
+   whose remapped background no longer matches its baked color. Only
+   info flips — warning's brass keeps readable black; primary/secondary/
+   success/danger stay white, matching Bootstrap. Mirrors the .pill.bg-*
+   correction in section 21. */
+.text-bg-info { color: #fff !important; }
+
 .btn-primary {
     background-color: var(--ct-blue);
     border-color: var(--ct-blue);
@@ -1742,6 +1755,7 @@ summary:focus-visible,
 .pill-review, .pill-pending, .pill-under-review, .pill-under_review,
 .pill-on-hold, .pill-on_hold, .pill-forecasted, .pill-preparing,
 .pill-proposal, .pill-negotiation, .pill-qualified, .pill-submitted,
+.pill-submitted_for_approval,
 .pill-searching, .pill-senior_review, .pill-scope_defined, .pill-implementing {
     background: var(--brass-soft);
     border-color: #e3c98a;

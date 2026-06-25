@@ -1,6 +1,7 @@
-{# Compose / reply form — rendered into #comms-compose-area by htmx.
-   Context: mailbox, reply_thread (optional), reply_message (optional)
-#}
+{% comment %}
+Compose / reply form — rendered into #comms-compose-area by htmx.
+Context: mailbox, reply_thread (optional), reply_message (optional)
+{% endcomment %}
 
 <div class="border-bottom p-3 bg-white">
   <form hx-post="{% url 'comms:send' mailbox.pk %}"
