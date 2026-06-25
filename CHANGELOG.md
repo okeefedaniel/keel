@@ -1,8 +1,9 @@
 # Keel Changelog
 
-Notable changes per release. Newest first. Per the pip-cache-trap rule in
-`keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
-`__version__` AND `pyproject.toml` `version` in the same commit.
+Notable changes per release. Newest first. During development, changes are added
+as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
+new section here and bumps + tags the version. See `changes.d/README.md` and the
+"Keel releases" section in `CLAUDE.md`.
 
 ## 0.55.0 — 2026-06-25
 
