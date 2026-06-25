@@ -4,6 +4,39 @@ Notable changes per release. Newest first. Per the pip-cache-trap rule in
 `keel/CLAUDE.md`, every meaningful change MUST bump `keel/__init__.py`
 `__version__` AND `pyproject.toml` `version` in the same commit.
 
+## 0.55.0 — 2026-06-25
+
+**Reconcile the divergent `v0.54.x` release line with `main`.** The `v0.54.0`–
+`v0.54.2` tags branched off `v0.52.3` and never received two fixes that had
+landed on `main`: the fleet-switcher full-opacity override (`v0.52.4`) and the
+`keel.requests` admin-scope security fix (`v0.53.1`). Any product pinning a
+`v0.54.x` tag therefore rendered greyed-out fleet logos and shipped the
+cross-product `_admin_check` hole. This release carries **both** lines: every
+`v0.54.x` workflow/CSS fix **and** the two `main`-only fixes, cherry-picked onto
+the `v0.54` tip. `0.55.0` is the single line going forward — pin all products
+here.
+
+### Fixed
+- **Fleet switcher renders v3 brand tiles at full opacity** (cherry-picked from
+  `v0.52.4` / `9ad48e6`). `.fleet-logo-chip img` and `.sb-icon.fleet-icon-img`
+  override the nav-glyph dimming so the full-color navy `#0A2B4E` tiles no
+  longer wash out to grey. Only the monochrome glyph fallback stays recessed.
+- **`keel.requests` `_admin_check` is scoped to the current product**
+  (cherry-picked from `v0.53.1` / `502fdcb`). The change-request admin console
+  now requires `is_superuser` OR an active `system_admin` `ProductAccess` for
+  `get_product_code()`, instead of any product's `admin`/`system_admin` — closing
+  the peer-mount approval hole flagged by the `/cso` audit.
+
+### Included (from the `v0.54.x` line)
+- `v0.54.2` — multi-line `{# … #}` comment conversion + centralized CI guard
+  (`5f260db`).
+- `v0.54.1` — readable `.text-bg-info` (white text) + `.pill-submitted_for_approval`
+  alias (`5d7adc0`).
+- `v0.54.0` — Django 6.0 compatibility: `CheckConstraint(condition=…)`, Django
+  upper cap dropped (`b836c7c`).
+- `v0.53.0` — invitation CC, beta-tester callout, AI-key walkthrough + CC-me
+  checkbox test coverage (`0e335d4`, `5ee3785`).
+
 ## 0.54.1 — 2026-06-23
 
 **Fix unreadable `text-bg-info` pills (dark-on-dark).**
