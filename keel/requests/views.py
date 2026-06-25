@@ -30,16 +30,32 @@ logger = logging.getLogger(__name__)
 
 
 def _admin_check(user):
-    """Check if user is a Keel admin."""
+    """Check if user is a Keel admin for the CURRENT product.
+
+    Mirrors ``keel.ops.canary.user_can_view_canary``: superusers always pass;
+    otherwise the user must hold an active ``system_admin`` ``ProductAccess``
+    row for the product that mounts this view (resolved via
+    ``settings.KEEL_PRODUCT_CODE``).
+
+    Without the per-product scope, a ``system_admin`` of any product could
+    approve / decline / mark-implemented ChangeRequest rows on every peer
+    where ``keel.requests`` is mounted — see the CSO 2026-05-30 audit and
+    the role-hierarchy contract in keel/CLAUDE.md ("only ``system_admin``
+    bypasses per-record ACL").
+    """
     if user.is_superuser:
         return True
     try:
         from keel.accounts.models import ProductAccess
+        from keel.core.utils import get_product_code
         return ProductAccess.objects.filter(
-            user=user, role__in=('admin', 'system_admin'), is_active=True,
+            user=user,
+            product=get_product_code(),
+            role='system_admin',
+            is_active=True,
         ).exists()
     except Exception:
-        return getattr(user, 'role', None) in ('admin', 'system_admin')
+        return False
 
 
 def admin_required(view_func):
