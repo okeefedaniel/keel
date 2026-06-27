@@ -1,1 +1,0 @@
-- **Changelog fragments + `scripts/release.py`.** Develop by dropping a `changes.d/<slug>.<category>.md` fragment; cut releases with `release.py cut <part>` (collates fragments, bumps both version files, commits, tags, pushes). Replaces the per-commit `__version__` bump rule, which made parallel keel branches collide on the version number and the top of CHANGELOG.md.

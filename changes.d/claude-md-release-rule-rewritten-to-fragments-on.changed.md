@@ -1,1 +1,0 @@
-- **`CLAUDE.md` release rule rewritten** to fragments + one-step cut + tag-pinning (was: bump `__version__` every commit). The pip cache trap is now defeated by immutable tags, not per-commit bumps.

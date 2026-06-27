@@ -5,6 +5,17 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.56.0 — 2026-06-27
+
+**Cross-product /ops/ console — Activity system-events lane fan-out, scheduling, canary. New keel_site.ops app.**
+
+### Added
+- **Changelog fragments + `scripts/release.py`.** Develop by dropping a `changes.d/<slug>.<category>.md` fragment; cut releases with `release.py cut <part>` (collates fragments, bumps both version files, commits, tags, pushes). Replaces the per-commit `__version__` bump rule, which made parallel keel branches collide on the version number and the top of CHANGELOG.md.
+- **Keel `/ops/` console** — cross-product operational console at `keel.docklabs.ai/ops/`. Three rows: scheduling (Keel-local in v1) / Activity system-events lane (cross-product via `fetch_product_activity`) / canary (Keel-local in v1). Same permission gate as `/audit/` (superuser OR system_admin/agency_admin ProductAccess). New `keel_site.ops` app holds the aggregator, forms, permissions, and template; mounted at `path('ops/', OpsConsoleView.as_view(), name='ops')`. Products that haven't mounted `/api/v1/activity-feed/` yet show as gray 'pending' chips — that's the visible signal to wire the endpoint.
+
+### Changed
+- **`CLAUDE.md` release rule rewritten** to fragments + one-step cut + tag-pinning (was: bump `__version__` every commit). The pip cache trap is now defeated by immutable tags, not per-commit bumps.
+
 ## 0.55.0 — 2026-06-25
 
 **Reconcile the divergent `v0.54.x` release line with `main`.** The `v0.54.0`–
