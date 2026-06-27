@@ -2554,6 +2554,17 @@ summary:focus-visible,
 .dl-status-dot--urgent       { --status-color: var(--status-urgent); }
 .dl-status-dot--overdue      { --status-color: var(--status-overdue); }
 
+/* Semantic modifiers — products map their own status vocabulary
+   (prospect, awarded, posted, forecasted, etc.) onto one of these
+   five colors instead of leaking product-specific status names into
+   the shared component. neutral = warm muted, info = blue,
+   success = forest, warning = brass, danger = brick. */
+.dl-status-dot--neutral      { --status-color: var(--status-received); }
+.dl-status-dot--info         { --status-color: var(--status-scheduled); }
+.dl-status-dot--success      { --status-color: var(--status-completed); }
+.dl-status-dot--warning      { --status-color: var(--status-needs-info); }
+.dl-status-dot--danger       { --status-color: var(--status-declined); }
+
 /* Exception variant — for URGENT / OVERDUE / NEEDS INFO /
    BLOCKED / FAILED only. Same dot, but the row gets a
    hairline border + a 12% tint of the status color so it

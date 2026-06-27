@@ -5,6 +5,13 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.56.2 — 2026-06-27
+
+**Add semantic .dl-status-dot color modifiers (neutral/info/success/warning/danger).**
+
+### Added
+- **`.dl-status-dot--{neutral,info,success,warning,danger}`** semantic color modifiers so products can map their own status vocabulary (prospect, awarded, posted, etc.) onto the shared dot+text treatment without leaking product-specific names into keel.
+
 ## 0.56.1 — 2026-06-27
 
 **Annotate keel-shipped retry_failed_mention_deliveries cron with @scheduled_job(emits=) so consumers (harbor) inherit /ops/ visibility + failure notifications for free.**
