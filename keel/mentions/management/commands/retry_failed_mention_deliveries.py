@@ -30,10 +30,24 @@ from django.db import transaction
 from keel.mentions.beacon import append_contact_mention, is_available
 from keel.mentions.models import MentionDelivery
 from keel.mentions.notify import _excerpt_for
+from keel.scheduling import scheduled_job
 
 logger = logging.getLogger(__name__)
 
 
+@scheduled_job(
+    slug='keel-mentions-retry-failed-deliveries',
+    name='Keel mentions — retry failed contact-mention deliveries',
+    cron='0 3 * * *',  # display only; consumer's GH Actions sets actual cadence
+    owner='keel',
+    emits='keel_mentions.failed_deliveries_retried',
+    notes=(
+        'Replays MentionDelivery rows with peer_status=failed against Beacon. '
+        'Idempotent on (contact_slug, source_url). Owned by keel; harbor (and '
+        'any future consumer) inherits the @scheduled_job + emits= wiring '
+        'automatically by virtue of having keel.mentions in INSTALLED_APPS.'
+    ),
+)
 class Command(BaseCommand):
     help = (
         'Retry MentionDelivery rows with peer_status=failed. '
@@ -72,7 +86,11 @@ class Command(BaseCommand):
                 'Beacon is not configured (BEACON_INTAKE_URL / '
                 'BEACON_INTAKE_API_KEY missing). Cannot retry.'
             ))
-            return
+            return {
+                'summary': 'Beacon not configured; cannot retry mention deliveries.',
+                'status': 'warn',
+                'counts': {'attempted': 0, 'ok': 0, 'failed': 0, 'gone': 0},
+            }
 
         # Pull only contact-mention rows in failed (or optionally gone) state.
         statuses = [MentionDelivery.PEER_FAILED]
@@ -94,7 +112,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(
                 'No failed contact mentions to retry.'
             ))
-            return
+            return {
+                'summary': 'No failed contact mentions to retry.',
+                'status': 'ok',
+                'counts': {'attempted': 0, 'ok': 0, 'failed': 0, 'gone': 0},
+            }
 
         self.stdout.write(self.style.WARNING(
             f'Found {total} failed contact mention(s) to retry'
@@ -178,6 +200,30 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(summary))
         else:
             self.stdout.write(self.style.WARNING(summary))
+
+        # Structured return for @scheduled_job(emits=...) — one Activity row
+        # per invocation visible on Keel /ops/ Row 2. status=warn when any
+        # row failed or was gone; ok when every attempted row recovered.
+        # Dry-run reports as 'ok' (no real failures); use status='warn' on
+        # gone to surface the cleanup signal without paging.
+        if dry_run:
+            return {
+                'summary': (f'Dry-run: would retry {total} failed contact '
+                            f'mention(s) (skipped).'),
+                'status': 'ok',
+                'counts': {'attempted': total, 'ok': 0, 'failed': 0, 'gone': 0},
+                'metadata': {'dry_run': True},
+            }
+        return {
+            'summary': summary.strip().lstrip(),
+            'status': 'warn' if (failed_count or gone_count) else 'ok',
+            'counts': {
+                'attempted': total,
+                'ok': ok_count,
+                'failed': failed_count,
+                'gone': gone_count,
+            },
+        }
 
     def _resolve_note(self, row: MentionDelivery):
         """Return the source note instance, or None if it's been deleted."""
