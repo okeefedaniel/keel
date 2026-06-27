@@ -16,6 +16,7 @@ from keel.oidc.views import session_status as oidc_session_status
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
 from .audit.views import AuditLogListView
+from .ops.views import OpsConsoleView
 
 
 def home(request):
@@ -142,6 +143,9 @@ urlpatterns = [
 
     # Cross-product audit log
     path('audit/', AuditLogListView.as_view(), name='audit'),
+
+    # Cross-product operations console — scheduling / system events / canary
+    path('ops/', OpsConsoleView.as_view(), name='ops'),
 
     # Django admin (fallback)
     path('admin/', admin.site.urls),

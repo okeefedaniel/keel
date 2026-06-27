@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 ops-page">
+
+  {# === Page header === #}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">{{ page_title }}</h1>
+    <small class="text-muted">
+      Window {{ window_start|date:"Y-m-d H:i" }} &rarr; {{ window_end|date:"Y-m-d H:i" }} UTC
+    </small>
+  </div>
+
+  {# === Headline status — failure/warn counts across the window === #}
+  {% if activity_result.failure_count or activity_result.warn_count %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" role="alert">
+    <div>
+      {% if activity_result.failure_count %}
+        <i class="bi bi-exclamation-octagon me-2"></i>
+        <strong>{{ activity_result.failure_count }}</strong> failure{{ activity_result.failure_count|pluralize }}
+      {% endif %}
+      {% if activity_result.warn_count %}
+        <span class="ms-3">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>{{ activity_result.warn_count }}</strong> warning{{ activity_result.warn_count|pluralize }}
+        </span>
+      {% endif %}
+      in window.
+    </div>
+  </div>
+  {% endif %}
+
+  {# === Per-product activity-feed chip row (Row 2 fetch status) === #}
+  <div class="ops-chip-row d-flex flex-wrap gap-2 mb-3" role="status" aria-label="Per-product activity-feed status">
+    {% for code, status in activity_result.per_product.items %}
+      <span class="ops-chip ops-chip-{{ status.status }}"
+            title="{{ status.status|title }}{% if status.capped %} · {{ status.total_in_window }} entries, showing 200{% endif %}{% if status.error %} · {{ status.error }}{% endif %}">
+        <i class="bi
+          {% if status.status == 'ok' %}bi-check-circle
+          {% elif status.status == 'pending' %}bi-hourglass-split
+          {% elif status.status == 'unauthorized' %}bi-key
+          {% elif status.status == 'timeout' %}bi-clock
+          {% else %}bi-x-circle{% endif %}"></i>
+        {{ code|title }}
+        {% if status.capped %}<small class="text-muted ms-1">200+</small>{% endif %}
+      </span>
+    {% empty %}
+      <span class="text-muted small">No products visible in your scope.</span>
+    {% endfor %}
+  </div>
+
+  {# === Filters === #}
+  <details class="dl-filters-collapse mb-4" {% if request.GET %}open{% endif %}>
+    <summary class="d-md-none small text-muted mb-2" style="cursor:pointer;">
+      <i class="bi bi-funnel me-1"></i>Filters
+    </summary>
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-end ops-filter-bar">
+      <div class="flex-grow-0">
+        <label class="form-label small mb-1" for="id_window">Window</label>
+        {{ form.window }}
+      </div>
+      <div class="flex-grow-0">
+        <label class="form-label small mb-1" for="id_status">Status</label>
+        {{ form.status }}
+      </div>
+      <div class="flex-grow-1" style="min-width: 200px;">
+        <label class="form-label small mb-1" for="id_q">Search (verb / summary)</label>
+        {{ form.q }}
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+      {% if request.GET %}
+      <a href="?" class="btn btn-sm btn-outline-secondary">Clear</a>
+      {% endif %}
+    </form>
+  </details>
+
+  {# ====================================================================== #}
+  {# Row 1 — Scheduling (Keel-local in v1; cross-product roll-up deferred). #}
+  {# ====================================================================== #}
+  <section class="ops-row mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0 text-uppercase text-muted">Scheduling — Keel local</h2>
+      <a href="/scheduling/" class="small text-muted">Full dashboard &rarr;</a>
+    </div>
+    {% if scheduling_rows %}
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="small text-uppercase text-muted">
+            <tr>
+              <th>Job</th>
+              <th>Owner</th>
+              <th>Cron</th>
+              <th>Last run</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in scheduling_rows %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td><small class="text-muted">{{ row.owner }}</small></td>
+              <td><code class="small">{{ row.cron }}</code></td>
+              <td>
+                {% if row.last_started_at %}
+                  <small>{{ row.last_started_at|date:"M j H:i" }}</small>
+                  {% if row.last_duration_ms %}
+                    <small class="text-muted">· {{ row.last_duration_ms }}ms</small>
+                  {% endif %}
+                {% else %}
+                  <small class="text-muted">never</small>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.last_status == 'success' %}
+                  <span class="ops-dot ops-dot-ok" aria-label="success"></span> <small>OK</small>
+                {% elif row.last_status == 'error' %}
+                  <span class="ops-dot ops-dot-failed" aria-label="error"></span> <small>Failed</small>
+                {% elif row.last_status == 'running' %}
+                  <span class="ops-dot ops-dot-running" aria-label="running"></span> <small>Running</small>
+                {% else %}
+                  <span class="ops-dot ops-dot-pending" aria-label="never run"></span> <small class="text-muted">{{ row.last_status }}</small>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-muted small">No scheduled jobs registered on Keel.</div>
+    {% endif %}
+  </section>
+
+  {# ====================================================================== #}
+  {# Row 2 — Activity system-events lane (cross-product, the main payload). #}
+  {# ====================================================================== #}
+  <section class="ops-row mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0 text-uppercase text-muted">System events — across the suite</h2>
+      <small class="text-muted">{{ activity_result.rows|length }} row{{ activity_result.rows|length|pluralize }}</small>
+    </div>
+
+    {% if activity_result.rows %}
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <tbody>
+            {% for row in activity_result.rows %}
+            <tr class="ops-row-{{ row.status|default:'ok' }}">
+              <td class="text-muted text-nowrap" style="width: 130px;">
+                <small style="font-variant-numeric: tabular-nums;">{{ row.timestamp|slice:":16" }}</small>
+              </td>
+              <td class="text-muted text-uppercase" style="width: 80px;">
+                <small>{{ row.product }}</small>
+              </td>
+              <td>
+                {% if row.status == 'failed' or row.status == 'errored' %}
+                  <span class="ops-dot ops-dot-failed" aria-label="failed"></span>
+                {% elif row.status == 'warn' %}
+                  <span class="ops-dot ops-dot-warn" aria-label="warn"></span>
+                {% else %}
+                  <span class="ops-dot ops-dot-ok" aria-label="ok"></span>
+                {% endif %}
+                <small class="text-uppercase text-muted">{{ row.verb }}</small>
+                <span class="ms-2">{{ row.summary|default:"" }}</span>
+              </td>
+              <td class="text-muted text-end" style="width: 80px;">
+                {% if row.metadata.duration_ms %}
+                  <small>{{ row.metadata.duration_ms }}ms</small>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="card">
+      <div class="card-body text-center text-muted py-4">
+        <i class="bi bi-inbox d-block mb-2" style="font-size: 1.5rem;"></i>
+        No system events in this window.
+        {% for code, status in activity_result.per_product.items %}{% if status.status == 'pending' %}
+          <div class="small mt-2">
+            <code>{{ code }}</code> hasn't mounted <code>/api/v1/activity-feed/</code> yet.
+          </div>
+        {% endif %}{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ====================================================================== #}
+  {# Row 3 — Canary (Keel-local in v1).                                     #}
+  {# ====================================================================== #}
+  <section class="ops-row mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0 text-uppercase text-muted">Canary — Keel local</h2>
+      <a href="/api/v1/metrics/" class="small text-muted">Raw JSON &rarr;</a>
+    </div>
+    {% if canary %}
+    <div class="card">
+      <div class="card-body py-3">
+        <div class="d-flex flex-wrap gap-3 align-items-center">
+          {% for flag_key, flag_val in canary.flags.items %}
+          <span class="d-inline-flex align-items-center">
+            {% if flag_val %}
+              <span class="ops-dot ops-dot-failed me-2" aria-hidden="true"></span>
+              <small class="text-uppercase">{{ flag_key }} TRIPPED</small>
+            {% else %}
+              <span class="ops-dot ops-dot-ok me-2" aria-hidden="true"></span>
+              <small class="text-uppercase text-muted">{{ flag_key }}</small>
+            {% endif %}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-muted small">Canary unavailable.</div>
+    {% endif %}
+  </section>
+
+</div>
+
+<style>
+  /* /ops/ visual conventions — dot+text per suite design rule.
+     No filled colored pills anywhere; status drives a small dot color. */
+  .ops-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+  }
+  .ops-dot-ok      { background: #94a3b8; }  /* slate — routine */
+  .ops-dot-warn    { background: #f59e0b; }  /* amber */
+  .ops-dot-failed  { background: #ef4444; }  /* red */
+  .ops-dot-running { background: #3b82f6; }  /* blue */
+  .ops-dot-pending { background: #d1d5db; }  /* gray */
+
+  /* Row tint for failed/warn — subtle, so the row pops without shouting. */
+  .ops-row-failed  { background: rgba(239, 68, 68, 0.04); }
+  .ops-row-errored { background: rgba(239, 68, 68, 0.04); }
+  .ops-row-warn    { background: rgba(245, 158, 11, 0.04); }
+
+  /* Chips — match the audit chip pattern, lighter. */
+  .ops-chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+  }
+  .ops-chip-ok           { border-color: #94a3b8; color: #475569; }
+  .ops-chip-pending      { border-color: #d1d5db; color: #6b7280; }
+  .ops-chip-unauthorized { border-color: #f59e0b; color: #b45309; }
+  .ops-chip-timeout      { border-color: #f59e0b; color: #b45309; }
+  .ops-chip-error        { border-color: #ef4444; color: #b91c1c; }
+</style>
+{% endblock %}
+</parameter>
+</invoke>

@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'keel.oidc.apps.KeelOIDCConfig',  # Phase 2b: OIDC validator + claims
     # keel_site local apps
     'keel_site.audit.apps.AuditConfig',  # /audit/ cross-product audit log
+    'keel_site.ops.apps.OpsConfig',      # /ops/ cross-product operational console
 ]
 
 # ---------------------------------------------------------------------------
