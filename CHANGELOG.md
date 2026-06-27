@@ -5,6 +5,13 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.56.1 — 2026-06-27
+
+**Annotate keel-shipped retry_failed_mention_deliveries cron with @scheduled_job(emits=) so consumers (harbor) inherit /ops/ visibility + failure notifications for free.**
+
+### Added
+- **`keel-mentions-retry-failed-deliveries` cron annotated with `@scheduled_job(emits='keel_mentions.failed_deliveries_retried')`.** Every consumer of `keel.mentions` (currently harbor) inherits both scheduling-registry visibility AND `/ops/` Activity emission for free. The cron returns a structured dict with `{attempted, ok, failed, gone}` counters; `status='warn'` when any row failed/was-gone, `'ok'` otherwise. Closes a follow-up from the 2026-06-27 review: keel-owned crons that ship to consumers should be annotated at the source so each consumer doesn't need to wire `emits=` separately.
+
 ## 0.56.0 — 2026-06-27
 
 **Cross-product /ops/ console — Activity system-events lane fan-out, scheduling, canary. New keel_site.ops app.**
