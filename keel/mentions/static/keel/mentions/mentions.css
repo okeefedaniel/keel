@@ -14,7 +14,7 @@
   border-radius: var(--dl-radius-sm, 8px);
   box-shadow: var(--dl-shadow-md, 0 10px 24px rgba(0, 0, 0, 0.12));
   overflow-y: auto;
-  font-family: Poppins, -apple-system, system-ui, sans-serif;
+  font-family: var(--font-sans, -apple-system, system-ui, sans-serif);
   font-size: 14px;
   color: var(--dl-text, #1f2937);
 }
