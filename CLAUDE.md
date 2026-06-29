@@ -886,6 +886,33 @@ by that app's own CI; bundling it into a feature PR is what makes
 PRs (Renovate) so every app tracks the latest keel tag automatically and its CI
 gates each bump; until that lands, bump pins in small dedicated PRs, landed last.
 
+**Renovate is now live (all 9 products).** Each product ships
+`.github/workflows/renovate.yml` + `.github/renovate.json` (a custom regex
+manager scoped to keel only) that bumps both the `requirements.txt` pin and the
+reusable-workflow pin to the latest keel tag, and auto-merges once that repo's
+CI is green (~6h cadence). So the **deployed image** never falls behind.
+
+**Local dev venvs do NOT auto-track the pin — Renovate can't touch your machine.**
+After you `git pull` a merged keel bump, `requirements.txt` moves but `.venv`
+keeps the old keel until something runs `pip install`. Testing against a stale
+venv produces false bugs that don't exist on demo/prod (CSP `unsafe-inline`
+console floods, favicon-manifest 500s — all symptoms of an old keel, fixed
+versions back). Two tools close this loop (both in `keel/scripts/`):
+- `sync_venvs.py` — brings every product's `.venv` to its `requirements.txt`
+  keel pin (`pip install -r requirements.txt` + best-effort `migrate` +
+  `collectstatic`); idempotent, a product already on its pin is a no-op.
+  `python3 keel/scripts/sync_venvs.py --check` reports drift (exit 1 if any);
+  no args syncs all; pass product names to scope.
+- `install-dev-hooks.sh` — one-time per machine. Installs local
+  `post-merge` / `post-checkout` git hooks in every repo that call
+  `sync_venvs.py <product>` whenever a pull/checkout changes `requirements.txt`.
+  So a Renovate keel bump auto-resyncs your venv the moment you pull it.
+
+New-machine onboarding: clone the repos, then run
+`bash keel/scripts/install-dev-hooks.sh` once. Hooks live in local `.git/hooks`
+(not committed), so they're per-machine. A nightly launchd/cron calling
+`sync_venvs.py` is a reasonable backstop (mirrors `scripts/nightly.sh`).
+
 **Version strings MUST be valid PEP 440.** Pip's build backend validates `pyproject.toml` version against PEP 440 and fails the wheel build otherwise. Safe forms:
 - Release: `0.11.14`, `0.12.0`
 - Pre-release: `0.12.0a1` (alpha), `0.12.0b1` (beta), `0.12.0rc1` (release candidate)
