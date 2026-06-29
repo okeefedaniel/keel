@@ -5,6 +5,13 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.56.3 — 2026-06-28
+
+**Drop unused Poppins from authenticated app/auth chrome; align on the editorial Fraunces / Instrument Sans / JetBrains Mono stack. Poppins retained only on public/marketing + email.**
+
+### Changed
+- **Typography** — removed the unused Poppins Google Fonts request from the authenticated app/auth chrome (`auth.html`, Keel admin password-reset pages) and migrated the invitation-page wordmarks + the `keel.mentions` picker off hardcoded `Poppins` onto the editorial stack vars (`--font-display`/`--font-sans`/`--font-mono` = Fraunces / Instrument Sans / JetBrains Mono). Poppins was being fetched on these surfaces but never rendered. It is retained intentionally on the public/marketing layout and HTML email templates. `keel/CLAUDE.md` typography note updated to match.
+
 ## 0.56.2 — 2026-06-27
 
 **Add semantic .dl-status-dot color modifiers (neutral/info/success/warning/danger).**
