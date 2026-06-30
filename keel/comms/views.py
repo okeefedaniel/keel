@@ -1,21 +1,22 @@
 """
-Webhook endpoints for Postmark and htmx views for the comms panel.
+Webhook endpoints for Resend and htmx views for the comms panel.
 """
-import base64
+import email as email_lib
 import json
 import logging
+from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files.base import ContentFile
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
-from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.utils.html import format_html
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 
-from .conf import COMMS_POSTMARK_WEBHOOK_TOKEN
+from . import resend_client
+from .conf import COMMS_RESEND_API_KEY, COMMS_RESEND_WEBHOOK_SECRET
 from .export import export_message_eml_response, export_thread_transcript_response
 from .models import Attachment, DeadLetter, MailboxAddress, Message, Thread
 from .registry import comms_registry
@@ -71,40 +72,38 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Webhook authentication
+# Resend webhook (single endpoint — Resend posts every event type here)
 # ---------------------------------------------------------------------------
 def _verify_webhook(request):
-    """Verify the inbound webhook using a shared bearer token.
+    """Verify the Svix signature on a Resend webhook.
 
-    Fails closed: if COMMS_POSTMARK_WEBHOOK_TOKEN is unset, all webhook
-    requests are rejected. Set the env var (even in dev) to receive inbound.
-
-    We accept the token *only* via ``Authorization: Bearer``. The prior
-    ``?token=`` query-parameter fallback was removed because query strings
-    are captured in proxy/CDN/Railway/Postmark/browser logs, which would
-    leak the shared secret. Plan migration target: Postmark HMAC
-    ``X-Postmark-Signature`` for cryptographic verification.
+    Fails closed: if COMMS_RESEND_WEBHOOK_SECRET is unset, every request is
+    rejected. The secret is the endpoint signing secret from the Resend
+    dashboard (``whsec_...``).
     """
-    if not COMMS_POSTMARK_WEBHOOK_TOKEN:
-        logger.error('Comms: COMMS_POSTMARK_WEBHOOK_TOKEN not configured — rejecting webhook')
+    if not COMMS_RESEND_WEBHOOK_SECRET:
+        logger.error('Comms: COMMS_RESEND_WEBHOOK_SECRET not configured — rejecting webhook')
         return False
-
-    auth = request.headers.get('Authorization', '')
-    expected = f'Bearer {COMMS_POSTMARK_WEBHOOK_TOKEN}'
-    # Constant-time compare to avoid timing oracles on the shared token.
-    import hmac
-    return hmac.compare_digest(auth, expected)
+    return resend_client.verify_webhook_signature(
+        COMMS_RESEND_WEBHOOK_SECRET, request.headers, request.body,
+    )
 
 
-# ---------------------------------------------------------------------------
-# Postmark inbound webhook
-# ---------------------------------------------------------------------------
+# Resend delivery-event types → DeliveryStatus.
+_DELIVERY_EVENTS = {
+    'email.sent': Message.DeliveryStatus.SENT,
+    'email.delivered': Message.DeliveryStatus.DELIVERED,
+    'email.bounced': Message.DeliveryStatus.BOUNCED,
+    'email.failed': Message.DeliveryStatus.FAILED,
+}
+
+
 @csrf_exempt
 @require_POST
-def postmark_inbound_webhook(request):
-    """Receive inbound email from Postmark.
+def resend_webhook(request):
+    """Receive all Resend events (inbound mail + outbound delivery status).
 
-    POST /keel/comms/webhook/postmark/inbound/
+    POST /keel/comms/webhook/resend/
     """
     if not _verify_webhook(request):
         return JsonResponse({'error': 'unauthorized'}, status=401)
@@ -112,77 +111,125 @@ def postmark_inbound_webhook(request):
     try:
         payload = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
-        logger.warning('Comms: invalid JSON in inbound webhook')
+        logger.warning('Comms: invalid JSON in resend webhook')
         return JsonResponse({'status': 'invalid_payload'}, status=400)
 
-    # Extract recipient address
-    to_full = payload.get('ToFull', [])
-    if not to_full:
-        _dead_letter(payload, reason=DeadLetter.Reason.PARSE_ERROR)
-        return JsonResponse({'status': 'no_recipient'}, status=200)
+    event_type = payload.get('type', '')
+    data = payload.get('data', {}) or {}
 
-    to_address = to_full[0].get('Email', '')
-    parsed = parse_address(to_address)
+    if event_type == 'email.received':
+        return _handle_inbound(data)
+
+    if event_type in _DELIVERY_EVENTS:
+        return _handle_delivery_event(event_type, data, payload)
+
+    # Other event types (e.g. email.opened) — ack so Resend stops retrying.
+    return JsonResponse({'status': 'ignored', 'event': event_type}, status=200)
+
+
+def _handle_delivery_event(event_type, data, payload):
+    """Reconcile an outbound message's delivery status from a Resend event."""
+    email_id = data.get('email_id') or data.get('id') or ''
+    if not email_id:
+        return JsonResponse({'status': 'no_message_id'}, status=200)
+
+    status = _DELIVERY_EVENTS[event_type]
+    update = {'delivery_status': status}
+    if status in (Message.DeliveryStatus.BOUNCED, Message.DeliveryStatus.FAILED):
+        update['delivery_detail'] = payload
+
+    updated = Message.objects.filter(provider_message_id=email_id).update(**update)
+    return JsonResponse({'status': 'ok', 'updated': updated})
+
+
+def _handle_inbound(data):
+    """Handle a Resend ``email.received`` event.
+
+    The webhook carries metadata only, so we fetch the full content (body,
+    headers, attachments) from the Received-emails API by ``email_id``.
+    """
+    email_id = data.get('email_id', '')
+    if not email_id:
+        logger.warning('Comms: email.received with no email_id')
+        return JsonResponse({'status': 'no_email_id'}, status=400)
+
+    try:
+        full = resend_client.get_received_email(COMMS_RESEND_API_KEY, email_id)
+    except resend_client.ResendError:
+        logger.exception('Comms: failed to fetch received email %s', email_id)
+        # 200 so Resend doesn't retry-storm; the dead letter records the miss.
+        _dead_letter(data, reason=DeadLetter.Reason.PARSE_ERROR)
+        return JsonResponse({'status': 'fetch_failed'}, status=200)
+
+    # Route on the address the mail was received for (catch-all target),
+    # falling back to scanning To/Cc for a structured mailbox address.
+    parsed = None
+    candidates = [full.get('received_for', '')]
+    candidates += list(full.get('to') or []) + list(full.get('cc') or [])
+    for cand in candidates:
+        if not cand:
+            continue
+        _, addr = parseaddr(cand if isinstance(cand, str) else cand.get('email', ''))
+        parsed = parse_address(addr)
+        if parsed:
+            break
 
     if not parsed:
-        _dead_letter(payload, reason=DeadLetter.Reason.UNROUTABLE)
+        _dead_letter(full, reason=DeadLetter.Reason.UNROUTABLE)
         return JsonResponse({'status': 'unroutable'}, status=200)
 
-    # Resolve mailbox
     try:
         mailbox = MailboxAddress.objects.get(address=parsed.raw, is_active=True)
     except MailboxAddress.DoesNotExist:
-        _dead_letter(payload, reason=DeadLetter.Reason.NO_MAILBOX)
+        _dead_letter(full, reason=DeadLetter.Reason.NO_MAILBOX)
         return JsonResponse({'status': 'no_mailbox'}, status=200)
 
-    # Thread resolution
-    headers = {
-        h['Name']: h['Value']
-        for h in payload.get('Headers', [])
-        if isinstance(h, dict)
-    }
-    in_reply_to = headers.get('In-Reply-To', '')
-    references_raw = headers.get('References', '')
+    headers = _header_map(full.get('headers'))
+    in_reply_to = headers.get('in-reply-to', '')
+    references_raw = headers.get('references', '')
     references = references_raw.split() if references_raw else []
+
+    message_id_header = full.get('message_id') or headers.get('message-id', '')
+    if not message_id_header:
+        import uuid
+        message_id_header = f'<resend-{uuid.uuid4()}@inbound>'
+
+    # Deduplicate — Resend retries on 5xx.
+    if Message.objects.filter(message_id_header=message_id_header).exists():
+        return JsonResponse({'status': 'duplicate'}, status=200)
 
     thread = resolve_thread(
         mailbox=mailbox,
         in_reply_to=in_reply_to,
         references=references,
-        subject=payload.get('Subject', ''),
+        subject=full.get('subject', ''),
     )
 
-    # Determine sent_at
-    date_str = payload.get('Date')
-    sent_at = parse_datetime(date_str) if date_str else timezone.now()
-    if sent_at and timezone.is_naive(sent_at):
+    date_str = headers.get('date', '')
+    sent_at = None
+    if date_str:
+        try:
+            sent_at = parsedate_to_datetime(date_str)
+        except (TypeError, ValueError):
+            sent_at = None
+    if sent_at is None:
+        sent_at = timezone.now()
+    if timezone.is_naive(sent_at):
         sent_at = timezone.make_aware(sent_at)
 
-    # Create message
-    message_id_header = payload.get('MessageID', '') or headers.get('Message-ID', '')
-    if not message_id_header:
-        import uuid
-        message_id_header = f'<postmark-{uuid.uuid4()}@inbound>'
-
-    # Deduplicate — if we've already processed this Message-ID, skip
-    if Message.objects.filter(message_id_header=message_id_header).exists():
-        return JsonResponse({'status': 'duplicate'}, status=200)
-
-    from_full = payload.get('FromFull', {})
-
-    # Sanitize inbound HTML to prevent XSS in the comms panel
-    raw_html = payload.get('HtmlBody', '')
+    from_name, from_email = parseaddr(full.get('from', ''))
+    raw_html = full.get('html', '') or ''
     safe_html = sanitize_html(raw_html) if raw_html else ''
 
     message = Message.objects.create(
         thread=thread,
         direction=Message.Direction.INBOUND,
-        from_address=from_full.get('Email', payload.get('From', '')),
-        from_name=from_full.get('Name', ''),
-        to_addresses=payload.get('ToFull', []),
-        cc_addresses=payload.get('CcFull', []),
-        subject=payload.get('Subject', ''),
-        body_text=payload.get('TextBody', ''),
+        from_address=from_email,
+        from_name=from_name,
+        to_addresses=_address_dicts(full.get('to')),
+        cc_addresses=_address_dicts(full.get('cc')),
+        subject=full.get('subject', ''),
+        body_text=full.get('text', '') or '',
         body_html=safe_html,
         message_id_header=message_id_header,
         in_reply_to_header=in_reply_to,
@@ -191,17 +238,13 @@ def postmark_inbound_webhook(request):
         delivery_status=Message.DeliveryStatus.DELIVERED,
     )
 
-    # Mark thread as unread + bump timestamp
     Thread.objects.filter(pk=thread.pk).update(
         is_read=False,
         updated_at=timezone.now(),
     )
 
-    # Save attachments
-    for att_data in payload.get('Attachments', []):
-        _save_attachment(message, att_data)
+    _save_inbound_attachments(message, full)
 
-    # Dispatch to product handler
     comms_registry.dispatch(
         product=parsed.product,
         entity_type=parsed.entity_type,
@@ -212,64 +255,27 @@ def postmark_inbound_webhook(request):
     return JsonResponse({'status': 'ok'})
 
 
-# ---------------------------------------------------------------------------
-# Postmark delivery / bounce webhooks
-# ---------------------------------------------------------------------------
-@csrf_exempt
-@require_POST
-def postmark_delivery_webhook(request):
-    """Track delivery confirmations from Postmark.
-
-    POST /keel/comms/webhook/postmark/delivery/
-    """
-    if not _verify_webhook(request):
-        return JsonResponse({'error': 'unauthorized'}, status=401)
-
-    try:
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return JsonResponse({'status': 'invalid_payload'}, status=400)
-
-    pm_message_id = payload.get('MessageID', '')
-    if not pm_message_id:
-        return JsonResponse({'status': 'no_message_id'}, status=200)
-
-    updated = Message.objects.filter(
-        postmark_message_id=pm_message_id,
-    ).update(
-        delivery_status=Message.DeliveryStatus.DELIVERED,
-    )
-
-    return JsonResponse({'status': 'ok', 'updated': updated})
+def _header_map(headers):
+    """Normalize Resend's ``headers`` (dict or list) to a lowercased dict."""
+    out = {}
+    if isinstance(headers, dict):
+        for k, v in headers.items():
+            out[str(k).lower()] = v
+    elif isinstance(headers, list):
+        for h in headers:
+            if isinstance(h, dict):
+                name = h.get('name') or h.get('Name')
+                if name:
+                    out[str(name).lower()] = h.get('value') or h.get('Value')
+    return out
 
 
-@csrf_exempt
-@require_POST
-def postmark_bounce_webhook(request):
-    """Track bounces from Postmark.
-
-    POST /keel/comms/webhook/postmark/bounce/
-    """
-    if not _verify_webhook(request):
-        return JsonResponse({'error': 'unauthorized'}, status=401)
-
-    try:
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return JsonResponse({'status': 'invalid_payload'}, status=400)
-
-    pm_message_id = payload.get('MessageID', '')
-    if not pm_message_id:
-        return JsonResponse({'status': 'no_message_id'}, status=200)
-
-    Message.objects.filter(
-        postmark_message_id=pm_message_id,
-    ).update(
-        delivery_status=Message.DeliveryStatus.BOUNCED,
-        delivery_detail=payload,
-    )
-
-    return JsonResponse({'status': 'ok'})
+def _address_dicts(values):
+    """Normalize a Resend address list (strings) to ``[{name, email}]``."""
+    if not values:
+        return []
+    pairs = getaddresses([v for v in values if isinstance(v, str)])
+    return [{'name': n, 'email': e} for n, e in pairs if e]
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +358,7 @@ def send_compose(request, mailbox_id):
     body_text = request.POST.get('body', '')
     # HTML-escape the user-supplied body before wrapping in <pre>; an f-string
     # here would let a staff user inject arbitrary HTML into outbound mail that
-    # ships via Postmark under a trusted .gov sender.
+    # ships via Resend under a trusted .gov sender.
     body_html = format_html(
         '<pre style="font-family: sans-serif;">{}</pre>', body_text,
     )
@@ -473,15 +479,22 @@ def search_messages(request):
 # Helpers
 # ---------------------------------------------------------------------------
 def _dead_letter(payload, reason):
-    """Store an unroutable message for manual triage."""
-    from_full = payload.get('FromFull', {})
-    to_full = payload.get('ToFull', [{}])
+    """Store an unroutable message for manual triage.
+
+    ``payload`` is a Resend webhook ``data`` object or a fetched received-email
+    body — both expose ``from`` (string), ``to`` (list), and ``subject``.
+    """
+    _, from_email = parseaddr(payload.get('from', '') or '')
+    to_list = payload.get('to') or []
+    to_address = ''
+    if to_list:
+        _, to_address = parseaddr(to_list[0] if isinstance(to_list[0], str) else '')
 
     DeadLetter.objects.create(
         raw_payload=payload,
-        from_address=from_full.get('Email', payload.get('From', '')),
-        to_address=to_full[0].get('Email', '') if to_full else '',
-        subject=payload.get('Subject', ''),
+        from_address=from_email,
+        to_address=to_address,
+        subject=payload.get('subject', ''),
         reason=reason,
     )
 
@@ -517,30 +530,65 @@ def _sanitize_attachment_filename(name: str) -> str:
     return cleaned
 
 
-def _save_attachment(message, att_data):
-    """Save a Postmark attachment to an Attachment record.
+def _save_inbound_attachments(message, full):
+    """Save inbound attachments for a received email.
 
-    The inbound ``Name`` field is attacker-controlled, so it is passed
-    through ``_sanitize_attachment_filename`` before being used as a
-    storage path. Extensions are validated against
-    ``KEEL_ALLOWED_UPLOAD_EXTENSIONS`` (if configured) — unknown
-    extensions are dead-lettered rather than silently stored.
+    Resend's webhook + received-email JSON expose attachment *metadata* only;
+    the bytes live in the original message, fetched once via the signed
+    ``raw.download_url`` and parsed with the stdlib email parser. Skips the
+    download entirely when the message has no attachments.
     """
-    from django.conf import settings as _settings
+    attachments_meta = full.get('attachments') or []
+    if not attachments_meta:
+        return
 
-    content = att_data.get('Content', '')
-    if not content:
+    raw_url = (full.get('raw') or {}).get('download_url', '')
+    if not raw_url:
+        logger.warning(
+            'Comms: message %s has %d attachment(s) but no raw.download_url',
+            message.pk, len(attachments_meta),
+        )
         return
 
     try:
-        file_bytes = base64.b64decode(content)
-    except Exception:
-        logger.warning('Failed to decode attachment for message %s', message.pk)
+        raw_bytes = resend_client.download_bytes(raw_url)
+    except resend_client.ResendError:
+        logger.exception('Comms: failed to download raw email for message %s', message.pk)
         return
 
-    raw_name = att_data.get('Name', 'attachment')
+    parsed = email_lib.message_from_bytes(raw_bytes)
+    for part in parsed.walk():
+        if part.get_content_maintype() == 'multipart':
+            continue
+        filename = part.get_filename()
+        disposition = (part.get('Content-Disposition') or '').lower()
+        if not filename and 'attachment' not in disposition:
+            continue
+        try:
+            file_bytes = part.get_payload(decode=True)
+        except Exception:
+            file_bytes = None
+        if not file_bytes:
+            continue
+        _store_attachment_bytes(
+            message,
+            raw_name=filename or 'attachment',
+            content_type=part.get_content_type() or 'application/octet-stream',
+            file_bytes=file_bytes,
+        )
+
+
+def _store_attachment_bytes(message, raw_name, content_type, file_bytes):
+    """Validate and persist one inbound attachment's bytes.
+
+    The ``raw_name`` is attacker-controlled, so it is passed through
+    ``_sanitize_attachment_filename`` before being used as a storage path.
+    Extensions are validated against ``KEEL_ALLOWED_UPLOAD_EXTENSIONS`` (if
+    configured) — unknown extensions are dropped rather than silently stored.
+    """
+    from django.conf import settings as _settings
+
     filename = _sanitize_attachment_filename(raw_name)
-    content_type = att_data.get('ContentType', 'application/octet-stream')
 
     allowed_exts = getattr(_settings, 'KEEL_ALLOWED_UPLOAD_EXTENSIONS', None)
     if allowed_exts:

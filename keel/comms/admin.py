@@ -53,7 +53,7 @@ class MessageAdmin(admin.ModelAdmin):
         'to_addresses', 'cc_addresses', 'subject',
         'body_text', 'message_id_header', 'in_reply_to_header',
         'references_header', 'sent_at', 'created_at',
-        'sent_by', 'postmark_message_id', 'delivery_detail',
+        'sent_by', 'provider_message_id', 'delivery_detail',
     )
     inlines = [AttachmentInline]
 

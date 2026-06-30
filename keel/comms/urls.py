@@ -6,10 +6,9 @@ from . import views
 app_name = 'comms'
 
 urlpatterns = [
-    # Postmark webhooks (no auth — verified by token)
-    path('webhook/postmark/inbound/', views.postmark_inbound_webhook, name='postmark_inbound'),
-    path('webhook/postmark/delivery/', views.postmark_delivery_webhook, name='postmark_delivery'),
-    path('webhook/postmark/bounce/', views.postmark_bounce_webhook, name='postmark_bounce'),
+    # Resend webhook — single endpoint for all event types (inbound mail +
+    # outbound delivery status), verified by Svix signature.
+    path('webhook/resend/', views.resend_webhook, name='resend_webhook'),
 
     # htmx UI views (staff only)
     path('<uuid:mailbox_id>/', views.comms_panel, name='panel'),

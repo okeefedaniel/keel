@@ -1,20 +1,18 @@
 """
-Outbound email service — compose, send via Postmark, track delivery.
+Outbound email service — compose, send via Resend, track delivery.
 
 This is the primary API for products sending email through keel.comms.
 """
 import logging
 
-import requests
 from django.utils import timezone
 
+from . import resend_client
 from .addresses import generate_message_id
-from .conf import COMMS_MAIL_DOMAIN, COMMS_POSTMARK_SERVER_TOKEN
+from .conf import COMMS_MAIL_DOMAIN, COMMS_RESEND_API_KEY
 from .models import Message, Thread
 
 logger = logging.getLogger(__name__)
-
-POSTMARK_API_URL = 'https://api.postmarkapp.com/email'
 
 
 def build_references_chain(in_reply_to_message):
@@ -42,7 +40,7 @@ def send_message(
     cc=None,
     in_reply_to=None,
 ):
-    """Compose and send an outbound email via Postmark.
+    """Compose and send an outbound email via Resend.
 
     Args:
         mailbox: MailboxAddress to send from.
@@ -59,7 +57,7 @@ def send_message(
         The created Message instance.
 
     Raises:
-        PostmarkSendError: If the Postmark API returns an error.
+        resend_client.ResendError: If the Resend API returns an error.
     """
     message_id = generate_message_id(COMMS_MAIL_DOMAIN)
     references = build_references_chain(in_reply_to)
@@ -83,48 +81,36 @@ def send_message(
         delivery_status=Message.DeliveryStatus.PENDING,
     )
 
-    # Build Postmark request
-    headers = [
-        {'Name': 'Message-ID', 'Value': message_id},
-    ]
+    # Build Resend request. Resend's `headers` is an object, and it accepts
+    # custom Message-ID / In-Reply-To / References so external clients thread
+    # replies back onto this conversation.
+    headers = {'Message-ID': message_id}
     if message.in_reply_to_header:
-        headers.append({'Name': 'In-Reply-To', 'Value': message.in_reply_to_header})
+        headers['In-Reply-To'] = message.in_reply_to_header
     if references:
-        headers.append({'Name': 'References', 'Value': ' '.join(references)})
+        headers['References'] = ' '.join(references)
 
     payload = {
-        'From': f'{mailbox.display_name} <{mailbox.address}>',
-        'To': ', '.join(to),
-        'Subject': subject,
-        'HtmlBody': body_html,
-        'TextBody': body_text,
-        'ReplyTo': mailbox.address,
-        'Headers': headers,
-        'MessageStream': 'outbound',
+        'from': f'{mailbox.display_name} <{mailbox.address}>',
+        'to': list(to),
+        'subject': subject,
+        'html': body_html,
+        'text': body_text,
+        'reply_to': mailbox.address,
+        'headers': headers,
     }
     if cc:
-        payload['Cc'] = ', '.join(cc)
+        payload['cc'] = list(cc)
 
     try:
-        resp = requests.post(
-            POSTMARK_API_URL,
-            json=payload,
-            headers={
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-Postmark-Server-Token': COMMS_POSTMARK_SERVER_TOKEN,
-            },
-            timeout=15,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        data = resend_client.send_email(COMMS_RESEND_API_KEY, payload)
 
-        message.postmark_message_id = data.get('MessageID', '')
+        message.provider_message_id = data.get('id', '')
         message.delivery_status = Message.DeliveryStatus.SENT
-        message.save(update_fields=['postmark_message_id', 'delivery_status'])
+        message.save(update_fields=['provider_message_id', 'delivery_status'])
 
-    except requests.RequestException:
-        logger.exception('Postmark send failed for message %s', message.pk)
+    except resend_client.ResendError:
+        logger.exception('Resend send failed for message %s', message.pk)
         message.delivery_status = Message.DeliveryStatus.FAILED
         message.save(update_fields=['delivery_status'])
         raise
