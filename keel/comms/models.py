@@ -171,8 +171,8 @@ class Message(models.Model):
         related_name='+',
     )
 
-    # Postmark metadata
-    postmark_message_id = models.CharField(max_length=255, blank=True)
+    # Provider (Resend) message id, for delivery/bounce reconciliation.
+    provider_message_id = models.CharField(max_length=255, blank=True, db_index=True)
     delivery_status = models.CharField(
         max_length=12,
         choices=DeliveryStatus.choices,
@@ -244,7 +244,7 @@ class Attachment(models.Model):
 class DeadLetter(models.Model):
     """Unroutable inbound messages for manual triage.
 
-    Captures the full Postmark webhook payload so staff can
+    Captures the inbound webhook/received-email payload so staff can
     investigate and manually route if needed.
     """
 
@@ -255,7 +255,7 @@ class DeadLetter(models.Model):
         WRONG_DOMAIN = 'wrong_domain', _('Address domain does not match tenant')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    raw_payload = models.JSONField(help_text='Full Postmark webhook body.')
+    raw_payload = models.JSONField(help_text='Full inbound webhook / received-email body.')
     from_address = models.EmailField()
     to_address = models.EmailField()
     subject = models.CharField(max_length=500, blank=True)
