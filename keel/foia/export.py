@@ -139,7 +139,8 @@ def _get_export_model():
 def submit_to_foia(source_product: str, record_type: str, record_id: str,
                    title: str, content: str,
                    created_by: str = '', created_at=None, metadata=None,
-                   submitted_by=None, foia_request_id: str = ''):
+                   submitted_by=None, foia_request_id: str = '',
+                   ip_address: str = None):
     """Submit a single record for FOIA review.
 
     Creates a FOIAExportItem in the queue for Admiralty to pick up.
@@ -159,6 +160,7 @@ def submit_to_foia(source_product: str, record_type: str, record_id: str,
         record_created_at=created_at,
         metadata=metadata or {},
         submitted_by=submitted_by,
+        submitted_from_ip=ip_address,
         foia_request_id_ref=foia_request_id,
     )
 
@@ -171,7 +173,8 @@ def submit_to_foia(source_product: str, record_type: str, record_id: str,
 
 
 def bulk_submit_to_foia(records: list[FOIAExportRecord],
-                        submitted_by=None, foia_request_id: str = ''):
+                        submitted_by=None, foia_request_id: str = '',
+                        ip_address: str = None):
     """Submit multiple records at once. Returns list of created items."""
     ExportItem = _get_export_model()
     items = []
@@ -203,6 +206,7 @@ def bulk_submit_to_foia(records: list[FOIAExportRecord],
             record_created_at=rec.created_at,
             metadata=rec.metadata,
             submitted_by=submitted_by,
+            submitted_from_ip=ip_address,
             foia_request_id_ref=foia_request_id,
         )
         items.append(item)

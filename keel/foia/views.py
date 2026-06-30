@@ -5,6 +5,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
+from keel.core.audit import log_audit
 from .export import foia_export_registry, submit_to_foia
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,8 @@ def export_to_foia(request):
             status=400,
         )
 
+    ip_address = getattr(request, 'audit_ip', None)
+
     # Try to use the registry first (structured export)
     entry = foia_export_registry.get_type(product, record_type)
     if entry:
@@ -74,6 +77,7 @@ def export_to_foia(request):
                 metadata=export_record.metadata,
                 submitted_by=request.user,
                 foia_request_id=foia_request_id,
+                ip_address=ip_address,
             )
         except ValueError as e:
             return JsonResponse({'error': str(e)}, status=400)
@@ -95,11 +99,23 @@ def export_to_foia(request):
             content=content,
             submitted_by=request.user,
             foia_request_id=foia_request_id,
+            ip_address=ip_address,
         )
 
+    # Audit the FOIA export action
+    log_audit(
+        user=request.user,
+        action='export',
+        entity_type=f'{product}:{record_type}',
+        entity_id=record_id,
+        description=f'FOIA export to Admiralty: {product}:{record_type}:{record_id}',
+        changes={'foia_export_item_id': str(item.pk)},
+        ip_address=ip_address,
+    )
+
     logger.info(
-        'User %s exported %s:%s:%s to FOIA queue (item %s)',
-        request.user, product, record_type, record_id, item.pk,
+        'User %s exported %s:%s:%s to FOIA queue (item %s, IP %s)',
+        request.user, product, record_type, record_id, item.pk, ip_address,
     )
 
     return JsonResponse({

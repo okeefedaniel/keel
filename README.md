@@ -34,10 +34,14 @@ git+https://github.com/okeefedaniel/keel.git
 - **Security event monitor** — `check_security_events` management command for cron
 
 ### keel.foia
-- **Abstract FOIA models** — FOIARequest, FOIAScope, FOIASearchResult, FOIADetermination, FOIAResponsePackage, FOIAAppeal
+- **Abstract FOIA models** — FOIARequest, FOIAScope, FOIASearchResult, FOIADetermination, FOIAResponsePackage, FOIAAppeal, FOIAExportItem
+- **FOIA export registry** — One-click export of any record to Admiralty with IP tracking
 - **FOIA search engine** — Zone-aware record search across models
 - **FOIA workflow** — Status transitions for request lifecycle
 - **AI review** — Claude-powered pre-classification of search results
+- **FOIA audit command** — `foia_audit` management command to verify FOIA readiness
+- **FOIAReadyAppConfig** — Base AppConfig that validates FOIA integration on startup
+- **View mixins** — `FOIAExportMixin`, `FOIAExportListMixin` for drop-in export buttons
 
 ### docs/
 - **SECURITY.md** — Vulnerability disclosure policy and security program overview (copy to each product repo)
@@ -301,6 +305,129 @@ python manage.py security_audit --fail-on-error --json
 
 ---
 
+## FOIA Integration Checklist
+
+Every DockLabs product handling agency-submitted content **must** be FOIA-enabled. This ensures FOIA staff can one-click export any record to Admiralty, and that a complete audit trail (timestamp, IP address, user, content) exists for every action.
+
+### What Keel Provides Automatically
+
+When properly integrated, every product gets:
+
+- **Immutable audit log** — every create, update, delete, login, export action is recorded with user, IP address, timestamp, and field-level changes (`AbstractAuditLog`)
+- **IP address capture** — `AuditMiddleware` extracts client IP on every request via `request.audit_ip`
+- **Workflow transition history** — `AbstractStatusHistory` records who changed what status, when, with comments
+- **One-click FOIA export** — `{% foia_export_button %}` template tag lets FOIA staff export any record to Admiralty
+- **Audit log bulk export** — `foia_export_view` generates date-ranged JSON/CSV packages for Admiralty ingestion
+- **FOIA search** — `FOIASearchEngine` discovers responsive records across product models
+
+### Per-Product Integration Steps
+
+#### 1. Add FOIA settings to `settings.py`
+
+```python
+# Concrete FOIAExportItem model for one-click export queue
+KEEL_FOIA_EXPORT_MODEL = 'core.FOIAExportItem'
+```
+
+#### 2. Create concrete FOIAExportItem model
+
+```python
+# core/models.py
+from keel.foia.models import AbstractFOIAExportItem
+
+class FOIAExportItem(AbstractFOIAExportItem):
+    class Meta(AbstractFOIAExportItem.Meta):
+        pass
+```
+
+Run `makemigrations` and `migrate`.
+
+#### 3. Register exportable record types
+
+In your product's `AppConfig.ready()`, register every model containing agency-submitted content:
+
+```python
+from keel.foia.apps import FOIAReadyAppConfig
+
+class MyProductConfig(FOIAReadyAppConfig):
+    name = 'myproduct'
+    foia_product_name = 'myproduct'
+
+    def register_foia_exports(self):
+        from keel.foia.export import foia_export_registry
+        from .models import MyRecord
+
+        foia_export_registry.register(
+            product='myproduct',
+            record_type='my_record',
+            queryset_fn=lambda: MyRecord.objects.all(),
+            serializer_fn=lambda r: FOIAExportRecord(
+                source_product='myproduct',
+                record_type='my_record',
+                record_id=str(r.pk),
+                title=str(r),
+                content=r.content,
+                created_by=str(r.created_by) if r.created_by else '',
+                created_at=r.created_at,
+                metadata={},
+            ),
+            display_name='My Record',
+            description='Description for FOIA staff',
+        )
+```
+
+#### 4. Wire up FOIA URLs
+
+```python
+# urls.py
+from keel.core.foia_export import foia_export_view
+
+urlpatterns = [
+    path('foia-export/', foia_export_view, name='foia_export'),
+    path('foia/', include('keel.foia.urls')),
+]
+```
+
+#### 5. Add export buttons to detail views
+
+```python
+# views.py
+from keel.foia.mixins import FOIAExportMixin
+
+class MyRecordDetailView(FOIAExportMixin, DetailView):
+    model = MyRecord
+    foia_record_type = 'my_record'
+    foia_product_name = 'myproduct'
+```
+
+In the template:
+```html
+{% load foia_tags %}
+{% foia_export_button object "my_record" "myproduct" %}
+```
+
+#### 6. Verify with `foia_audit`
+
+```bash
+python manage.py foia_audit
+```
+
+### Product FOIA Status
+
+| Product | Agency Content | Exportable Types to Register |
+|---------|---------------|-------------------------------|
+| **Beacon** | Interactions, notes, companies, contacts | `interaction`, `note`, `company`, `contact` |
+| **Harbor** | Applications, awards, reports, reviews | `application`, `award`, `report`, `review` |
+| **Manifest** | Documents, signatures, attestations | `document`, `signature`, `attestation` |
+| **Lookout** | Testimony, tracking notes, bills | `testimony`, `tracking_note`, `bill` |
+| **Bounty** | Federal grants, applications | `grant`, `application` |
+| **Purser** | Invoices, payments, financial records | `invoice`, `payment`, `journal_entry` |
+| **Yeoman** | Schedules, appointments, delegations | `appointment`, `schedule`, `delegation` |
+| **Admiralty** | FOIA hub (consumes exports) | N/A — this is the export destination |
+| **Keel** | Platform admin (no agency content) | N/A — admin console only |
+
+---
+
 ## Quick Reference: Settings
 
 | Setting | Default | Description |
@@ -318,6 +445,7 @@ python manage.py security_audit --fail-on-error --json
 | `KEEL_LOGIN_LOCKOUT_DURATION` | `1800` | Lockout duration in seconds |
 | `KEEL_LOGIN_PATHS` | `['/auth/login/', ...]` | URL paths to monitor for failed logins |
 | `KEEL_ADMIN_ALLOWED_IPS` | `[]` | IP addresses/CIDRs allowed to access /admin/ |
+| `KEEL_FOIA_EXPORT_MODEL` | `None` | Dotted path to your concrete FOIAExportItem model |
 | `KEEL_BUSINESS_HOURS` | `(8, 18)` | Business hours tuple for after-hours alerts |
 | `KEEL_PRODUCT_NAME` | `'DockLabs'` | Product name used in alert emails |
 | `KEEL_CSP_POLICY` | `None` | Content-Security-Policy header value |

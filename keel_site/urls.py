@@ -57,6 +57,7 @@ urlpatterns = [
     path('keel/accounts/', include('keel.accounts.urls')),
     path('keel/requests/', include('keel.requests.urls')),
     path('keel/notifications/', include('keel.notifications.urls')),
+    path('keel/comms/', include('keel.comms.urls')),
 
     # Invitation acceptance (clean URL)
     path('invite/<str:token>/', include([])),  # handled by keel.accounts.urls

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'keel.reporting',
     'keel.compliance',
     'keel.calendar',
+    'keel.comms',
 ]
 
 # ---------------------------------------------------------------------------
@@ -183,6 +184,11 @@ TWILIO_FROM_NUMBER = os.environ.get('TWILIO_FROM_NUMBER', '')
 KEEL_CALENDAR_PROVIDER = os.environ.get('KEEL_CALENDAR_PROVIDER', None)  # 'google' or 'microsoft'
 KEEL_CALENDAR_EVENT_MODEL = None  # Products set this to their concrete model
 KEEL_CALENDAR_SYNC_LOG_MODEL = None
+
+# Communications (keel.comms) — Postmark inbound/outbound email
+COMMS_MAIL_DOMAIN = os.environ.get('COMMS_MAIL_DOMAIN', 'mail.docklabs.ai')
+COMMS_POSTMARK_SERVER_TOKEN = os.environ.get('COMMS_POSTMARK_SERVER_TOKEN', '')
+COMMS_POSTMARK_WEBHOOK_TOKEN = os.environ.get('COMMS_POSTMARK_WEBHOOK_TOKEN', '')
 
 # ---------------------------------------------------------------------------
 # Security
