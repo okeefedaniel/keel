@@ -5,6 +5,16 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.0 — 2026-06-30
+
+**keel.comms transports over Resend (single email vendor); Postmark removed.**
+
+### Changed
+- **`keel.comms` now transports over Resend instead of Postmark** — one vendor across the suite (shares `RESEND_API_KEY` with `keel.notifications`). Outbound `send_message()` posts to the Resend API; inbound arrives on a single Svix-signed webhook (`/keel/comms/webhook/resend/`) handling both `email.received` and outbound delivery events. Because Resend's inbound webhook is metadata-only, full body/headers/attachments are fetched from the Received-emails API by `email_id`. New `keel.comms.resend_client` (stdlib `urllib`, no `requests`/`svix` dependency) holds the API calls and Svix verification.
+
+### Consumer note
+- **Comms consumers must reconfigure for Resend.** Replace the old `COMMS_POSTMARK_SERVER_TOKEN` / `COMMS_POSTMARK_WEBHOOK_TOKEN` settings with `COMMS_RESEND_WEBHOOK_SECRET` (the Resend endpoint's Svix signing secret, `whsec_…`); outbound + inbound fetches reuse the existing `RESEND_API_KEY`. Point the Resend webhook at `/keel/comms/webhook/resend/` (the `/webhook/postmark/*` routes are gone) and the domain's MX at Resend inbound. Migration `keel_comms.0004` renames `Message.postmark_message_id` → `provider_message_id` (no product ships real comms data yet, so this is a no-op rename in practice).
+
 ## 0.56.4 — 2026-06-30
 
 **Canary healthy ignores idle-app silence flags; FOIA mixins, foia_audit command, and FOIAReadyAppConfig land.**
