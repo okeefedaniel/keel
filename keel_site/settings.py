@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'keel.calendar',
     'keel.scheduling',
     'keel.signatures',
+    'keel.foia',  # FOIA export registry + foia_audit command (abstract models only, no migrations)
     'keel.mentions',  # suite-wide @-mentions on notes (0.42.0)
     'keel.ai.apps.KeelAIConfig',  # /api/v1/ai/key/ — user AI key handoff
     'keel.settings.apps.KeelSettingsConfig',  # /settings/ panel framework
