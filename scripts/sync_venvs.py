@@ -53,6 +53,18 @@ def pinned_version(req: Path) -> str | None:
     return None
 
 
+def keel_requirement(req: Path) -> str | None:
+    """Return the full keel requirement line (e.g. 'keel @ git+...@v0.56.2')."""
+    try:
+        for line in req.read_text().splitlines():
+            s = line.strip()
+            if s and not s.startswith("#") and PIN_RE.search(s):
+                return s
+    except OSError:
+        return None
+    return None
+
+
 def installed_version(venv_py: Path) -> str | None:
     try:
         out = subprocess.run(
@@ -106,6 +118,16 @@ def sync_one(prod: Path, *, check: bool, force: bool, quiet: bool,
     if not run(pip, prod, quiet):
         print(f"  {prod.name:12} FAILED    pip install")
         return "failed"
+
+    # pip's git URL resolver won't DOWNGRADE an already-installed keel (the pip
+    # cache trap — see keel/CLAUDE.md). If the venv sits ahead of a lagging pin
+    # (e.g. local 0.56.3 vs pin 0.56.2), the -r install above is a silent no-op.
+    # Force keel to the exact pinned tag so the venv faithfully matches deployed.
+    if installed_version(venv_py) != pin:
+        spec = keel_requirement(prod / "requirements.txt")
+        if spec:
+            run([str(venv_py), "-m", "pip", "install", "-q",
+                 "--force-reinstall", "--no-deps", spec], prod, quiet)
 
     if do_django:
         # Best-effort: a stopped Postgres or unconfigured .env must not fail the
