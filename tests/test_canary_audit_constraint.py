@@ -62,6 +62,24 @@ def test_audit_constraint_missing_flag_only_when_gauge_returned_false():
     assert payload['flags']['audit_constraint_missing'] is False
 
 
+def test_silence_flags_are_advisory_not_unhealthy():
+    """A quiet app (no audit writes / no cron runs in 24h) is idle, not broken.
+    The silence flags may be True but must NOT, on their own, flip ``healthy``.
+    Only genuine-fault flags gate health."""
+    from keel.ops.canary import build_canary_payload
+
+    with patch('keel.ops.canary._check_audit_constraint_present',
+               return_value=True):  # constraint present → not a fault
+        payload = build_canary_payload()
+
+    # Silence flags may legitimately be True on an idle test DB...
+    # ...but with every genuine-fault flag clear, the app is healthy.
+    assert payload['flags']['cron_failures_24h'] is False
+    assert payload['flags']['notifications_failing'] is False
+    assert payload['flags']['audit_constraint_missing'] is False
+    assert payload['healthy'] is True
+
+
 def test_flag_labels_includes_audit_constraint_missing():
     """The label dict drives the chip rendering on /ops/ — every flag must
     have a human-readable label or the chip falls back to the raw key."""

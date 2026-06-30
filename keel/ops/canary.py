@@ -215,7 +215,20 @@ def build_canary_payload(extras_callable=None):
         ),
     }
     payload['flags'] = flags
-    payload['healthy'] = not any(flags.values())
+    # Only genuine-fault flags gate `healthy`. The two "silence" flags
+    # (audit_silent_24h, cron_silent_24h) mean the app is *quiet*, not *broken* —
+    # an idle / pre-beta deployment with no traffic legitimately writes no audit
+    # rows and (if it has no cron, or none fired) no CommandRun rows in 24h. They
+    # stay in `flags` so the dashboard chips still surface them as advisory, but
+    # they no longer flip `healthy` and trip every canary on a low-traffic app.
+    # A genuinely broken audit pipeline is still caught by audit_constraint_missing
+    # (structural) plus the endpoint up/200/JSON checks in the canary workflow.
+    CRITICAL_FLAGS = (
+        'cron_failures_24h',
+        'notifications_failing',
+        'audit_constraint_missing',
+    )
+    payload['healthy'] = not any(flags[k] for k in CRITICAL_FLAGS)
     return payload
 
 
