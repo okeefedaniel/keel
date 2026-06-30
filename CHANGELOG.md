@@ -5,6 +5,18 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.56.4 — 2026-06-30
+
+**Canary healthy ignores idle-app silence flags; FOIA mixins, foia_audit command, and FOIAReadyAppConfig land.**
+
+### Added
+- **`FOIAExportMixin` / `FOIAExportListMixin`** (`keel.foia.mixins`) — drop-in detail/list view mixins that inject `foia_record_type` + `foia_product_name` into the template context so products can render `{% foia_export_button %}` without hand-wiring context. Closes the docs/reality gap: CLAUDE.md and `keel/foia/__init__.py` already documented the mixin, but `main` shipped without it.
+- **`foia_audit` management command** (`python manage.py foia_audit [--fail-on-error] [--json]`) — audits FOIA readiness (AuditMiddleware present, `KEEL_AUDIT_LOG_MODEL` / `KEEL_FOIA_EXPORT_MODEL` set, AuditLog has the required fields and is immutable, exportable types registered per product). `--fail-on-error` exits 1 for CI gating; `--json` emits a machine-readable envelope. CLAUDE.md documented this as a CI gate, but the command did not exist on `main`.
+- **`FOIAReadyAppConfig`** (`keel.foia.apps`) — base `AppConfig` for products that must be FOIA-enabled. Subclass it, implement `register_foia_exports()`, and on `ready()` it registers the exportable types then validates FOIA wiring (settings present, ≥1 exportable type) via non-fatal `logger.warning` so a misconfigured product still boots while surfacing the gap. CLAUDE.md already documented this as the base class for "automatic validation," but `main` shipped without it (companion to the `FOIAExportMixin` / `foia_audit` gap closed in the prior change).
+
+### Fixed
+- **Canary `healthy`** no longer trips on idle apps: `audit_silent_24h` and `cron_silent_24h` are now advisory (still surfaced as chips) and excluded from the `healthy` computation. Only genuine-fault flags (`cron_failures_24h`, `notifications_failing`, `audit_constraint_missing`) plus the workflow's endpoint checks gate health. Fixes the fleet-wide false-unhealthy canaries on pre-beta deployments with no traffic.
+
 ## 0.56.3 — 2026-06-28
 
 **Drop unused Poppins from authenticated app/auth chrome; align on the editorial Fraunces / Instrument Sans / JetBrains Mono stack. Poppins retained only on public/marketing + email.**
