@@ -22,7 +22,7 @@ django-oauth-toolkit>=2.4
 # Pillow processes uploads; django-storages[s3] writes to docklabs-avatars
 # bucket via CloudFront. Without these, avatar features fall back to local
 # FS — fine for dev but lost on Railway redeploy.
-Pillow>=10.0
+Pillow>=12.2.0
 django-storages[s3]>=1.14
 
 # Optional (uncomment as needed)
