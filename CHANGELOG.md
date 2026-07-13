@@ -5,6 +5,13 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.1 — 2026-07-13
+
+**Standardize public auth CTA on "Sign In"; drop redundant top-right button on landing pages.**
+
+### Changed
+- **Public topbar / landing / auth layouts** — standardized the auth CTA wording to **"Sign In"** suite-wide (the topbar and the auth `<title>` fallback said "Log In"; heroes, CTAs, and the login card already said "Sign In"). Landing pages now suppress the redundant top-right auth button via the new `{% block public_topbar_auth %}` override — the hero already carries the primary Sign In / Dashboard CTA. Other public pages (privacy, help, etc.) keep the topbar button.
+
 ## 0.57.0 — 2026-06-30
 
 **keel.comms transports over Resend (single email vendor); Postmark removed.**

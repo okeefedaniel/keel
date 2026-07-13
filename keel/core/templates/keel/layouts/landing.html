@@ -13,6 +13,9 @@ All branding flows from KEEL_PRODUCT_* settings via site_context.
 {% block sidebar_brand_icon %}{{ PRODUCT_ICON|default:"bi-gear" }}{% endblock %}
 {% block sidebar_brand_name %}{{ SITE_NAME|default:"DockLabs" }}{% endblock %}
 
+{# Landing pages carry the primary Sign In / Dashboard CTA in the hero, so the redundant top-right auth button is suppressed here. #}
+{% block public_topbar_auth %}{% endblock %}
+
 {% block content %}
 {# ============ HERO ============ #}
 {% block landing_hero %}

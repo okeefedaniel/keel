@@ -49,15 +49,17 @@ Products extend this:
     </a>
     <nav class="d-flex align-items-center gap-2" aria-label="Primary">
       {% block public_nav %}{% endblock %}
+      {% block public_topbar_auth %}
       {% if not user.is_authenticated %}
       <a href="{% block login_url %}{% url 'account_login' %}{% endblock %}" class="tb-btn primary">
-        <i class="bi bi-box-arrow-in-right"></i> Log In
+        <i class="bi bi-box-arrow-in-right"></i> Sign In
       </a>
       {% else %}
       <a href="{% block dashboard_url %}/dashboard/{% endblock %}" class="tb-btn primary">
         <i class="bi bi-speedometer2"></i> Dashboard
       </a>
       {% endif %}
+      {% endblock %}
     </nav>
   </header>
 
