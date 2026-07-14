@@ -18,3 +18,9 @@ staticfiles/
 # Claude Code runtime state
 .claude/*.lock
 .claude/
+
+# Nightly test suite artifacts (scripts/nightly.sh, scripts/nightly-qa.sh).
+# Both write here on every run. Untracked, they are one `git add -A` away
+# from being committed by the suite's own auto-fix phase.
+logs/
+reports/

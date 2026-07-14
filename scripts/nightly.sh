@@ -118,11 +118,13 @@ ${KEEL_DIR}
 # uncommitted work happened to be sitting there at 2am and pushes it.
 # Bash 3.2 (macOS system bash) has no associative arrays, hence the
 # space-delimited string + case-glob membership test.
+# `git status --porcelain`, not `git diff`: diff cannot see untracked files,
+# so a repo holding only untracked work reads as clean and Phase 2's
+# `git add -A` would hoover it into the commit.
 CLEAN_BEFORE=""
 for PRODUCT_DIR in ${PRODUCT_DIRS}; do
     [ -d "${PRODUCT_DIR}/.git" ] || continue
-    if git -C "${PRODUCT_DIR}" diff --quiet 2>/dev/null &&
-       git -C "${PRODUCT_DIR}" diff --cached --quiet 2>/dev/null; then
+    if [ -z "$(git -C "${PRODUCT_DIR}" status --porcelain 2>/dev/null)" ]; then
         CLEAN_BEFORE="${CLEAN_BEFORE} ${PRODUCT_DIR}"
     else
         echo "  note: $(basename "${PRODUCT_DIR}") has uncommitted changes — auto-commit disabled for it"
@@ -174,7 +176,7 @@ for PRODUCT_DIR in ${PRODUCT_DIRS}; do
     cd "${PRODUCT_DIR}"
 
     # Nothing changed — nothing to commit.
-    if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
+    if [ -z "$(git status --porcelain 2>/dev/null)" ]; then
         continue
     fi
 
