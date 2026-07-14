@@ -13,7 +13,7 @@ from pathlib import Path
 # Base directory — all repos are siblings
 BASE_DIR = Path(os.environ.get(
     'DOCKLABS_BASE_DIR',
-    os.path.expanduser('~/SynologyDrive/Work/CT/Web'),
+    os.path.expanduser('~/Code/CT'),
 ))
 
 # Demo users are passwordless as of keel 0.20.1 — generated test scripts

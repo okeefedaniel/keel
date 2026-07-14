@@ -5,7 +5,12 @@ to test every parameterless URL in the product.
 
 Usage (inside the generated smoke test script):
     The code from generate_discovery_code() introspects urlpatterns,
-    filters to parameterless list/dashboard views, and GETs each one.
+    filters to parameterless list/dashboard views, and GETs each one
+    both as an authenticated role and logged out.
+
+The URL collection and the logged-out sweep live in keel.testing.anon_sweep
+so products can run the same checks from their own test suites; keel is
+installed in every product venv, so the generated script imports it.
 """
 
 
@@ -19,36 +24,9 @@ def generate_discovery_code():
 # ── URL Autodiscovery ──
 section = 'URL Autodiscovery'
 try:
-    from django.urls import URLPattern, URLResolver, get_resolver
-    import re
+    from keel.testing.anon_sweep import collect_parameterless_urls, sweep_anonymous
 
-    def _collect_urls(resolver=None, prefix=''):
-        """Recursively collect all parameterless URL patterns."""
-        if resolver is None:
-            resolver = get_resolver()
-        urls = []
-        for pattern in resolver.url_patterns:
-            if isinstance(pattern, URLResolver):
-                new_prefix = prefix + str(pattern.pattern)
-                urls.extend(_collect_urls(pattern, new_prefix))
-            elif isinstance(pattern, URLPattern):
-                full_pattern = prefix + str(pattern.pattern)
-                # Skip patterns with parameters (angle brackets)
-                if '<' in full_pattern:
-                    continue
-                # Skip admin, static, __debug__ etc
-                if any(skip in full_pattern for skip in ('admin/', '__debug__', 'static/', 'media/')):
-                    continue
-                # Convert regex-style pattern to URL path
-                url = '/' + full_pattern.rstrip('$').lstrip('^')
-                if not url.endswith('/') and '.' not in url.split('/')[-1]:
-                    url += '/'
-                urls.append(url)
-        return urls
-
-    discovered = _collect_urls()
-    # Deduplicate and sort
-    discovered = sorted(set(discovered))
+    discovered = collect_parameterless_urls()
 
     # Already-tested URLs from the explicit config
     already_tested = set()
@@ -89,4 +67,22 @@ try:
               f'{errors} errors' if errors else '')
 except Exception as e:
     fail(section, 'URL autodiscovery failed', str(e)[:300])
+
+# ── Anonymous URL Sweep ──
+# The pass above force_logins first, so it is structurally blind to views
+# that crash only for AnonymousUser (no .role / .organization). Beacon
+# shipped two such 500s. Sweep the same URLs logged out.
+section = 'Anonymous URL Sweep'
+try:
+    from keel.testing.anon_sweep import collect_parameterless_urls, sweep_anonymous
+
+    swept = collect_parameterless_urls()
+    anon_failures = sweep_anonymous(urls=swept)
+    for anon_url, anon_detail in anon_failures:
+        fail(section, f'500 on logged-out GET {anon_url}', anon_detail)
+    check(section, not anon_failures,
+          f'All URLs handle logged-out requests ({len(swept)} swept)',
+          f'{len(anon_failures)} failing' if anon_failures else '')
+except Exception as e:
+    fail(section, 'Anonymous sweep failed', str(e)[:300])
 '''
