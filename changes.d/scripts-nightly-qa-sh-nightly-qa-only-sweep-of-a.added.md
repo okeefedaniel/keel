@@ -1,0 +1,1 @@
+- **`scripts/nightly-qa.sh`** — nightly `/qa-only` sweep of a deployed product via headless `claude -p`, complementing the deterministic checks in `nightly.sh`. Report-only and tool-restricted; fails loudly on an empty report.
