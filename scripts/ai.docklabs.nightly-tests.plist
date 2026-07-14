@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DockLabs nightly test suite — runs scripts/nightly.sh at 02:00 daily.
+
+  Install:
+    cp scripts/ai.docklabs.nightly-tests.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/ai.docklabs.nightly-tests.plist
+
+  Verify / run on demand:
+    launchctl list | grep nightly-tests
+    launchctl start ai.docklabs.nightly-tests
+    tail -f ~/Code/CT/keel/logs/nightly.log
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/ai.docklabs.nightly-tests.plist
+
+  launchd, not cron: the old header documented a crontab entry that was
+  never installed, and cron on macOS needs Full Disk Access to read the
+  repos. launchd also catches up a missed 02:00 run once the machine
+  wakes, instead of silently skipping the night.
+
+  Runs in the default auto-fix mode: fixes land on nightly/auto-fix-<date>
+  with a PR, never on main. Nothing reaches production without review —
+  which matters because --auto-fix regex-rewrites settings.py and a push to
+  main auto-deploys Railway. Pass --report-only to disable code changes
+  entirely, or --dry-run to write nothing at all.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.docklabs.nightly-tests</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/dok/Code/CT/keel/scripts/nightly.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/dok/Code/CT/keel</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/dok/Code/CT/keel/logs/nightly.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/dok/Code/CT/keel/logs/nightly.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- launchd agents get a minimal PATH; git, python and the venv
+             tooling all need to resolve. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>DOCKLABS_BASE_DIR</key>
+        <string>/Users/dok/Code/CT</string>
+    </dict>
+
+    <!-- Don't run at load time; 02:00 only. -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

@@ -1,26 +1,65 @@
 #!/usr/bin/env bash
 # =============================================================================
 # DockLabs Nightly Test Suite
-# Runs at 2:00 AM via cron.
+# Runs at 2:00 AM via launchd (ai.docklabs.nightly-tests.plist).
 #
-# Cron entry:
-#   0 2 * * * /Users/dok/SynologyDrive/Work/CT/Web/keel/scripts/nightly.sh >> /Users/dok/SynologyDrive/Work/CT/Web/keel/logs/nightly.log 2>&1
+# Install:
+#   cp scripts/ai.docklabs.nightly-tests.plist ~/Library/LaunchAgents/
+#   launchctl load ~/Library/LaunchAgents/ai.docklabs.nightly-tests.plist
 #
 # What it does:
 #   1. Run full test suite with --auto-fix --json --notify-dashboard
-#   2. If auto-fix changed files, commit and push
+#   2. If auto-fix changed files, commit them to nightly/auto-fix-<date> and
+#      open a PR (clean repos only — see Phase 2). Never commits to main:
+#      a push to main auto-deploys Railway, and these are unattended regex
+#      rewrites of settings.py, not reasoned edits.
 #   3. POST unfixable failures to Keel dashboard API
+#
+# Paths are overridable so this is runnable from a checkout anywhere:
+#   DOCKLABS_BASE_DIR=/path/to/repos scripts/nightly.sh
+#
+# Modes:
+#   (default)      auto-fix -> branch + PR, dashboard POST
+#   --report-only  no code changes at all; dashboard POST only
+#   --dry-run      no writes anywhere, not even the dashboard
 # =============================================================================
 
 set -uo pipefail
 
+DRY_RUN=0
+REPORT_ONLY=0
+for arg in "$@"; do
+    case "${arg}" in
+        --dry-run)     DRY_RUN=1 ;;
+        --report-only) REPORT_ONLY=1 ;;
+        *) echo "unknown argument: ${arg}" >&2; exit 2 ;;
+    esac
+done
+
 # --- Configuration ---
-KEEL_DIR="/Users/dok/SynologyDrive/Work/CT/Web/keel"
-BASE_DIR="/Users/dok/SynologyDrive/Work/CT/Web"
+# Derive from this script's own location rather than hardcoding: the
+# previous absolute paths pointed at ~/SynologyDrive/Work/CT/Web, which
+# stopped existing when the repos moved to ~/Code/CT. Nothing failed
+# loudly — the job just could not find a single repo, and there was no
+# cron entry invoking it either, so it went years without running.
+KEEL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BASE_DIR="${DOCKLABS_BASE_DIR:-$(dirname "${KEEL_DIR}")}"
+export DOCKLABS_BASE_DIR="${BASE_DIR}"   # keel.testing.config reads this
 LOG_DIR="${KEEL_DIR}/logs"
 REPORT_DIR="${KEEL_DIR}/reports"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 JSON_FILE="${REPORT_DIR}/nightly_${TIMESTAMP}.json"
+
+# `python -m keel.testing` bootstraps keel_site.settings, which hard-fails
+# on a chain of production guards (SECRET_KEY, then ALLOWED_HOSTS, ...)
+# while DEBUG is off — the harness died before emitting a single result and
+# left a 0-byte report. Each guard has an `if DEBUG:` fallback, and this is
+# a local test harness, so satisfy them all at the root rather than
+# enumerating env vars that grow every time a guard is added. Django's test
+# runner forces DEBUG=False for the tests themselves, so this only affects
+# the import-time checks. The key signs nothing that outlives the run.
+export DEBUG="${DEBUG:-True}"
+export SECRET_KEY="${SECRET_KEY:-nightly-test-key-not-for-production}"
 
 KEEL_API_URL="https://keel.docklabs.ai/api/requests/ingest/"
 
@@ -39,27 +78,83 @@ fi
 # Ensure directories exist
 mkdir -p "${LOG_DIR}" "${REPORT_DIR}"
 
-# Python from keel's venv
-PYTHON="${KEEL_DIR}/.venv/bin/python"
-if [ ! -f "${PYTHON}" ]; then
-    echo "ERROR: Keel venv not found at ${KEEL_DIR}/.venv"
+# Python from keel's venv. Accept either layout — the repo uses venv/,
+# this script only ever looked for .venv/ and bailed.
+if [ -x "${KEEL_DIR}/venv/bin/python" ]; then
+    VENV_DIR="${KEEL_DIR}/venv"
+elif [ -x "${KEEL_DIR}/.venv/bin/python" ]; then
+    VENV_DIR="${KEEL_DIR}/.venv"
+else
+    echo "ERROR: no keel venv at ${KEEL_DIR}/venv or ${KEEL_DIR}/.venv"
     exit 1
 fi
+PYTHON="${VENV_DIR}/bin/python"
 
 echo "============================================"
 echo "DockLabs Nightly Tests — $(date)"
 echo "============================================"
+echo "Keel:  ${KEEL_DIR}"
+echo "Repos: ${BASE_DIR}"
+
+# Every repo the auto-fixer may touch. keel.testing maps some products
+# onto a shared repo (admiralty->beacon, manifest->harbor), so this is the
+# de-duplicated repo list, not the product list.
+PRODUCT_DIRS="
+${BASE_DIR}/admiralty
+${BASE_DIR}/beacon
+${BASE_DIR}/bounty
+${BASE_DIR}/harbor
+${BASE_DIR}/helm
+${BASE_DIR}/lookout
+${BASE_DIR}/manifest
+${BASE_DIR}/purser
+${BASE_DIR}/yeoman
+${KEEL_DIR}
+"
+
+# --- Phase 0: record which repos are clean BEFORE the run ---
+# Phase 2 commits with `git add -A`, so it can only safely commit a repo
+# whose tree was clean beforehand — otherwise it sweeps up whatever
+# uncommitted work happened to be sitting there at 2am and pushes it.
+# Bash 3.2 (macOS system bash) has no associative arrays, hence the
+# space-delimited string + case-glob membership test.
+CLEAN_BEFORE=""
+for PRODUCT_DIR in ${PRODUCT_DIRS}; do
+    [ -d "${PRODUCT_DIR}/.git" ] || continue
+    if git -C "${PRODUCT_DIR}" diff --quiet 2>/dev/null &&
+       git -C "${PRODUCT_DIR}" diff --cached --quiet 2>/dev/null; then
+        CLEAN_BEFORE="${CLEAN_BEFORE} ${PRODUCT_DIR}"
+    else
+        echo "  note: $(basename "${PRODUCT_DIR}") has uncommitted changes — auto-commit disabled for it"
+    fi
+done
 
 # --- Phase 1: Run full test suite ---
 echo ""
-echo "Phase 1: Running test suite with --auto-fix --json --notify-dashboard..."
+echo "Phase 1: Running test suite..."
 echo ""
 
 cd "${KEEL_DIR}"
-source .venv/bin/activate
+source "${VENV_DIR}/bin/activate"
+
+if [ "${DRY_RUN}" -eq 1 ]; then
+    TESTING_ARGS="--json"
+    MODE_NOTE="[dry-run] no --auto-fix, no commit, no push, no dashboard POST"
+elif [ "${REPORT_ONLY}" -eq 1 ]; then
+    # --auto-fix regex-rewrites settings.py (see security_audit._fix_debug_setting)
+    # and Phase 2 pushes to main, which auto-deploys Railway. Report-only keeps
+    # the dashboard reporting and leaves the code alone.
+    TESTING_ARGS="--json --notify-dashboard"
+    MODE_NOTE="[report-only] no --auto-fix, no commit, no push; dashboard POST still runs"
+else
+    TESTING_ARGS="--auto-fix --json --notify-dashboard"
+    MODE_NOTE="[auto-fix] will rewrite files, then branch + PR (never main)"
+fi
+echo "  ${MODE_NOTE}"
+echo "  running: python -m keel.testing ${TESTING_ARGS}"
 
 set +e
-python -m keel.testing --auto-fix --json --notify-dashboard > "${JSON_FILE}" 2>"${LOG_DIR}/nightly_stderr_${TIMESTAMP}.log"
+python -m keel.testing ${TESTING_ARGS} > "${JSON_FILE}" 2>"${LOG_DIR}/nightly_stderr_${TIMESTAMP}.log"
 TEST_EXIT=$?
 set -e
 
@@ -71,25 +166,29 @@ echo ""
 echo "Phase 2: Checking for auto-fix changes..."
 echo ""
 
-# Product directories to check for changes
-declare -a PRODUCT_DIRS=(
-    "${BASE_DIR}/beacon"
-    "${BASE_DIR}/harbor"
-    "${BASE_DIR}/lookout"
-    "${BASE_DIR}/keel"
-)
-
-for PRODUCT_DIR in "${PRODUCT_DIRS[@]}"; do
-    if [ ! -d "${PRODUCT_DIR}/.git" ] && [ ! -d "${PRODUCT_DIR}" ]; then
-        continue
-    fi
+for PRODUCT_DIR in ${PRODUCT_DIRS}; do
+    # Was `[ ! -d .git ] && [ ! -d dir ]`, which only skipped when BOTH
+    # were missing — a non-repo directory fell through to `cd` + git.
+    [ -d "${PRODUCT_DIR}/.git" ] || continue
 
     cd "${PRODUCT_DIR}"
 
-    # Check for uncommitted changes
+    # Nothing changed — nothing to commit.
     if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
         continue
     fi
+
+    # Only commit repos that were clean before Phase 1 ran, so everything
+    # staged by `git add -A` is attributable to the auto-fixer.
+    case " ${CLEAN_BEFORE} " in
+        *" ${PRODUCT_DIR} "*) ;;
+        *)
+            echo "  $(basename "${PRODUCT_DIR}"): SKIP — tree was already dirty before the run;" \
+                 "auto-fix changes (if any) left in place for review"
+            cd "${KEEL_DIR}"
+            continue
+            ;;
+    esac
 
     # Describe the changes
     CHANGED_FILES=$(git diff --name-only 2>/dev/null)
@@ -113,10 +212,46 @@ for PRODUCT_DIR in "${PRODUCT_DIRS[@]}"; do
     fi
     DESCRIPTION="${DESCRIPTION%, }"  # trim trailing comma
 
-    echo "  ${PRODUCT_NAME}: committing auto-fix changes (${DESCRIPTION})"
+    ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'main')
+    FIX_BRANCH="nightly/auto-fix-$(date +%Y%m%d)"
+
+    if [ "${DRY_RUN}" -eq 1 ] || [ "${REPORT_ONLY}" -eq 1 ]; then
+        echo "  [no-write] ${PRODUCT_NAME}: would open ${FIX_BRANCH} (${DESCRIPTION})"
+        cd "${KEEL_DIR}"
+        continue
+    fi
+
+    # Land fixes on a dated branch and open a PR — never on ${ORIGINAL_BRANCH}.
+    # Pushing main here would auto-deploy Railway straight to production from
+    # an unattended 2am regex rewrite of settings.py. A PR keeps the
+    # automation useful while leaving a human in front of prod.
+    echo "  ${PRODUCT_NAME}: ${DESCRIPTION} -> ${FIX_BRANCH}"
+    git checkout -q -B "${FIX_BRANCH}" || { echo "  WARNING: branch failed for ${PRODUCT_NAME}"; cd "${KEEL_DIR}"; continue; }
     git add -A
-    git commit -m "Nightly auto-fix: ${DESCRIPTION} in ${PRODUCT_NAME}" 2>/dev/null || true
-    git push origin HEAD 2>/dev/null || echo "  WARNING: push failed for ${PRODUCT_NAME}"
+    git commit -q -m "Nightly auto-fix: ${DESCRIPTION} in ${PRODUCT_NAME}" \
+        -m "Authored unattended by scripts/nightly.sh on $(date +%Y-%m-%d). The tree was clean before the run, so every change here is the auto-fixer's. Review before merging — these are regex rewrites, not reasoned edits." \
+        || true
+
+    # Not silenced: a swallowed push error reads exactly like a success in
+    # the morning's log.
+    if git push -q -u origin "${FIX_BRANCH}"; then
+        echo "  ${PRODUCT_NAME}: pushed $(git rev-parse --short HEAD) to ${FIX_BRANCH}"
+        # Best-effort. gh may not resolve its keychain auth under launchd;
+        # the branch is pushed either way, so a failure here costs a click.
+        if command -v gh >/dev/null 2>&1; then
+            gh pr create --base "${ORIGINAL_BRANCH}" --head "${FIX_BRANCH}" \
+                --title "Nightly auto-fix: ${DESCRIPTION} in ${PRODUCT_NAME}" \
+                --body "Automated by \`keel/scripts/nightly.sh\` on $(date +%Y-%m-%d). Regex-based rewrites — review before merging. Full report: \`${JSON_FILE}\`" \
+                >/dev/null 2>&1 && echo "  ${PRODUCT_NAME}: PR opened" \
+                || echo "  ${PRODUCT_NAME}: branch pushed; open a PR manually (gh pr create failed — may already exist)"
+        fi
+    else
+        echo "  WARNING: push failed for ${PRODUCT_NAME} (commit is local at $(git rev-parse --short HEAD) on ${FIX_BRANCH})"
+    fi
+
+    # Put the checkout back where it was, so the morning doesn't start on a
+    # nightly branch. The fixes are committed, so the tree is clean.
+    git checkout -q "${ORIGINAL_BRANCH}" || echo "  WARNING: ${PRODUCT_NAME} left on ${FIX_BRANCH}"
 
     cd "${KEEL_DIR}"
 done
@@ -126,7 +261,9 @@ echo ""
 echo "Phase 3: Reporting unfixable failures to dashboard..."
 echo ""
 
-if [ ${TEST_EXIT} -ne 0 ] && [ -f "${JSON_FILE}" ]; then
+if [ "${DRY_RUN}" -eq 1 ]; then
+    echo "  [dry-run] skipping dashboard POST"
+elif [ ${TEST_EXIT} -ne 0 ] && [ -f "${JSON_FILE}" ]; then
     # Parse failures and POST each one
     python3 -c "
 import json, sys, urllib.request, urllib.error, os
