@@ -5,6 +5,16 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.2 — 2026-07-14
+
+**Anonymous URL sweep + revive the nightly harness's dead base path.**
+
+### Added
+- **`keel.testing.anon_sweep`** — sweeps every parameterless URL logged out and fails on a 500. The authenticated pass in `url_discovery` force_logins first, so it was structurally blind to views that crash only for `AnonymousUser`. Products call `sweep_anonymous()` from their own test suite to gate PRs.
+
+### Fixed
+- **`keel.testing.config`** — `BASE_DIR` defaulted to the long-dead `~/SynologyDrive/Work/CT/Web` path, so the nightly suite could not find any product repo. Now defaults to `~/Code/CT`.
+
 ## 0.57.1 — 2026-07-13
 
 **Standardize public auth CTA on "Sign In"; drop redundant top-right button on landing pages.**

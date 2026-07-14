@@ -1,1 +1,0 @@
-- **`keel.testing.anon_sweep`** — sweeps every parameterless URL logged out and fails on a 500. The authenticated pass in `url_discovery` force_logins first, so it was structurally blind to views that crash only for `AnonymousUser`. Products call `sweep_anonymous()` from their own test suite to gate PRs.
