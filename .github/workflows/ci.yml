@@ -1,0 +1,77 @@
+name: CI
+
+# Runs keel's own test suite on its own PRs.
+#
+# Until this existed, keel had no test gate: the only workflow in this repo
+# was security.yml (the reusable scanner consumers call). So the ~480 tests
+# under tests/ ran only when someone remembered to run them by hand, while
+# every merge here ships straight into 9 products via a tag pin. A green
+# checkmark on a keel PR meant "bandit found nothing", not "keel works".
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'CHANGELOG*', 'changes.d/**']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'CHANGELOG*', 'changes.d/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: keel
+          POSTGRES_PASSWORD: keel
+          POSTGRES_DB: keel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://keel:keel@localhost:5432/keel_test
+      # tests/conftest.py sets DEBUG + SECRET_KEY defaults, but keel_site
+      # settings refuse to import without a key outside DEBUG — set both
+      # here so a conftest change can't silently break collection.
+      DJANGO_SECRET_KEY: test-secret-key-not-for-production
+      DEBUG: 'True'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        # requirements.txt carries the runtime deps (whitenoise, psycopg2,
+        # dj-database-url) that pyproject deliberately does not, since
+        # consumers bring their own. The extras are what tests/settings.py
+        # reaches for: [sso] in particular, or every SocialAccount-backed
+        # test (keel.feed.resolve_user_from_sub, mentions search) silently
+        # self-skips and the gate passes while covering nothing.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[sso,avatars-s3,foia,alerts,sms,calendar,encryption]"
+          pip install pytest pytest-django
+
+      - name: Check for missing migrations
+        # Same drift gate the products carry. keel owns the migrations for
+        # every shared model, so drift here lands in all 9 consumers.
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run tests
+        run: pytest tests/ -q
