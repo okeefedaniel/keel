@@ -55,7 +55,13 @@ try:
         for url in new_urls:
             try:
                 resp = disc_client.get(url)
-                if resp.status_code >= 500:
+                # Flag 500 exactly, never >=500 — Django raises on an
+                # unhandled exception and never emits 503, so a 503 is
+                # always app code deliberately reporting itself
+                # unconfigured (the documented standalone-deploy
+                # behaviour of the /api/v1/ feed endpoints), not a crash.
+                # Matches keel.testing.anon_sweep.
+                if resp.status_code == 500:
                     fail(section, f'500 on {url}', f'status={resp.status_code}')
                     errors += 1
                 else:

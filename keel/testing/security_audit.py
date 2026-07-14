@@ -34,6 +34,14 @@ from pathlib import Path
 from .config import BASE_DIR, PRODUCTS
 from .result import TestResult
 
+# Directories that are never product source: virtualenvs, build artifacts,
+# git internals, and agent worktrees. `build/lib/...` and `.claude/worktrees/...`
+# are byte copies of files already scanned at their real path, so scanning them
+# reports every finding two or three extra times under a bogus path.
+NEVER_SCAN = ('venv/', 'node_modules/', '__pycache__', '.git/',
+              'build/', '.claude/', 'staticfiles/', 'site-packages/')
+
+
 # ---------------------------------------------------------------------------
 # Product source roots
 # ---------------------------------------------------------------------------
@@ -321,8 +329,7 @@ def _check_secret_exposure(T, products, critical_findings):
         for py_file in root.rglob('*.py'):
             # Skip venv, migrations, __pycache__
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', 'node_modules/', '__pycache__',
-                                             '.git/', 'migrations/']):
+            if any(skip in rel for skip in NEVER_SCAN + ('migrations/',)):
                 continue
 
             try:
@@ -421,8 +428,7 @@ def _check_xss_vectors(T, products, critical_findings):
         mark_safe_count = 0
         for py_file in root.rglob('*.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', 'node_modules/', '__pycache__',
-                                             '.git/', 'migrations/']):
+            if any(skip in rel for skip in NEVER_SCAN + ('migrations/',)):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -456,8 +462,7 @@ def _check_sql_injection(T, products, critical_findings):
 
         for py_file in root.rglob('*.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', 'node_modules/', '__pycache__',
-                                             '.git/', 'migrations/', 'tests/']):
+            if any(skip in rel for skip in NEVER_SCAN + ('migrations/', 'tests/',)):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -549,7 +554,7 @@ def _check_csrf_protection(T, products, critical_findings):
         exempt_locations = []
         for py_file in root.rglob('*.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/', 'migrations/']):
+            if any(skip in rel for skip in NEVER_SCAN + ('migrations/',)):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -615,7 +620,7 @@ def _check_authentication(T, products, critical_findings):
         total_views = 0
         for py_file in root.rglob('views.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/']):
+            if any(skip in rel for skip in NEVER_SCAN):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -680,7 +685,7 @@ def _check_file_uploads(T, products, critical_findings):
         has_validation = False
         for py_file in root.rglob('models.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/']):
+            if any(skip in rel for skip in NEVER_SCAN):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -719,7 +724,7 @@ def _check_admin_exposure(T, products, critical_findings):
         # Check URL patterns for admin
         for urls_file in root.rglob('urls.py'):
             rel = str(urls_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/']):
+            if any(skip in rel for skip in NEVER_SCAN):
                 continue
             try:
                 content = urls_file.read_text(errors='replace')
@@ -755,8 +760,7 @@ def _check_debug_endpoints(T, products, critical_findings):
 
         for py_file in root.rglob('*.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/',
-                                             'tests/', 'test_']):
+            if any(skip in rel for skip in NEVER_SCAN + ('tests/', 'test_',)):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -780,6 +784,21 @@ def _check_debug_endpoints(T, products, critical_findings):
 # ---------------------------------------------------------------------------
 # 10. Sensitive files in repository
 # ---------------------------------------------------------------------------
+def _git_tracked(root, rel):
+    """True if `rel` is committed to git under `root`.
+
+    A gitignored `.env` on a developer's laptop is expected and is not an
+    exposure — only a file git actually tracks is "in the repository".
+    """
+    try:
+        return subprocess.run(
+            ['git', 'ls-files', '--error-unmatch', str(rel)],
+            cwd=str(root), capture_output=True, timeout=10,
+        ).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return True  # can't tell — report it rather than hide it
+
+
 def _check_sensitive_files(T, products, critical_findings):
     """Check for sensitive files that should not be in the repository."""
     T.section('Sensitive Files')
@@ -795,11 +814,14 @@ def _check_sensitive_files(T, products, critical_findings):
         for pattern in DANGEROUS_FILES:
             if '*' in pattern:
                 for f in root.rglob(pattern):
-                    if '.git/' not in str(f) and 'venv/' not in str(f):
-                        found_files.append(str(f.relative_to(root)))
+                    if any(skip in str(f) for skip in NEVER_SCAN):
+                        continue
+                    rel = f.relative_to(root)
+                    if _git_tracked(root, rel):
+                        found_files.append(str(rel))
             else:
                 target = root / pattern
-                if target.exists():
+                if target.exists() and _git_tracked(root, pattern):
                     found_files.append(pattern)
 
         # Check .gitignore exists and covers sensitive patterns
@@ -933,7 +955,7 @@ def _check_template_security(T, products, critical_findings):
         # Check for user-controlled template rendering
         for py_file in root.rglob('*.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/']):
+            if any(skip in rel for skip in NEVER_SCAN):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -1022,8 +1044,7 @@ def _check_logging_security(T, products, critical_findings):
 
         for py_file in root.rglob('*.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/',
-                                             'tests/', 'test_']):
+            if any(skip in rel for skip in NEVER_SCAN + ('tests/', 'test_',)):
                 continue
             try:
                 content = py_file.read_text(errors='replace')
@@ -1058,7 +1079,7 @@ def _check_open_redirects(T, products, critical_findings):
 
         for py_file in root.rglob('*.py'):
             rel = str(py_file.relative_to(root))
-            if any(skip in rel for skip in ['venv/', '__pycache__', '.git/']):
+            if any(skip in rel for skip in NEVER_SCAN):
                 continue
             try:
                 content = py_file.read_text(errors='replace')

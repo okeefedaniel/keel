@@ -47,7 +47,8 @@ class Product:
 
 _BEACON_COMMON = [
     '/dashboard/',
-    '/auth/notifications/',
+    # keel.notifications mounts at /notifications/, not under /auth/.
+    '/notifications/',
     '/auth/profile/',
 ]
 
@@ -233,13 +234,16 @@ PRODUCTS = {
     'beacon': Product(
         name='Beacon',
         repo_dir='beacon',
-        settings_module='beacon.settings',
+        # The beacon repo's Django project package is named `harbor` for
+        # historical reasons — there is no `beacon.settings` module.
+        settings_module='harbor.settings',
         live_url='https://beacon.docklabs.ai',
         demo_roles=[
             'admin', 'agency_admin', 'relationship_manager',
             'foia_officer', 'foia_attorney', 'analyst', 'executive',
         ],
-        public_urls=['/login/', '/support/'],
+        # Canonical login is /accounts/login/; /login/ has never existed.
+        public_urls=['/accounts/login/', '/support/'],
         auth_urls={
             'admin': _BEACON_COMMON + _BEACON_STAFF + _BEACON_FOIA,
             'agency_admin': _BEACON_COMMON + _BEACON_STAFF,
@@ -262,8 +266,8 @@ PRODUCTS = {
     ),
     'admiralty': Product(
         name='Admiralty',
-        repo_dir='beacon',
-        settings_module='admiralty.settings',
+        repo_dir='admiralty',
+        settings_module='admiralty_site.settings',
         live_url='https://admiralty.docklabs.ai',
         demo_roles=['admin', 'foia_officer', 'foia_attorney'],
         public_urls=['/', '/accounts/login/', '/support/'],
@@ -320,8 +324,8 @@ PRODUCTS = {
     ),
     'manifest': Product(
         name='Manifest',
-        repo_dir='harbor',
-        settings_module='manifest.settings',
+        repo_dir='manifest',
+        settings_module='manifest_site.settings',
         live_url='https://manifest.docklabs.ai',
         demo_roles=['admin', 'staff', 'signer'],
         public_urls=['/accounts/login/', '/support/'],
