@@ -1,0 +1,1 @@
+- **`keel.testing.config`** — `BASE_DIR` defaulted to the long-dead `~/SynologyDrive/Work/CT/Web` path, so the nightly suite could not find any product repo. Now defaults to `~/Code/CT`.
