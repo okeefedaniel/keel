@@ -890,7 +890,33 @@ gates each bump; until that lands, bump pins in small dedicated PRs, landed last
 `.github/workflows/renovate.yml` + `.github/renovate.json` (a custom regex
 manager scoped to keel only) that bumps both the `requirements.txt` pin and the
 reusable-workflow pin to the latest keel tag, and auto-merges once that repo's
-CI is green (~6h cadence). So the **deployed image** never falls behind.
+CI is green.
+
+**Cadence is twice weekly — Mon & Thu 06:00 UTC** (trimmed from the original
+~6h to conserve Actions minutes). So a product can legitimately sit up to ~3.5
+days behind a fresh keel tag: **"the fleet is behind" is the normal steady
+state, not evidence of breakage.** Before concluding Renovate is broken, check
+in order: (1) `git fetch` — stale local clones lie about the current pin;
+(2) the keel tag's timestamp vs the last Renovate run (`gh run list --workflow
+renovate.yml`) — a tag cut *after* that day's run waits for the next one;
+(3) the repo's **Dependency Dashboard** issue, which states what Renovate
+detected and whether a branch is pending. Use `workflow_dispatch` to force an
+immediate cycle. All three misled us on 2026-07-14 — see below.
+
+**A dependency cap that contradicts keel's floor silently parks the fleet.**
+Renovate's regex manager string-replaces the version tag; it does NOT resolve
+dependencies. So it will happily open a keel bump whose `pip install` cannot
+resolve, CI fails, and because automerge waits for green CI the PR sits open
+**indefinitely without erroring** — it reads as "Renovate is broken." Landed
+2026-07-14: keel ≥ 0.57.1 requires `Pillow>=12.2.0`, while harbor, lookout,
+yeoman, manifest carried a scaffold-era `Pillow>=10.4,<12.0` cap — a hard
+`ResolutionImpossible` that made keel ≥ 0.57.1 uninstallable on those four.
+The cap traced to the initial scaffold, not to any real Pillow 12
+incompatibility (none of the four import `PIL` or declare an `ImageField`;
+Pillow is purely transitive via Django image validation + keel avatars).
+**When adding or keeping a version cap on a dep keel also declares, check it
+against keel's `pyproject.toml` floor** — the two must be able to co-resolve,
+or every consumer silently stops taking keel releases.
 
 **Local dev venvs do NOT auto-track the pin — Renovate can't touch your machine.**
 After you `git pull` a merged keel bump, `requirements.txt` moves but `.venv`
