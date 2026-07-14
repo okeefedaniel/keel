@@ -8,12 +8,19 @@ Pins the security-critical bits:
 - Missing ?user_sub= returns 400.
 """
 import pytest
+from django.apps import apps
 
-# allauth is an optional [sso] extra in keel; skip the whole module when
-# the host environment doesn't have it. Products that consume keel.feed
-# always install allauth via the [sso] extra, so this only matters for
-# the keel-internal pytest run.
-SocialAccount = pytest.importorskip('allauth.socialaccount.models').SocialAccount
+# allauth is an optional [sso] extra in keel; skip the whole module when the
+# host environment doesn't have it. Products that consume keel.feed always
+# install allauth via the [sso] extra, so this only matters for the
+# keel-internal pytest run. Gate on is_installed() rather than importability:
+# importing allauth's models when the app is absent from INSTALLED_APPS raises
+# RuntimeError, which importorskip does not catch, and an uncaught error here
+# aborts collection for the entire suite.
+if not apps.is_installed('allauth.socialaccount'):
+    pytest.skip('allauth not installed (keel [sso] extra)', allow_module_level=True)
+
+from allauth.socialaccount.models import SocialAccount
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache

@@ -9,15 +9,19 @@
 #
 # What it does:
 #   1. Run full test suite with --auto-fix --json --notify-dashboard
-#   2. If auto-fix changed files, commit and push (clean repos only — see Phase 2)
+#   2. If auto-fix changed files, commit them to nightly/auto-fix-<date> and
+#      open a PR (clean repos only — see Phase 2). Never commits to main:
+#      a push to main auto-deploys Railway, and these are unattended regex
+#      rewrites of settings.py, not reasoned edits.
 #   3. POST unfixable failures to Keel dashboard API
 #
 # Paths are overridable so this is runnable from a checkout anywhere:
 #   DOCKLABS_BASE_DIR=/path/to/repos scripts/nightly.sh
 #
-# --dry-run runs the suite read-only: no --auto-fix, no commit, no push, no
-# dashboard POST. Use it to verify wiring — running this script for real
-# just to check it works will commit and push to main.
+# Modes:
+#   (default)      auto-fix -> branch + PR, dashboard POST
+#   --report-only  no code changes at all; dashboard POST only
+#   --dry-run      no writes anywhere, not even the dashboard
 # =============================================================================
 
 set -uo pipefail
@@ -144,7 +148,7 @@ elif [ "${REPORT_ONLY}" -eq 1 ]; then
     MODE_NOTE="[report-only] no --auto-fix, no commit, no push; dashboard POST still runs"
 else
     TESTING_ARGS="--auto-fix --json --notify-dashboard"
-    MODE_NOTE="[auto-fix] WILL rewrite files, commit, and push to origin"
+    MODE_NOTE="[auto-fix] will rewrite files, then branch + PR (never main)"
 fi
 echo "  ${MODE_NOTE}"
 echo "  running: python -m keel.testing ${TESTING_ARGS}"
@@ -208,26 +212,46 @@ for PRODUCT_DIR in ${PRODUCT_DIRS}; do
     fi
     DESCRIPTION="${DESCRIPTION%, }"  # trim trailing comma
 
-    BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')
+    ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'main')
+    FIX_BRANCH="nightly/auto-fix-$(date +%Y%m%d)"
 
     if [ "${DRY_RUN}" -eq 1 ] || [ "${REPORT_ONLY}" -eq 1 ]; then
-        echo "  [no-write] ${PRODUCT_NAME}: would commit + push to ${BRANCH} (${DESCRIPTION})"
+        echo "  [no-write] ${PRODUCT_NAME}: would open ${FIX_BRANCH} (${DESCRIPTION})"
         cd "${KEEL_DIR}"
         continue
     fi
 
-    echo "  ${PRODUCT_NAME}: committing auto-fix changes (${DESCRIPTION}) on ${BRANCH}"
+    # Land fixes on a dated branch and open a PR — never on ${ORIGINAL_BRANCH}.
+    # Pushing main here would auto-deploy Railway straight to production from
+    # an unattended 2am regex rewrite of settings.py. A PR keeps the
+    # automation useful while leaving a human in front of prod.
+    echo "  ${PRODUCT_NAME}: ${DESCRIPTION} -> ${FIX_BRANCH}"
+    git checkout -q -B "${FIX_BRANCH}" || { echo "  WARNING: branch failed for ${PRODUCT_NAME}"; cd "${KEEL_DIR}"; continue; }
     git add -A
     git commit -q -m "Nightly auto-fix: ${DESCRIPTION} in ${PRODUCT_NAME}" \
-        -m "Committed unattended by scripts/nightly.sh. The tree was clean before the run, so every change here is the auto-fixer's." \
+        -m "Authored unattended by scripts/nightly.sh on $(date +%Y-%m-%d). The tree was clean before the run, so every change here is the auto-fixer's. Review before merging — these are regex rewrites, not reasoned edits." \
         || true
-    # Not silenced: a swallowed push error is indistinguishable from a
-    # successful one in the morning's log.
-    if git push origin HEAD; then
-        echo "  ${PRODUCT_NAME}: pushed $(git rev-parse --short HEAD) to ${BRANCH}"
+
+    # Not silenced: a swallowed push error reads exactly like a success in
+    # the morning's log.
+    if git push -q -u origin "${FIX_BRANCH}"; then
+        echo "  ${PRODUCT_NAME}: pushed $(git rev-parse --short HEAD) to ${FIX_BRANCH}"
+        # Best-effort. gh may not resolve its keychain auth under launchd;
+        # the branch is pushed either way, so a failure here costs a click.
+        if command -v gh >/dev/null 2>&1; then
+            gh pr create --base "${ORIGINAL_BRANCH}" --head "${FIX_BRANCH}" \
+                --title "Nightly auto-fix: ${DESCRIPTION} in ${PRODUCT_NAME}" \
+                --body "Automated by \`keel/scripts/nightly.sh\` on $(date +%Y-%m-%d). Regex-based rewrites — review before merging. Full report: \`${JSON_FILE}\`" \
+                >/dev/null 2>&1 && echo "  ${PRODUCT_NAME}: PR opened" \
+                || echo "  ${PRODUCT_NAME}: branch pushed; open a PR manually (gh pr create failed — may already exist)"
+        fi
     else
-        echo "  WARNING: push failed for ${PRODUCT_NAME} (commit is local at $(git rev-parse --short HEAD))"
+        echo "  WARNING: push failed for ${PRODUCT_NAME} (commit is local at $(git rev-parse --short HEAD) on ${FIX_BRANCH})"
     fi
+
+    # Put the checkout back where it was, so the morning doesn't start on a
+    # nightly branch. The fixes are committed, so the tree is clean.
+    git checkout -q "${ORIGINAL_BRANCH}" || echo "  WARNING: ${PRODUCT_NAME} left on ${FIX_BRANCH}"
 
     cd "${KEEL_DIR}"
 done

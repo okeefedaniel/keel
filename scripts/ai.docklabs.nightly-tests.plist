@@ -19,10 +19,11 @@
   repos. launchd also catches up a missed 02:00 run once the machine
   wakes, instead of silently skipping the night.
 
-  ProgramArguments carries --report-only: the suite currently reports 295
-  pre-existing failures across the fleet, and --auto-fix regex-rewrites
-  settings.py then pushes to main, which auto-deploys Railway. Drop the
-  flag to enable auto-fix + push once that baseline is triaged.
+  Runs in the default auto-fix mode: fixes land on nightly/auto-fix-<date>
+  with a PR, never on main. Nothing reaches production without review —
+  which matters because --auto-fix regex-rewrites settings.py and a push to
+  main auto-deploys Railway. Pass --report-only to disable code changes
+  entirely, or --dry-run to write nothing at all.
 -->
 <plist version="1.0">
 <dict>
@@ -33,7 +34,6 @@
     <array>
         <string>/bin/bash</string>
         <string>/Users/dok/Code/CT/keel/scripts/nightly.sh</string>
-        <string>--report-only</string>
     </array>
 
     <key>WorkingDirectory</key>
