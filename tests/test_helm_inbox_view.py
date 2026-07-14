@@ -7,6 +7,8 @@ Pins the security-critical bits:
   Helm aggregator can render a clean "no items" badge.
 - Missing ?user_sub= returns 400.
 """
+import json
+
 import pytest
 from django.apps import apps
 
@@ -36,6 +38,16 @@ def clear_cache():
     cache.clear()
     yield
     cache.clear()
+
+
+def _body(resp):
+    """Decode a JsonResponse body.
+
+    These tests call the view directly via RequestFactory, so responses are
+    raw JsonResponse objects — ``.json()`` only exists on responses returned
+    by the test client.
+    """
+    return json.loads(resp.content)
 
 
 def _build_inbox_returning(items):
@@ -88,7 +100,7 @@ def test_unknown_sub_returns_empty_inbox():
     resp = view(rf.get('/api/v1/helm-feed/inbox/?user_sub=ghost',
                        HTTP_AUTHORIZATION='Bearer k'))
     assert resp.status_code == 200
-    body = resp.json()
+    body = _body(resp)
     assert body['items'] == []
     assert body['user_sub'] == 'ghost'
 
@@ -118,8 +130,8 @@ def test_per_user_cache_isolation():
     r2 = view(rf.get('/api/v1/helm-feed/inbox/?user_sub=sub2',
                      HTTP_AUTHORIZATION='Bearer k'))
 
-    assert r1.json()['items'][0]['title'] == 'u1'
-    assert r2.json()['items'][0]['title'] == 'u2'
+    assert _body(r1)['items'][0]['title'] == 'u1'
+    assert _body(r2)['items'][0]['title'] == 'u2'
 
 
 @pytest.mark.django_db
