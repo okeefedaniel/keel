@@ -808,6 +808,13 @@ When one DockLabs product creates a record in another (e.g., Yeoman creates a Co
 - **Test runner:** pytest with `keel_site.settings` as the default DJANGO_SETTINGS_MODULE. The baseline keel test suite lives at `keel/tests/` and covers `keel.comms.sanitize`, `keel.search.engine` (column-name allowlist), `keel.security.alerts` (failed-login filter), `keel.oidc.validators` (claim-scope mapping), `keel.core.middleware.AuditMiddleware` (try/finally isolation), and `keel.core.workflow.WorkflowEngine`. Run with `pytest keel/tests/` from the keel repo root. New keel features must ship tests or explain in the PR why they can't.
 - **Products with zero tests at 2026-04-19:** Beacon, Bounty, Yeoman, Helm, Lookout, dokeefect-django. Government procurement questionnaires ask about coverage — these are the gaps.
 - **FOIA compliance:** `python manage.py foia_audit --fail-on-error` gates CI for any product that registers with `keel.foia.export`.
+- **Model/migration drift:** every product's CI runs `python manage.py makemigrations --check --dry-run` in the test job, so a model edit that never got its `makemigrations` fails the build. **All 9 products carry the gate as of 2026-07-14** — don't ship a new product without it. Put the step before `migrate` so it fails fast (8 of 9 do; helm runs it after, harmlessly).
+
+  **Why it's a gate and not a convention.** Drift is silent. Nothing breaks at runtime, nothing 500s, and the product deploys fine — it surfaces when the *next* person runs `makemigrations` for their own change and finds an unrelated migration mixed into it. Harbor is the worked example: `signatures/models.py` declared `validators=[FileSecurityValidator()]` on two FileFields (e613e27, the CSO audit), the migration was never generated, and `main` sat dirty for three weeks because CI never ran the check ([harbor#79](https://github.com/okeefedaniel/harbor/pull/79)). It stayed invisible locally because whoever generated the migration also ran `migrate`, so their dev DB was consistent while `main` was not.
+
+  **Two shapes, both acceptable.** Most products run it unscoped, so a newly-added app is covered automatically. **helm and purser scope theirs to first-party app labels** (`makemigrations helm_core dashboard helm_tasks --check --dry-run`) so that a keel pin bump introducing drift in keel's *own* apps can't break product CI. The scoped form's cost is that a new app is silently unguarded until someone adds it to the list — **if you add an app to helm or purser, add it to the list too.** Both lists cover every local app with a `migrations/` directory as of 2026-07-14.
+
+  **A `validators=`-only AlterField is state-only** — validators aren't enforced at the DB level, and `sqlmigrate` renders such an operation as an explicit `-- (no-op)`. Applying one is a `django_migrations` bookkeeping row and no DDL, so it's safe to land on a live product. Confirm with `sqlmigrate` rather than assuming.
 
 ## Deployment & Configuration
 
@@ -1055,7 +1062,7 @@ These items were completed during the Phase 2b OIDC rollout session:
 
 ---
 
-*Last updated: 2026-05-16.*
+*Last updated: 2026-07-14.*
 
 ## Design Partner
 
