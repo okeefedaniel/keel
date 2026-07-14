@@ -1,1 +1,0 @@
-- **`scripts/nightly.sh`** — the clean-tree guard used `git diff`, which cannot see untracked files, so a repo holding only untracked work read as clean and `git add -A` would have committed it. Uses `git status --porcelain` now. `logs/` + `reports/` are gitignored — the suite writes both on every run, one `git add -A` away from committing its own output.
