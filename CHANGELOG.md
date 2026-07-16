@@ -5,6 +5,65 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.4 — 2026-07-16
+
+**Security: stop allauth password-reset endpoint being used as an email spam relay; add invitation send-audit trail.**
+
+### Added
+- **`.github/workflows/ci.yml`** — keel now runs its own ~480-test suite on its own pushes and PRs, plus the `makemigrations --check` drift gate the products carry. Previously this repo's only workflow was `security.yml` (the reusable scanner consumers call), so a green check on a keel PR meant "bandit found nothing", not "keel works" — while every merge here ships into 9 products via a tag pin. Postgres 16 service, Python 3.12 + 3.13.
+- **`Invitation.email_sent_at` / `email_cc` / `email_error`** record whether
+  the invitation email actually reached the mail backend, when, whether a
+  copy was CC'd, and any send error — so "did the invite go out?" is
+  answerable from the row (and the admin invitation list) without
+  cross-referencing the Resend dashboard. `send_invitation` stamps them on
+  every row in the batch. Migration `keel_accounts.0023`.
+- **The "CC me" checkbox now defaults to checked** on the invitation form so
+  a beta copy isn't silently dropped when the form re-renders after a send.
+
+### Fixed
+**`keel.testing.config`** now points every product at the repo and settings
+module it actually has. `admiralty` and `manifest` were registered as
+sub-products sharing the `beacon` / `harbor` repos, but both are standalone
+repos with their own `admiralty_site.settings` / `manifest_site.settings`;
+`beacon` pointed at a `beacon.settings` module that has never existed (the
+beacon repo's project package is named `harbor` for historical reasons). The
+practical effect was that Admiralty ran *Beacon's* 382-test suite under a
+foreign settings module — 191 of the nightly's 295 failures — while Beacon,
+Manifest, Harbor, Lookout and Bounty never ran a single test, each dying on a
+`ModuleNotFoundError` that the runner recorded as one generic failure.
+
+**`keel.testing.url_discovery`** now flags `500` exactly rather than `>= 500`,
+matching `keel.testing.anon_sweep`. Django never emits 503 itself, so a 503 is
+always app code deliberately reporting itself unconfigured — the documented
+standalone-deploy behaviour of the `/api/v1/` feed endpoints. This was
+reporting `500 on /api/v1/helm-feed/` against Yeoman and Purser with
+`status=503` in its own detail line.
+
+**`keel.testing.security_audit`** no longer scans `build/`, `.claude/`
+worktrees, `staticfiles/` or `site-packages/` — byte copies of files already
+scanned at their real path, which reported each finding two or three extra
+times under a bogus path. `Sensitive Files` now asks git whether a match is
+tracked instead of whether it exists on disk, so a gitignored local `.env` is
+no longer reported as committed to the repo (the same check simultaneously
+passed `.gitignore covers .env`).
+- **`scripts/nightly.sh`** — Phase 3 now dedupes dashboard posts against a local ledger and caps new posts per run (`NIGHTLY_MAX_POSTS`, default 25). The first real run opened 100 tickets and would have re-opened the same 100 every night; against a ~295-failure suite that made the dashboard unreadable.
+
+### Security
+- **`KeelAccountAdapter.send_mail`** now hard-drops allauth's
+  `account/email/unknown_account` mail suite-wide. That mail is what
+  allauth sends (under its default `ACCOUNT_PREVENT_ENUMERATION = True`)
+  to an address with **no account** when someone POSTs it to the public
+  `/accounts/password/reset/` endpoint — which turned every product into
+  an open email relay: an attacker scripted scraped third-party
+  addresses through the reset form and each stranger got mail from
+  `info@docklabs.ai`, torching the sending domain's reputation and
+  landing real invitations in spam (97 of 100 outbound emails in the
+  2026-07 window were these `[Harbor]/[Bounty] Unknown Account` sends).
+  allauth's neutral "check your email" *response* is preserved, so there
+  is no account-enumeration regression. Opt back in for a genuine
+  standalone self-service deployment with `KEEL_EMAIL_UNKNOWN_ACCOUNTS =
+  True` (no suite product needs it).
+
 ## 0.57.3 — 2026-07-14
 
 **Security auto-fixer no longer proposes deploy-breaking settings; nightly suite revived.**
