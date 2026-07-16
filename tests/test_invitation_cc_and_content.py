@@ -58,6 +58,13 @@ def test_cc_me_checkbox_ccs_beta_address(db, client):
     assert len(mail.outbox) == 1
     assert mail.outbox[0].cc == ['dok@dok.net']
     assert mail.outbox[0].to == ['invitee@example.test']
+    # Send audit trail is stamped on the row (answers "did it go out?"
+    # without a Resend query).
+    from keel.accounts.models import Invitation
+    inv = Invitation.objects.get(email='invitee@example.test', product='beacon')
+    assert inv.email_sent_at is not None
+    assert inv.email_cc == 'dok@dok.net'
+    assert inv.email_error == ''
 
 
 def test_no_checkbox_means_empty_cc_list(db, client):

@@ -62,7 +62,7 @@
         </div>
 
         <div class="form-check mb-3">
-          <input type="checkbox" name="cc_me" value="1" class="form-check-input" id="inv-cc-me">
+          <input type="checkbox" name="cc_me" value="1" class="form-check-input" id="inv-cc-me" checked>
           <label class="form-check-label small" for="inv-cc-me">
             CC me on this invitation
             <span class="text-muted">— sends a copy to dok@dok.net so I can see what the invitee receives.</span>
@@ -155,6 +155,7 @@
             <th>Product</th>
             <th>Role</th>
             <th>Status</th>
+            <th>Email sent</th>
             <th>Invited By</th>
             <th>Created</th>
             <th>Expires</th>
@@ -178,6 +179,17 @@
               <span class="badge bg-danger">Revoked</span>
               {% endif %}
             </td>
+            <td>
+              {% if inv.email_sent_at %}
+              <span class="text-success" title="Delivered to mail backend {{ inv.email_sent_at|date:'M d, H:i' }}{% if inv.email_cc %} · CC {{ inv.email_cc }}{% endif %}">
+                <i class="bi bi-check-circle-fill"></i> {{ inv.email_sent_at|date:"M d" }}{% if inv.email_cc %} <i class="bi bi-envelope-paper" title="CC'd {{ inv.email_cc }}"></i>{% endif %}
+              </span>
+              {% elif inv.email_error %}
+              <span class="text-danger" title="{{ inv.email_error }}"><i class="bi bi-exclamation-triangle-fill"></i> Failed</span>
+              {% else %}
+              <span class="text-muted" title="No successful send recorded">—</span>
+              {% endif %}
+            </td>
             <td>{{ inv.invited_by|default:"-" }}</td>
             <td>{{ inv.created_at|date:"M d" }}</td>
             <td>{{ inv.expires_at|date:"M d" }}</td>
@@ -197,7 +209,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-4">No invitations found.</td>
+            <td colspan="9" class="text-center text-muted py-4">No invitations found.</td>
           </tr>
           {% endfor %}
         </tbody>

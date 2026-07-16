@@ -1036,6 +1036,25 @@ class Invitation(models.Model):
     expires_at = models.DateTimeField()
     accepted_at = models.DateTimeField(null=True, blank=True)
 
+    # Send audit trail — so "did the invitation email actually go out?"
+    # is answerable from the row itself, without cross-referencing the
+    # Resend dashboard. Stamped by keel.accounts.views.send_invitation
+    # after the mail backend accepts (or rejects) the message.
+    email_sent_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text=_('When the invitation email was accepted by the mail '
+                    'backend. Null = never sent (or send failed).'),
+    )
+    email_cc = models.EmailField(
+        blank=True, default='',
+        help_text=_('Address CC\'d on the invitation email, if any.'),
+    )
+    email_error = models.TextField(
+        blank=True, default='',
+        help_text=_('Mail-backend error from the last send attempt, if it '
+                    'failed. Empty on success.'),
+    )
+
     class Meta:
         db_table = 'keel_invitation'
         ordering = ['-created_at']

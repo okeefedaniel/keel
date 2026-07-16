@@ -86,7 +86,46 @@ class KeelAccountAdapter(DefaultAccountAdapter):
             pass
         return super().send_confirmation_mail(request, emailconfirmation, signup)
 
+    #: Allauth mail templates we NEVER send, suite-wide, regardless of
+    #: allauth's own settings. ``account/email/unknown_account`` is the
+    #: mail allauth sends to an address that has NO account when someone
+    #: POSTs it to the password-reset form (allauth's default
+    #: ``ACCOUNT_PREVENT_ENUMERATION = True`` behavior). Because the
+    #: reset endpoint is public and unauthenticated, that turns every
+    #: product into an open relay: an attacker scripts a scraped list of
+    #: third-party addresses through ``/accounts/password/reset/`` and we
+    #: dutifully email each stranger from ``info@docklabs.ai`` — cold mail
+    #: that torches the sending domain's reputation and lands real
+    #: invitations in spam. (Observed 2026-07: 97 of 100 outbound emails
+    #: were ``[Harbor]/[Bounty] Unknown Account`` to scraped business
+    #: addresses.) Suppressing the send here keeps allauth's anti-
+    #: enumeration *response* intact — the reset page still shows the same
+    #: neutral "check your email" message — while never actually mailing
+    #: a non-account. Every product routes through this adapter, so the
+    #: fix lands suite-wide via the keel pin and can't be forgotten by a
+    #: new product. See also ``ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False`` in
+    #: each product's settings (belt-and-suspenders / deployable without a
+    #: keel bump).
+    SUPPRESSED_MAIL_TEMPLATES = frozenset({
+        'account/email/unknown_account',
+    })
+
     def send_mail(self, template_prefix, email, context):
+        # Hard-drop the unknown-account (password-reset-for-nonexistent)
+        # email so the reset endpoint can't be abused as a spam relay.
+        # Opt back in per product with KEEL_EMAIL_UNKNOWN_ACCOUNTS=True
+        # only if you have a genuine self-service standalone deployment
+        # that needs it (no suite product does).
+        if (
+            template_prefix in self.SUPPRESSED_MAIL_TEMPLATES
+            and not getattr(settings, 'KEEL_EMAIL_UNKNOWN_ACCOUNTS', False)
+        ):
+            logger.warning(
+                'Suppressed abusive allauth mail %s to %s (password-reset '
+                'relay guard)', template_prefix, email,
+                extra={'security_event': 'unknown_account_mail_suppressed'},
+            )
+            return None
         # Defensive: if EMAIL_BACKEND import or send fails for any reason
         # (e.g., misconfigured Resend in dev), don't blow up the request.
         # Real product code should still wire EMAIL_BACKEND properly.

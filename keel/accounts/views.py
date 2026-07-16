@@ -684,9 +684,24 @@ def send_invitation(request):
             mail.attach_alternative(html_body, 'text/html')
             mail.send(fail_silently=False)
             email_sent = True
+            # Durable send audit — stamp every row in the batch so
+            # "did it go out?" is answerable from the Invitation itself.
+            Invitation.objects.filter(
+                pk__in=[inv.pk for inv in created_invitations]
+            ).update(
+                email_sent_at=timezone.now(),
+                email_cc=cc_email or '',
+                email_error='',
+            )
         except Exception as exc:  # noqa: BLE001 — best-effort; surface to admin
             logger.exception('Failed to send invitation email to %s: %s', email, exc)
             email_sent = False
+            try:
+                Invitation.objects.filter(
+                    pk__in=[inv.pk for inv in created_invitations]
+                ).update(email_error=str(exc)[:2000])
+            except Exception:  # pragma: no cover — never mask the original failure
+                logger.exception('Failed to record invitation email error')
 
         if email_sent:
             messages.success(
