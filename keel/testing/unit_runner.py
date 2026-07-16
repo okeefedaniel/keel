@@ -15,7 +15,8 @@ def run_django_tests(T: TestResult, product_names=None):
             Defaults to all products.
     """
     products = product_names or list(PRODUCTS.keys())
-    # Deduplicate by repo_dir (beacon/admiralty share a repo)
+    # Every product has its own repo; this guards against a future config
+    # that points two entries at the same repo+settings pair.
     seen_dirs = set()
 
     for key in products:
@@ -26,8 +27,7 @@ def run_django_tests(T: TestResult, product_names=None):
         repo_dir = str(product.path)
         settings = product.settings_module
 
-        # Don't run tests twice for the same repo
-        # (beacon and admiralty share a repo — run beacon's tests once)
+        # Don't run the same suite twice.
         dedup_key = f'{repo_dir}:{settings}'
         if dedup_key in seen_dirs:
             continue
