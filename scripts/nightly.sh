@@ -266,9 +266,19 @@ echo ""
 if [ "${DRY_RUN}" -eq 1 ]; then
     echo "  [dry-run] skipping dashboard POST"
 elif [ ${TEST_EXIT} -ne 0 ] && [ -f "${JSON_FILE}" ]; then
-    # Parse failures and POST each one
+    # Parse failures and POST each one.
+    #
+    # Only the ones we haven't reported before, and never more than
+    # NIGHTLY_MAX_POSTS in a run. The first real run of this script posted 100
+    # tickets in 74 seconds, and would have posted the same 100 again every
+    # night: Phase 3 opened a ticket per unfixable failure with no memory
+    # between runs, against a suite that currently reports ~295 failures. A
+    # dashboard that grows by 100 duplicates a night is one nobody reads.
+    #
+    # The ledger keys on (product, section, label) — not the detail string,
+    # which carries counts and timings that churn between runs.
     python3 -c "
-import json, sys, urllib.request, urllib.error, os
+import hashlib, json, sys, urllib.request, urllib.error, os
 
 with open('${JSON_FILE}') as f:
     data = json.load(f)
@@ -280,6 +290,37 @@ if not failures:
 
 api_url = '${KEEL_API_URL}'
 api_key = os.environ['KEEL_API_KEY']
+ledger_path = '${KEEL_DIR}/reports/.reported-failures'
+max_posts = int(os.environ.get('NIGHTLY_MAX_POSTS', '25'))
+
+def key(f):
+    raw = '|'.join([f.get('product', ''), f.get('section', ''), f.get('label', '')])
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+try:
+    with open(ledger_path) as fh:
+        seen = {line.strip() for line in fh if line.strip()}
+except FileNotFoundError:
+    seen = set()
+
+fresh = [f for f in failures if key(f) not in seen]
+already = len(failures) - len(fresh)
+if already:
+    print(f'  {already} failure(s) already reported in a previous run — not re-posting.')
+
+# Cap loudly. A silent truncation reads as 'that was everything'.
+if len(fresh) > max_posts:
+    print(f'  {len(fresh)} new failures; capping at {max_posts}. '
+          f'{len(fresh) - max_posts} not posted this run — they stay unreported '
+          f'and will be offered again next run. Raise NIGHTLY_MAX_POSTS to widen.')
+    fresh = fresh[:max_posts]
+
+if not fresh:
+    print('  Nothing new to report.')
+    sys.exit(0)
+
+failures = fresh
+newly_posted = []
 posted = 0
 skipped = 0
 
@@ -321,11 +362,20 @@ for f in failures:
     try:
         resp = urllib.request.urlopen(req, timeout=30)
         posted += 1
+        # Ledger only on success, so a 502 retries next run instead of being
+        # marked reported and lost. The dashboard 502'd on 7 of 107 posts the
+        # first time this ran.
+        newly_posted.append(key(f))
         print(f'  Posted: {label} ({priority} priority)')
     except urllib.error.HTTPError as e:
         print(f'  FAILED to post {label}: HTTP {e.code} - {e.read().decode()[:200]}', file=sys.stderr)
     except Exception as e:
         print(f'  FAILED to post {label}: {e}', file=sys.stderr)
+
+if newly_posted:
+    os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
+    with open(ledger_path, 'a') as fh:
+        fh.write('\n'.join(newly_posted) + '\n')
 
 print(f'\n{posted} failure(s) posted, {skipped} auto-fixed (skipped).')
 "
