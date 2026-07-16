@@ -80,7 +80,13 @@ REQUIRED_SETTINGS = {
     'SECURE_CONTENT_TYPE_NOSNIFF': ('True', 'Prevents MIME type sniffing'),
     'SESSION_COOKIE_SECURE': ('True', 'Session cookies only over HTTPS'),
     'CSRF_COOKIE_SECURE': ('True', 'CSRF cookies only over HTTPS'),
-    'SECURE_SSL_REDIRECT': ('True', 'Redirect HTTP to HTTPS'),
+    # False, deliberately. Railway terminates TLS at the proxy and healthchecks
+    # over plain HTTP, so True makes the healthcheck 301 and blocks the deploy —
+    # see keel/CLAUDE.md, which states it MUST be False. keel_site and all nine
+    # products set it False on purpose. Requiring True here meant --auto-fix
+    # appended a deploy-breaking line to any settings file that stayed silent
+    # on it, and would have opened a PR proposing exactly that every night.
+    'SECURE_SSL_REDIRECT': ('False', 'Railway terminates TLS; True 301s the healthcheck'),
     'X_FRAME_OPTIONS': ("'DENY'", 'Prevent clickjacking'),
     'SECURE_HSTS_SECONDS': ('31536000', 'Enable HSTS for 1 year'),
     'SECURE_HSTS_INCLUDE_SUBDOMAINS': ('True', 'HSTS covers subdomains'),
@@ -183,6 +189,36 @@ def run_security_audit(T: TestResult, product_names=None, auto_fix=False):
 # ---------------------------------------------------------------------------
 # 1. Django security settings
 # ---------------------------------------------------------------------------
+def _effective_settings_content(root, settings_path, content, _depth=0):
+    """Return `content` plus the source of every settings module it star-imports.
+
+    Django settings compose by `from other.settings import *`, so a file's
+    text is not its effective configuration. Two products in the suite are
+    almost entirely inherited (admiralty from harbor, manifest from harbor),
+    and grepping them in isolation reports every inherited setting as absent.
+
+    Resolution is intentionally shallow and textual: map the dotted module to
+    a path under the repo root and read it. Anything that doesn't resolve to a
+    file in-repo (site-packages, generated modules) is skipped — a missed
+    parent only costs a false 'not set', which is the pre-existing behaviour.
+    """
+    if _depth >= 3:  # cycle/pathological-depth guard
+        return content
+
+    parts = [content]
+    for match in re.finditer(r'^\s*from\s+([\w.]+)\s+import\s+\*', content, re.MULTILINE):
+        parent = root / Path(*match.group(1).split('.')).with_suffix('.py')
+        try:
+            if not parent.exists() or parent.resolve() == settings_path.resolve():
+                continue
+            parent_content = parent.read_text(errors='replace')
+        except OSError:
+            continue
+        parts.append(_effective_settings_content(root, parent, parent_content, _depth + 1))
+
+    return '\n'.join(parts)
+
+
 def _check_django_settings(T, products, auto_fix, critical_findings):
     """Verify production security settings in each product's settings.py."""
     T.section('Django Security Settings')
@@ -252,12 +288,23 @@ def _check_django_settings(T, products, auto_fix, critical_findings):
             else:
                 T.ok(f'{name}/{settings_file}: ALLOWED_HOSTS restricted')
 
-            # Check each required security setting
+            # Check each required security setting.
+            #
+            # Against the *effective* settings, not just this file: a settings
+            # module that star-imports another inherits everything it defines.
+            # admiralty/settings.py is `from harbor.settings import *` plus two
+            # constants, so reading it alone reports all eleven settings as
+            # missing even though harbor sets every one — and --auto-fix then
+            # appends the lot. Only the presence check widens; DEBUG and
+            # SECRET_KEY still read `content`, since those findings (and their
+            # rewrites) belong to the file that actually declares them.
+            effective = _effective_settings_content(info['root'], settings_path, content)
+
             for setting, (expected, description) in REQUIRED_SETTINGS.items():
                 pattern = re.compile(
                     rf'^{setting}\s*=\s*(.+?)$', re.MULTILINE
                 )
-                match = pattern.search(content)
+                match = pattern.search(effective)
                 if match:
                     val = match.group(1).strip()
                     # Settings gated behind not DEBUG are OK
@@ -267,7 +314,7 @@ def _check_django_settings(T, products, auto_fix, critical_findings):
                     # Check if it's in a production/env block
                     env_gated = re.search(
                         rf'{setting}.*os\.environ|if not DEBUG.*{setting}',
-                        content, re.DOTALL,
+                        effective, re.DOTALL,
                     )
                     if env_gated:
                         T.ok(f'{name}/{settings_file}: {setting}',

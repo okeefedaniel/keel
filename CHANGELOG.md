@@ -5,6 +5,19 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.3 — 2026-07-14
+
+**Security auto-fixer no longer proposes deploy-breaking settings; nightly suite revived.**
+
+### Added
+- **`scripts/nightly-qa.sh`** — nightly `/qa-only` sweep of a deployed product via headless `claude -p`, complementing the deterministic checks in `nightly.sh`. Report-only and tool-restricted; fails loudly on an empty report.
+
+### Fixed
+- **`tests/test_helm_inbox_view.py`** — two tests called `resp.json()` on a raw `JsonResponse`; that helper only exists on test-client responses, so they raised `AttributeError` the moment the module started collecting again. Decodes the body with `json.loads(resp.content)` instead. The file had never run — its `pytest.importorskip('allauth.socialaccount.models')` guard only caught `ImportError`, while allauth-installed-but-not-in-`INSTALLED_APPS` raises `RuntimeError` — so the breakage shipped unnoticed.
+- **`keel.testing.security_audit`** — stop `--auto-fix` proposing a deploy-breaking change. It required `SECURE_SSL_REDIRECT = True`, which `keel/CLAUDE.md` says MUST be `False` on Railway (the proxy terminates TLS and healthchecks over plain HTTP, so True 301s the healthcheck and blocks the deploy). It also read each settings file in isolation, so a module that star-imports a configured parent (admiralty from harbor) reported every inherited setting as missing — `--auto-fix` then appended all eleven, ten redundant and one destructive.
+- **`scripts/nightly.sh`** — revived. It resolved paths under `~/SynologyDrive/Work/CT/Web` (gone since the repos moved), looked for a `.venv` the repo doesn't have, and died on `keel_site.settings` production guards before emitting a result. There was no cron entry invoking it either. Adds `--dry-run` / `--report-only`, a launchd plist, and a clean-tree guard so auto-commit can't sweep up unrelated WIP.
+- **`scripts/nightly.sh`** — the clean-tree guard used `git diff`, which cannot see untracked files, so a repo holding only untracked work read as clean and `git add -A` would have committed it. Uses `git status --porcelain` now. `logs/` + `reports/` are gitignored — the suite writes both on every run, one `git add -A` away from committing its own output.
+
 ## 0.57.2 — 2026-07-14
 
 **Anonymous URL sweep + revive the nightly harness's dead base path.**
