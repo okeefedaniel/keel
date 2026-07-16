@@ -1,0 +1,1 @@
+- **`scripts/nightly.sh`** — Phase 3 now dedupes dashboard posts against a local ledger and caps new posts per run (`NIGHTLY_MAX_POSTS`, default 25). The first real run opened 100 tickets and would have re-opened the same 100 every night; against a ~295-failure suite that made the dashboard unreadable.
