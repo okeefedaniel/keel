@@ -267,10 +267,16 @@ def ai_key_prompt(context, product_code=None):
 def _ai_settings_url():
     """Where the user goes to set their API key.
 
-    In suite mode this is Keel's ``/settings/?panel=ai``. In standalone
-    mode this is the local ``/settings/?panel=ai``. Falls back to a
-    blank string when the settings URL isn't wired (the prompt then
-    renders the message without a link).
+    In suite mode this is Keel's ``/settings/ai/``. In standalone mode
+    this is the local ``/settings/ai/``. Falls back to a blank string
+    when the settings URL isn't wired (the prompt then renders the
+    message without a link).
+
+    NB: the settings router keys on the *path* slug (``/settings/<slug>/``)
+    and ignores any ``?panel=`` query string. Linking to
+    ``/settings/?panel=ai`` lands the user on ``/settings/`` → a redirect
+    to the *first* visible panel (Profile), not the AI panel — the exact
+    "wrong place" symptom. The ``ai`` slug must ride in the path.
     """
     from django.conf import settings as django_settings
     from django.urls import NoReverseMatch, reverse
@@ -279,8 +285,8 @@ def _ai_settings_url():
     if is_suite_mode():
         issuer = (getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or '').rstrip('/')
         if issuer:
-            return f'{issuer}/settings/?panel=ai'
+            return f'{issuer}/settings/ai/'
     try:
-        return reverse('keel_settings:index') + '?panel=ai'
+        return reverse('keel_settings:panel', kwargs={'slug': 'ai'})
     except NoReverseMatch:
         return ''

@@ -407,6 +407,83 @@ class SessionFreshnessMiddleware:
         return parsed
 
 
+class AIKeyClaimRefreshMiddleware:
+    """Self-heal a stale ``ai_key_present`` OIDC claim mid-session.
+
+    ``ai_key_present`` is a login-time snapshot in the user's
+    ``SocialAccount.extra_data`` (see ``keel.core.sso``). If a user sets
+    their Anthropic key on Keel *after* logging into this product, the
+    snapshot stays ``False`` until their next full OIDC login, so the AI
+    gate keeps showing the "you have not yet put in your API key" prompt
+    and keeps AI features disabled even though the key exists. Users read
+    that as "I already added my key — why is it still asking?".
+
+    This middleware re-checks the claim out-of-band — via the existing
+    security-hardened cross-product key fetch (``keel.core.ai_key_refresh``
+    → ``keel.core.ai._fetch_key_from_keel``) — and rewrites the snapshot
+    when it has gone stale. It is deliberately conservative:
+
+    - **No-ops** unless authenticated, in suite mode, and past a
+      per-session TTL gate (``AI_KEY_REFRESH_TTL``). The TTL check is the
+      first thing that runs, so the overwhelming majority of requests exit
+      in a dict lookup with zero queries.
+    - **Only** does network work for users actually in the ``needs_key``
+      state — i.e. exactly the users seeing the false prompt. A user who
+      already has a key never triggers a check.
+    - **Best-effort.** Any failure (Keel down, access token too stale to
+      fetch, network error) leaves the stored claim untouched and never affects
+      the response. It can only ever *correct* a stale ``False`` claim; it
+      never makes the gate more permissive on error.
+
+    Wire it after ``ProductAccessMiddleware`` (needs ``request.user`` and
+    the session). Enabling it is opt-in per product via ``MIDDLEWARE``;
+    products that don't add it keep the login-time-only behavior.
+    """
+
+    SESSION_KEY = '_ai_key_checked_at'
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        try:
+            self._maybe_refresh(request)
+        except Exception:  # noqa: BLE001 — must never break the request
+            logger.debug('AIKeyClaimRefreshMiddleware skipped', exc_info=True)
+        return self.get_response(request)
+
+    def _maybe_refresh(self, request):
+        import time
+
+        user = getattr(request, 'user', None)
+        if user is None or not getattr(user, 'is_authenticated', False):
+            return
+        session = getattr(request, 'session', None)
+        if session is None:
+            return
+
+        from keel.core.utils import is_suite_mode
+        if not is_suite_mode():
+            return
+
+        from keel.core.ai_key_refresh import AI_KEY_REFRESH_TTL, refresh_ai_key_claim
+
+        now = time.time()
+        last = session.get(self.SESSION_KEY)
+        if isinstance(last, (int, float)) and (now - last) < AI_KEY_REFRESH_TTL:
+            return  # Cheap fast-path: checked recently, nothing to do.
+
+        # Past the TTL gate — mark checked up front so a slow or failed
+        # check doesn't re-fire on every subsequent request this window.
+        session[self.SESSION_KEY] = now
+
+        from keel.core.ai_access import user_ai_state
+        if user_ai_state(user) != 'needs_key':
+            return  # 'ready' (has key) or 'off' (no AI access) — nothing to fix.
+
+        refresh_ai_key_claim(user)
+
+
 def _parse_iso(value):
     """Parse an ISO 8601 timestamp into an aware datetime, or None.
 

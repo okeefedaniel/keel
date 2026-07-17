@@ -1,0 +1,1 @@
+- **AI-key prompt link** now points at `…/settings/ai/` (path slug) instead of `…/settings/?panel=ai`. The settings router keys on the path slug and ignores the `?panel=` query string, so the old link bounced the user to the first visible panel (Profile) — the "wrong place" symptom on the "Add API key" button. Fixed in `_ai_settings_url` and the invitation-email AI-settings link.

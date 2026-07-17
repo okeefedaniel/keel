@@ -651,8 +651,10 @@ def send_invitation(request):
             any_ai = any(inv.ai_enabled for inv in created_invitations)
             from django.urls import NoReverseMatch, reverse
             try:
+                # Path slug, not ?panel= — the settings router ignores the
+                # query string and would bounce the user to the first panel.
                 ai_settings_url = request.build_absolute_uri(
-                    reverse('keel_settings:index') + '?panel=ai'
+                    reverse('keel_settings:panel', kwargs={'slug': 'ai'})
                 )
             except NoReverseMatch:
                 ai_settings_url = ''
