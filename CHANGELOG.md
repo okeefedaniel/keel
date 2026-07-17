@@ -5,6 +5,16 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.6 — 2026-07-17
+
+**AI-key claim self-heal now works without stored OIDC tokens (new /oauth/ai-key-status/ endpoint).**
+
+### Added
+- **`GET /oauth/ai-key-status/?sub=<keel_user_pk>`** on the Keel IdP — returns `{"ai_key_present": bool}` for a user, authenticated by peer-client HTTP Basic (any confidential OIDC Application; no new credential to provision). Live source of truth behind the AI gate's `needs_key` prompt; consumed by `AIKeyClaimRefreshMiddleware`. Unknown/malformed subs return `false` (200, no info leak); only a boolean is ever returned.
+
+### Fixed
+- **AI-key claim self-heal now works without stored OIDC tokens.** The v0.57.5 `AIKeyClaimRefreshMiddleware` derived key presence from the access-token-based cross-product fetch, which is inert on products running allauth's default `SOCIALACCOUNT_STORE_TOKENS=False` (no `SocialToken` rows to authenticate with). It now polls a new token-independent endpoint, `GET /oauth/ai-key-status/?sub=<sub>`, authenticated with the product's own OIDC client credentials (HTTP Basic — the same peer-client auth `SessionFreshnessMiddleware` uses), keyed by the user's `SocialAccount.uid`. Corrective-only and best-effort as before; only a boolean crosses the wire. The `issuer_safe_for_secret` HTTPS/host guard is now shared between this and `_fetch_key_from_keel`.
+
 ## 0.57.5 — 2026-07-17
 
 **Fix false AI-key prompt (stale claim self-heal) and route the prompt to /settings/ai/.**
