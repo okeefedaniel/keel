@@ -5,6 +5,17 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.5 — 2026-07-17
+
+**Fix false AI-key prompt (stale claim self-heal) and route the prompt to /settings/ai/.**
+
+### Fixed
+- **Stale `ai_key_present` claim** no longer strands users on the "you have not yet put in your API key" prompt after they set their Anthropic key on Keel mid-session. `keel.core.ai_key_refresh` re-derives key presence from the existing hardened cross-product fetch (`keel.core.ai._fetch_key_from_keel`) and corrects a stale `False` claim to `True` — corrective-only, never a false negative, never more permissive on error. Wired via the opt-in `keel.accounts.middleware.AIKeyClaimRefreshMiddleware` (runs at most once per session TTL, and only for users in the `needs_key` state).
+- **AI-key prompt link** now points at `…/settings/ai/` (path slug) instead of `…/settings/?panel=ai`. The settings router keys on the path slug and ignores the `?panel=` query string, so the old link bounced the user to the first visible panel (Profile) — the "wrong place" symptom on the "Add API key" button. Fixed in `_ai_settings_url` and the invitation-email AI-settings link.
+
+### Consumer note
+- **Opt into `AIKeyClaimRefreshMiddleware`** to get mid-session AI-key self-healing. Add `'keel.accounts.middleware.AIKeyClaimRefreshMiddleware'` to `MIDDLEWARE` after `ProductAccessMiddleware` (it needs `request.user` and the session). It no-ops in standalone/demo mode and for users who already have a key, so it's safe to add unconditionally. Products that don't add it keep the previous login-time-only claim behavior.
+
 ## 0.57.4 — 2026-07-16
 
 **Security: stop allauth password-reset endpoint being used as an email spam relay; add invitation send-audit trail.**
