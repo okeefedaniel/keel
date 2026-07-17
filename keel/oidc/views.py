@@ -12,6 +12,7 @@ Currently:
 import base64
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
@@ -93,3 +94,48 @@ def session_status(request):
         'sub': sub,
         'last_logout_at': last_logout_at.isoformat() if last_logout_at else None,
     })
+
+
+@require_GET
+def ai_key_status(request):
+    """Report whether a user has an Anthropic key set at Keel.
+
+    ``GET /oauth/ai-key-status/?sub=<keel_user_pk>``
+
+    Response (200)::
+
+        {"sub": "<uuid>", "ai_key_present": true | false}
+
+    This is the live source of truth behind the AI gate's ``needs_key``
+    prompt. Products stamp ``ai_key_present`` into the user's OIDC claim
+    at login, but that snapshot goes stale if the user sets their key on
+    Keel mid-session. ``keel.accounts.middleware.AIKeyClaimRefreshMiddleware``
+    polls this endpoint to self-heal the stale claim — token-independent,
+    so it works even where the product doesn't persist OIDC access tokens
+    (``SOCIALACCOUNT_STORE_TOKENS=False``, the allauth default).
+
+    Auth is the same peer-client HTTP Basic as ``session_status`` — every
+    product is already a registered confidential OIDC client, so no new
+    credential is provisioned. Only a boolean is returned (never the key).
+
+    An unknown sub returns ``ai_key_present: false`` (a 200, not a 404) so
+    the endpoint doesn't leak which subs exist at Keel — the consumer
+    treats "no key" and "no such user" identically (leave the claim as-is).
+
+    401 without valid client credentials. 400 if ``sub`` is missing.
+    """
+    if _authenticate_peer_client(request) is None:
+        return JsonResponse({'detail': 'unauthorized'}, status=401)
+
+    sub = request.GET.get('sub', '').strip()
+    if not sub:
+        return JsonResponse({'detail': 'sub query param required'}, status=400)
+
+    User = get_user_model()
+    try:
+        user = User.objects.filter(pk=sub).first()
+    except (ValueError, ValidationError):
+        # Malformed sub (e.g. not a valid UUID) — treat as unknown.
+        user = None
+    present = bool(user and user.has_anthropic_key())
+    return JsonResponse({'sub': sub, 'ai_key_present': present})

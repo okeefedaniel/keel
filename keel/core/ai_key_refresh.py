@@ -15,46 +15,49 @@ showing the "needs key" prompt (and keeps AI disabled) until the user's next
 full OIDC login, even though the key now exists. Users reasonably read that
 as "I already added my key — why is it still asking?".
 
-This module re-checks the claim out-of-band and rewrites the snapshot when
-it has gone stale.
+Design — a token-independent service lookup
+-------------------------------------------
 
-Design — delegate the network hop to the hardened fetch
--------------------------------------------------------
+Presence is read live from Keel's ``GET /oauth/ai-key-status/?sub=<sub>``
+endpoint, authenticated with the **product's own OIDC client credentials**
+(HTTP Basic) — the same peer-client auth ``SessionFreshnessMiddleware`` uses
+for ``/oauth/session-status/``. Crucially this does **not** depend on the
+user having a stored OIDC access token: most products run allauth's default
+``SOCIALACCOUNT_STORE_TOKENS=False`` and hold no ``SocialToken`` rows, which
+is why the earlier access-token-based cross-product fetch couldn't self-heal
+the claim. The ``sub`` is the user's ``SocialAccount.uid`` (the KeelUser pk),
+which is present regardless of token storage. Only a boolean crosses the
+wire — never the key.
 
-Presence is derived from ``keel.core.ai._fetch_key_from_keel`` — the same
-security-hardened call the AI features already use to pull the user's key
-from Keel (HTTPS-only outside DEBUG, issuer-host allowlist, redirect-refusing
-opener; see the CSO guards on that function). We deliberately do **not** open
-a second, differently-guarded network path to Keel here, and we do **not**
-mint fresh tokens: this rides the user's existing OIDC access token exactly
-as the feature path does. The cleartext key it returns is used only to
-compute a boolean and is never stored.
+The request goes through the shared ``keel.core.ai.issuer_safe_for_secret``
+guard (HTTPS-only outside DEBUG, issuer-host allowlist) and a redirect-
+refusing opener, so the product's client secret can't leak to a misconfigured
+or hostile issuer.
 
 Contract
 --------
 
 ``refresh_ai_key_claim(user)`` is:
 
-- **Corrective-only.** It can flip a stale ``False`` claim to ``True`` when
-  Keel confirms the key exists; it never writes ``False``. A negative or
-  failed fetch (no key, or an expired access token) leaves the stored claim
-  exactly as it was — so it can never introduce a false negative and never
-  makes the gate *more* permissive on error.
+- **Corrective-only.** It flips a stale ``False`` claim to ``True`` when Keel
+  confirms the key exists; it never writes ``False``. A negative or failed
+  lookup leaves the stored claim exactly as it was — so it can never
+  introduce a false negative and never makes the gate more permissive on
+  error.
 - **Targeted & bounded.** The caller (``AIKeyClaimRefreshMiddleware``) only
-  invokes it for users already in the ``needs_key`` state, at most once per
-  session TTL. A user who already has a key never triggers a fetch.
+  invokes it for users in the ``needs_key`` state, at most once per session
+  TTL. A user who already has a key never triggers a lookup.
 - **Best-effort.** Every failure path returns ``None`` and leaves the stored
   claim untouched. It never raises into the request.
-
-Residual limitation: a user whose OIDC access token has expired (past the
-~1h access-token lifetime, with no valid token on the product side) won't
-self-heal until their next login — the hardened fetch has no key to present.
-That's a strict improvement over the login-time-only behavior and avoids
-introducing refresh-token machinery the suite otherwise doesn't run.
 """
 from __future__ import annotations
 
+import base64
+import json
 import logging
+import urllib.error
+import urllib.parse
+import urllib.request
 
 from django.conf import settings as django_settings
 
@@ -62,6 +65,8 @@ logger = logging.getLogger(__name__)
 
 # How long a single session trusts its last check before re-verifying.
 AI_KEY_REFRESH_TTL = 600  # seconds (10 minutes)
+
+_HTTP_TIMEOUT = 5  # seconds
 
 
 def _keel_social_account(user):
@@ -74,6 +79,45 @@ def _keel_social_account(user):
         return SocialAccount.objects.filter(user=user, provider='keel').first()
     except Exception:  # noqa: BLE001 — defensive against schema drift
         return None
+
+
+def _query_ai_key_present(issuer: str, sub: str) -> bool | None:
+    """Poll Keel's ai-key-status endpoint for this sub.
+
+    Returns ``True``/``False`` on a clean answer, or ``None`` on any skip or
+    failure (missing client creds, unsafe issuer, network/parse error).
+    Never raises.
+    """
+    from keel.core.ai import _build_no_redirect_opener, issuer_safe_for_secret
+
+    if not issuer_safe_for_secret(issuer):
+        return None
+    client_id = getattr(django_settings, 'KEEL_OIDC_CLIENT_ID', '') or ''
+    client_secret = getattr(django_settings, 'KEEL_OIDC_CLIENT_SECRET', '') or ''
+    if not (client_id and client_secret):
+        return None
+
+    basic = base64.b64encode(f'{client_id}:{client_secret}'.encode()).decode()
+    url = f'{issuer}/oauth/ai-key-status/?' + urllib.parse.urlencode({'sub': sub})
+    req = urllib.request.Request(
+        url,
+        headers={'Authorization': f'Basic {basic}', 'Accept': 'application/json'},
+    )
+    try:
+        opener = _build_no_redirect_opener()
+        with opener.open(req, timeout=_HTTP_TIMEOUT) as resp:
+            if not (200 <= resp.status < 300):
+                return None
+            data = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as exc:
+        logger.info('ai_key_refresh.query: HTTP %s', exc.code)
+        return None
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        logger.info('ai_key_refresh.query: %s', exc)
+        return None
+
+    val = data.get('ai_key_present')
+    return val if isinstance(val, bool) else None
 
 
 def _store_claim_true(account) -> None:
@@ -101,27 +145,18 @@ def refresh_ai_key_claim(user) -> bool | None:
     ``None`` (no key confirmed, or skipped/failed — claim left untouched).
     Never raises.
     """
-    issuer = (getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or '').strip()
+    issuer = (getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or '').rstrip('/')
     if not issuer:
         return None  # Not a suite deployment — nothing to refresh against.
 
     account = _keel_social_account(user)
-    if account is None:
+    if account is None or not getattr(account, 'uid', ''):
         return None
 
-    # Reuse the hardened cross-product fetch. It returns the cleartext key on
-    # success or '' on any failure (no key / expired token / network error).
-    # We use only its truthiness and never persist the cleartext.
-    try:
-        from keel.core.ai import _fetch_key_from_keel
-        key = _fetch_key_from_keel(user, None)
-    except Exception as exc:  # noqa: BLE001 — best-effort
-        logger.info('ai_key_refresh.fetch: %s', exc)
-        return None
-
-    if not key:
-        # No key confirmed (genuinely absent, or token too stale to fetch).
-        # Corrective-only: never write a False here.
+    present = _query_ai_key_present(issuer, account.uid)
+    if present is not True:
+        # False (no key) or None (unknown/error). Corrective-only: never
+        # write a False here — leave the stored claim as-is.
         return None
 
     try:

@@ -182,6 +182,56 @@ def _build_no_redirect_opener():
     return urllib.request.build_opener(_NoRedirect())
 
 
+def issuer_safe_for_secret(issuer: str) -> bool:
+    """Whether it's safe to send credentials to ``issuer`` over the network.
+
+    Shared guard for every product→Keel call that carries a secret — the
+    user's bearer token (``_fetch_key_from_keel``) or the product's own
+    OIDC client credentials (``keel.core.ai_key_refresh``). Two checks:
+
+    - **Scheme allowlist** — prod must be HTTPS. The localhost carve-out
+      keeps dev workflows working without forcing TLS on every machine;
+      ``DEBUG=True`` also unlocks plain http for local Keel test instances.
+    - **Host allowlist** — defense against env-var corruption / typo
+      attacks. ``KEEL_AI_KEY_FETCH_HOSTS`` is a comma-separated allowlist
+      of acceptable issuer hosts (defaults to the DockLabs domains plus
+      localhost). A typo'd ``KEEL_OIDC_ISSUER=https://attaker.com`` (or
+      env-var injection) would otherwise ship the secret there.
+
+    Logs loudly on refusal so misconfiguration is caught in deploy review.
+    """
+    is_local = issuer.startswith('http://localhost') or issuer.startswith('http://127.0.0.1')
+    if not issuer.startswith('https://') and not (
+        getattr(settings, 'DEBUG', False) or is_local
+    ):
+        logger.error(
+            'KEEL_OIDC_ISSUER must use https:// in production — refusing '
+            'to send credentials over plaintext to %r', issuer,
+        )
+        return False
+
+    from urllib.parse import urlparse
+    issuer_host = urlparse(issuer).hostname or ''
+    default_hosts = {
+        'keel.docklabs.ai', 'demo-keel.docklabs.ai',
+        'localhost', '127.0.0.1',
+    }
+    allowed_hosts = set(
+        (getattr(settings, 'KEEL_AI_KEY_FETCH_HOSTS', '') or '')
+        .replace(' ', '').split(',')
+    ) - {''} or default_hosts
+    if issuer_host not in allowed_hosts and not (
+        getattr(settings, 'DEBUG', False) or is_local
+    ):
+        logger.error(
+            'KEEL_OIDC_ISSUER host %r not in allowlist %r — refusing '
+            'to send credentials. Set KEEL_AI_KEY_FETCH_HOSTS to '
+            'override.', issuer_host, sorted(allowed_hosts),
+        )
+        return False
+    return True
+
+
 def _fetch_key_from_keel(user, request):
     """Call Keel's ``/api/v1/ai/key/`` with the user's bearer token.
 
@@ -206,45 +256,7 @@ def _fetch_key_from_keel(user, request):
     ).rstrip('/')
     if not issuer:
         return ''
-
-    # Scheme allowlist — prod must be HTTPS. The localhost carve-out
-    # keeps dev workflows working without forcing TLS on every machine;
-    # DEBUG=True also unlocks plain http for local Keel test instances.
-    is_local = issuer.startswith('http://localhost') or issuer.startswith('http://127.0.0.1')
-    if not issuer.startswith('https://') and not (
-        getattr(settings, 'DEBUG', False) or is_local
-    ):
-        logger.error(
-            'KEEL_OIDC_ISSUER must use https:// in production — refusing '
-            "to send bearer token over plaintext to %r", issuer,
-        )
-        return ''
-
-    # Host allowlist — defense against env-var corruption / typo
-    # attacks. ``KEEL_AI_KEY_FETCH_HOSTS`` is a comma-separated
-    # allowlist of acceptable issuer hosts. Default permits the
-    # canonical DockLabs domain plus localhost for dev; a deployment
-    # using a different host MUST opt in via setting. Without this,
-    # a typo'd ``KEEL_OIDC_ISSUER=https://attaker.com`` (or env-var
-    # injection) would ship the user's bearer token there.
-    from urllib.parse import urlparse
-    issuer_host = urlparse(issuer).hostname or ''
-    default_hosts = {
-        'keel.docklabs.ai', 'demo-keel.docklabs.ai',
-        'localhost', '127.0.0.1',
-    }
-    allowed_hosts = set(
-        (getattr(settings, 'KEEL_AI_KEY_FETCH_HOSTS', '') or '')
-        .replace(' ', '').split(',')
-    ) - {''} or default_hosts
-    if issuer_host not in allowed_hosts and not (
-        getattr(settings, 'DEBUG', False) or is_local
-    ):
-        logger.error(
-            'KEEL_OIDC_ISSUER host %r not in allowlist %r — refusing '
-            'to send bearer token. Set KEEL_AI_KEY_FETCH_HOSTS to '
-            'override.', issuer_host, sorted(allowed_hosts),
-        )
+    if not issuer_safe_for_secret(issuer):
         return ''
 
     token = _user_access_token(user)

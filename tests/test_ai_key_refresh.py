@@ -53,49 +53,76 @@ def _read_claim(account):
 @override_settings(KEEL_OIDC_ISSUER='https://keel.example.com')
 def test_flips_stale_false_to_true_when_key_present(keel_user, monkeypatch):
     account = _make_account(keel_user, present=False)
-    import keel.core.ai as ai_mod
-    monkeypatch.setattr(ai_mod, '_fetch_key_from_keel', lambda u, r: 'sk-ant-xyz')
+    import keel.core.ai_key_refresh as refresh_mod
+    monkeypatch.setattr(refresh_mod, '_query_ai_key_present', lambda issuer, sub: True)
 
-    from keel.core.ai_key_refresh import refresh_ai_key_claim
-    assert refresh_ai_key_claim(keel_user) is True
+    assert refresh_mod.refresh_ai_key_claim(keel_user) is True
     assert _read_claim(account) is True
 
 
 @override_settings(KEEL_OIDC_ISSUER='https://keel.example.com')
 def test_no_key_leaves_claim_untouched(keel_user, monkeypatch):
-    """A negative/failed fetch must never write a False (no false negatives)."""
+    """A False answer must never write a False claim (corrective-only)."""
     account = _make_account(keel_user, present=False)
-    import keel.core.ai as ai_mod
-    monkeypatch.setattr(ai_mod, '_fetch_key_from_keel', lambda u, r: '')
+    import keel.core.ai_key_refresh as refresh_mod
+    monkeypatch.setattr(refresh_mod, '_query_ai_key_present', lambda issuer, sub: False)
 
-    from keel.core.ai_key_refresh import refresh_ai_key_claim
-    assert refresh_ai_key_claim(keel_user) is None
+    assert refresh_mod.refresh_ai_key_claim(keel_user) is None
     assert _read_claim(account) is False  # unchanged
+
+
+@override_settings(KEEL_OIDC_ISSUER='https://keel.example.com')
+def test_query_error_leaves_claim_untouched(keel_user, monkeypatch):
+    """A None answer (unknown/error) also leaves the stored claim as-is."""
+    account = _make_account(keel_user, present=False)
+    import keel.core.ai_key_refresh as refresh_mod
+    monkeypatch.setattr(refresh_mod, '_query_ai_key_present', lambda issuer, sub: None)
+
+    assert refresh_mod.refresh_ai_key_claim(keel_user) is None
+    assert _read_claim(account) is False
 
 
 @override_settings(KEEL_OIDC_ISSUER='')
 def test_noop_without_issuer(keel_user, monkeypatch):
     """Standalone deployment: short-circuit before any network call."""
     _make_account(keel_user, present=False)
-    import keel.core.ai as ai_mod
+    import keel.core.ai_key_refresh as refresh_mod
     called = {'n': 0}
 
-    def _spy(u, r):
+    def _spy(issuer, sub):
         called['n'] += 1
-        return 'sk-ant'
+        return True
 
-    monkeypatch.setattr(ai_mod, '_fetch_key_from_keel', _spy)
-    from keel.core.ai_key_refresh import refresh_ai_key_claim
-    assert refresh_ai_key_claim(keel_user) is None
+    monkeypatch.setattr(refresh_mod, '_query_ai_key_present', _spy)
+    assert refresh_mod.refresh_ai_key_claim(keel_user) is None
     assert called['n'] == 0
 
 
 @override_settings(KEEL_OIDC_ISSUER='https://keel.example.com')
 def test_noop_without_keel_social_account(keel_user, monkeypatch):
-    import keel.core.ai as ai_mod
-    monkeypatch.setattr(ai_mod, '_fetch_key_from_keel', lambda u, r: 'sk-ant')
-    from keel.core.ai_key_refresh import refresh_ai_key_claim
-    assert refresh_ai_key_claim(keel_user) is None
+    import keel.core.ai_key_refresh as refresh_mod
+    monkeypatch.setattr(refresh_mod, '_query_ai_key_present', lambda issuer, sub: True)
+    assert refresh_mod.refresh_ai_key_claim(keel_user) is None
+
+
+@override_settings(
+    KEEL_OIDC_ISSUER='https://keel.example.com', DEBUG=False,
+    KEEL_OIDC_CLIENT_ID='cid', KEEL_OIDC_CLIENT_SECRET='sec',
+)
+def test_query_refuses_unsafe_issuer(monkeypatch):
+    """The client secret must not be sent to a plaintext / non-allowlisted host."""
+    from keel.core.ai_key_refresh import _query_ai_key_present
+    # http:// outside DEBUG → refused by the shared guard, no network attempt.
+    assert _query_ai_key_present('http://attacker.example.com', 'sub-1') is None
+
+
+@override_settings(
+    KEEL_OIDC_ISSUER='https://keel.example.com', DEBUG=False,
+    KEEL_OIDC_CLIENT_ID='', KEEL_OIDC_CLIENT_SECRET='',
+)
+def test_query_skips_without_client_credentials():
+    from keel.core.ai_key_refresh import _query_ai_key_present
+    assert _query_ai_key_present('https://keel.docklabs.ai', 'sub-1') is None
 
 
 # --------------------------------------------------------------------------

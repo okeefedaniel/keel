@@ -12,6 +12,7 @@ from keel.accounts.views import (
 )
 from keel.core.demo import demo_login_view
 from keel.core.views import favicon_view, robots_txt, suite_logout_endpoint
+from keel.oidc.views import ai_key_status as oidc_ai_key_status
 from keel.oidc.views import session_status as oidc_session_status
 from keel.requests.views import api_ingest
 from . import dashboard, notifications_admin, tools
@@ -100,6 +101,11 @@ urlpatterns = [
     # SessionFreshnessMiddleware to detect that a user logged out at
     # Keel from another product and tear down their stale local session.
     path('oauth/session-status/', oidc_session_status, name='session_status'),
+
+    # Live AI-key-presence lookup. Peer products poll this from
+    # AIKeyClaimRefreshMiddleware to self-heal a stale ai_key_present
+    # claim (the login-time snapshot) when a user sets their key mid-session.
+    path('oauth/ai-key-status/', oidc_ai_key_status, name='ai_key_status'),
 
     # Keel admin modules
     path('keel/accounts/', include('keel.accounts.urls')),

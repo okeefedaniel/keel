@@ -418,10 +418,10 @@ class AIKeyClaimRefreshMiddleware:
     and keeps AI features disabled even though the key exists. Users read
     that as "I already added my key — why is it still asking?".
 
-    This middleware re-checks the claim out-of-band — via the existing
-    security-hardened cross-product key fetch (``keel.core.ai_key_refresh``
-    → ``keel.core.ai._fetch_key_from_keel``) — and rewrites the snapshot
-    when it has gone stale. It is deliberately conservative:
+    This middleware re-checks the claim out-of-band — ``keel.core.ai_key_refresh``
+    polls Keel's token-independent ``/oauth/ai-key-status/`` endpoint (peer-client
+    HTTP Basic, keyed by the user's ``SocialAccount.uid``) — and rewrites the
+    snapshot when it has gone stale. It is deliberately conservative:
 
     - **No-ops** unless authenticated, in suite mode, and past a
       per-session TTL gate (``AI_KEY_REFRESH_TTL``). The TTL check is the
