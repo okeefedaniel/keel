@@ -320,6 +320,57 @@ def _extract_keel_claims(sociallogin) -> dict:
     return {}
 
 
+def _maybe_hydrate_local_ai_key(sociallogin) -> None:
+    """One-shot: pull the user's Anthropic key from Keel at login into the
+    product-LOCAL encrypted field. Nothing is persisted beyond that field —
+    no OIDC token is stored (Phase B of the invisible-Keel AI-key design).
+
+    This is what delivers "enter once, see everywhere" without token-at-rest:
+    allauth holds a login-fresh access token in memory (``sociallogin.token``)
+    even with ``SOCIALACCOUNT_STORE_TOKENS=False``, so we spend it once here to
+    read ``GET /api/v1/ai/key/`` and copy the key locally, then discard it.
+
+    Runs only when ALL of:
+      - this product stores the key locally (``KEEL_LOCAL_AI_KEY``),
+      - the local field is empty (never clobber an in-product edit or a key
+        hydrated on a prior login),
+      - allauth handed us a login-fresh access token in memory.
+
+    Best-effort: any failure is swallowed so login is never blocked. A user
+    with no key on Keel simply gets a 404 → local field stays empty → the
+    in-product needs-key prompt shows, exactly as intended.
+    """
+    try:
+        from keel.core.utils import local_ai_key_enabled
+        if not local_ai_key_enabled():
+            return
+        if not _is_keel_provider(sociallogin):
+            return
+        user = getattr(sociallogin, 'user', None)
+        if user is None or not getattr(user, 'pk', None):
+            return
+        # The encrypted local field must exist on this user model.
+        if not hasattr(user, 'anthropic_api_key'):
+            return
+        # Never overwrite a locally-stored key (in-product edit or a prior
+        # hydration). The local field is the source of truth once set.
+        has_local = getattr(user, 'has_anthropic_key', None)
+        if callable(has_local) and has_local():
+            return
+        token_obj = getattr(sociallogin, 'token', None)
+        access_token = getattr(token_obj, 'token', '') if token_obj else ''
+        if not access_token:
+            return
+        from keel.core.ai import fetch_ai_key_with_token
+        key = fetch_ai_key_with_token(access_token)
+        if key:
+            user.anthropic_api_key = key
+            user.save(update_fields=['anthropic_api_key_encrypted'])
+            logger.info('SSO: hydrated local Anthropic key for user=%s', user.pk)
+    except Exception:
+        logger.exception('SSO: local AI-key hydration failed (non-fatal)')
+
+
 class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
     """Base social account adapter for DockLabs SSO.
 
@@ -491,6 +542,12 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
                 # ProductAccess only requires updating the registry, not
                 # this site and ``save_user`` separately.
                 _mirror_product_access(u, claims)
+
+                # One-shot AI-key hydration for local-AI-key products.
+                # Existing/returning (and freshly-linked) users have a pk
+                # here; new users are handled in save_user. Uses the
+                # in-memory login token; persists nothing but the key.
+                _maybe_hydrate_local_ai_key(sociallogin)
             return
 
         # --- Microsoft Entra ID path (unchanged) --------------------------
@@ -632,6 +689,9 @@ class KeelSocialAccountAdapter(DefaultSocialAccountAdapter):
         if _is_keel_provider(sociallogin):
             claims = _extract_keel_claims(sociallogin)
             _mirror_product_access(user, claims)
+            # New user's first login: hydrate the local AI key from Keel
+            # with the in-memory login token (local-AI-key products only).
+            _maybe_hydrate_local_ai_key(sociallogin)
             return user
 
         # --- Microsoft / default path: grant access to current product ---

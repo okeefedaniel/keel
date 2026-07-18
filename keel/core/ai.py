@@ -251,16 +251,37 @@ def _fetch_key_from_keel(user, request):
       raises so a compromised DNS / misconfigured front door cannot
       bounce the request to an attacker host with the token attached.
     """
+    token = _user_access_token(user)
+    if not token:
+        return ''
+    return fetch_ai_key_with_token(token)
+
+
+def fetch_ai_key_with_token(access_token: str) -> str:
+    """Fetch the user's Anthropic key from Keel with an explicit access token.
+
+    Same transport guards as :func:`_fetch_key_from_keel` (HTTPS + host
+    allowlist via ``issuer_safe_for_secret``, no-redirect opener so the
+    bearer token can't leak across a 30x) but takes the token directly
+    instead of reading it from a stored ``SocialToken``.
+
+    Used by the SSO adapter's login-time one-shot AI-key hydration
+    (``keel.core.sso._maybe_hydrate_local_ai_key``), where allauth holds a
+    login-fresh access token in memory and nothing is persisted
+    (``SOCIALACCOUNT_STORE_TOKENS`` stays off). The token MUST carry the
+    ``ai`` scope — the endpoint 401s otherwise.
+
+    Returns cleartext on success, '' on any failure (including a 404 =
+    the user simply has no key set on Keel).
+    """
+    if not access_token:
+        return ''
     issuer = (
         getattr(settings, 'KEEL_OIDC_ISSUER', '') or ''
     ).rstrip('/')
     if not issuer:
         return ''
     if not issuer_safe_for_secret(issuer):
-        return ''
-
-    token = _user_access_token(user)
-    if not token:
         return ''
 
     try:
@@ -272,7 +293,7 @@ def _fetch_key_from_keel(user, request):
         req = urllib.request.Request(
             f'{issuer}/api/v1/ai/key/',
             headers={
-                'Authorization': f'Bearer {token}',
+                'Authorization': f'Bearer {access_token}',
                 'Accept': 'application/json',
             },
         )
