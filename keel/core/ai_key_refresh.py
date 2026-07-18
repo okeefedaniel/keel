@@ -69,16 +69,21 @@ AI_KEY_REFRESH_TTL = 600  # seconds (10 minutes)
 _HTTP_TIMEOUT = 5  # seconds
 
 
-def _keel_social_account(user):
-    """Return the user's keel-provider SocialAccount, or None."""
+def _keel_social_accounts(user):
+    """Return all of the user's keel-provider SocialAccounts (may be >1).
+
+    A local account can be OIDC-linked to multiple Keel identities (the
+    dok/dokadmin duplicate-identity case), so we check every one rather
+    than an arbitrary ``.first()``.
+    """
     try:
         from allauth.socialaccount.models import SocialAccount
     except ImportError:
-        return None
+        return []
     try:
-        return SocialAccount.objects.filter(user=user, provider='keel').first()
+        return list(SocialAccount.objects.filter(user=user, provider='keel'))
     except Exception:  # noqa: BLE001 — defensive against schema drift
-        return None
+        return []
 
 
 def _query_ai_key_present(issuer: str, sub: str) -> bool | None:
@@ -149,20 +154,19 @@ def refresh_ai_key_claim(user) -> bool | None:
     if not issuer:
         return None  # Not a suite deployment — nothing to refresh against.
 
-    account = _keel_social_account(user)
-    if account is None or not getattr(account, 'uid', ''):
-        return None
-
-    present = _query_ai_key_present(issuer, account.uid)
-    if present is not True:
-        # False (no key) or None (unknown/error). Corrective-only: never
-        # write a False here — leave the stored claim as-is.
-        return None
-
-    try:
-        _store_claim_true(account)
-    except Exception as exc:  # noqa: BLE001
-        logger.info('ai_key_refresh.store: %s', exc)
-        return None
-    logger.info('ai_key_refresh.ok: user=%s corrected stale ai_key_present claim', user.pk)
-    return True
+    # Check every linked Keel identity; stop at the first one that has a key.
+    # Corrective-only: only ever store True, and only when Keel confirms it.
+    for account in _keel_social_accounts(user):
+        sub = getattr(account, 'uid', '')
+        if not sub:
+            continue
+        if _query_ai_key_present(issuer, sub) is True:
+            try:
+                _store_claim_true(account)
+            except Exception as exc:  # noqa: BLE001
+                logger.info('ai_key_refresh.store: %s', exc)
+                return None
+            logger.info(
+                'ai_key_refresh.ok: user=%s corrected stale ai_key_present claim', user.pk)
+            return True
+    return None

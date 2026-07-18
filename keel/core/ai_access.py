@@ -106,27 +106,37 @@ def _user_has_ai(user, product_code: str) -> bool:
         return False
 
 
+def _account_ai_key_present(acct) -> bool:
+    """Read ``ai_key_present`` from one SocialAccount's stored claims."""
+    data = acct.extra_data or {}
+    # allauth 65+ stores claims under 'userinfo' / 'id_token' keys.
+    userinfo = data.get('userinfo')
+    if isinstance(userinfo, dict) and 'ai_key_present' in userinfo:
+        return bool(userinfo['ai_key_present'])
+    id_token = data.get('id_token')
+    if isinstance(id_token, dict) and 'ai_key_present' in id_token:
+        return bool(id_token['ai_key_present'])
+    return bool(data.get('ai_key_present', False))
+
+
 def _oidc_ai_key_present(user) -> bool:
     """Read ai_key_present from stored OIDC claims (SocialAccount.extra_data).
 
     Used as a fallback in suite-mode products where the user's Anthropic key
     lives in Keel's database, not the local product's database. The claim is
     stamped at login time by Keel's OIDC validator (requires the 'ai' scope).
+
+    Returns True if **any** of the user's keel SocialAccounts reports a key.
+    A local account can be OIDC-linked to more than one Keel identity — the
+    dok/dokadmin duplicate-identity case, where one linked identity holds the
+    Anthropic key and the other doesn't. The old ``.first()`` read a single
+    arbitrary account and would miss a key sitting on the other, firing a
+    false "needs key" prompt. The user has a key if any linked identity does.
     """
     try:
         from allauth.socialaccount.models import SocialAccount
-        acct = SocialAccount.objects.filter(user=user, provider='keel').first()
-        if acct is None:
-            return False
-        data = acct.extra_data or {}
-        # allauth 65+ stores claims under 'userinfo' / 'id_token' keys.
-        userinfo = data.get('userinfo')
-        if isinstance(userinfo, dict) and 'ai_key_present' in userinfo:
-            return bool(userinfo['ai_key_present'])
-        id_token = data.get('id_token')
-        if isinstance(id_token, dict) and 'ai_key_present' in id_token:
-            return bool(id_token['ai_key_present'])
-        return bool(data.get('ai_key_present', False))
+        accts = SocialAccount.objects.filter(user=user, provider='keel')
+        return any(_account_ai_key_present(a) for a in accts)
     except Exception:  # noqa: BLE001 — defensive; allauth may not be installed
         return False
 

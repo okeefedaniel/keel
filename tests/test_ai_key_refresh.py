@@ -37,10 +37,10 @@ def keel_user(db):
     )
 
 
-def _make_account(user, present):
+def _make_account(user, present, uid=None):
     from allauth.socialaccount.models import SocialAccount
     return SocialAccount.objects.create(
-        user=user, provider='keel', uid=f'sub-{user.pk}',
+        user=user, provider='keel', uid=uid or f'sub-{user.pk}',
         extra_data={'userinfo': {'ai_key_present': present}},
     )
 
@@ -103,6 +103,42 @@ def test_noop_without_keel_social_account(keel_user, monkeypatch):
     import keel.core.ai_key_refresh as refresh_mod
     monkeypatch.setattr(refresh_mod, '_query_ai_key_present', lambda issuer, sub: True)
     assert refresh_mod.refresh_ai_key_claim(keel_user) is None
+
+
+# --------------------------------------------------------------------------
+# Multi-account (dok/dokadmin dual-link) — the real Beacon root cause
+# --------------------------------------------------------------------------
+def test_oidc_ai_key_present_true_if_any_linked_account_has_key(keel_user):
+    """A user linked to two Keel identities has a key if EITHER does."""
+    from keel.core.ai_access import _oidc_ai_key_present
+    _make_account(keel_user, present=False, uid='sub-dokadmin')  # no key
+    _make_account(keel_user, present=True, uid='sub-dok')        # has key
+    assert _oidc_ai_key_present(keel_user) is True
+
+
+def test_oidc_ai_key_present_false_if_no_account_has_key(keel_user):
+    from keel.core.ai_access import _oidc_ai_key_present
+    _make_account(keel_user, present=False, uid='sub-a')
+    _make_account(keel_user, present=False, uid='sub-b')
+    assert _oidc_ai_key_present(keel_user) is False
+
+
+@override_settings(KEEL_OIDC_ISSUER='https://keel.example.com')
+def test_refresh_heals_via_second_linked_identity(keel_user, monkeypatch):
+    """Self-heal must check every linked identity, not just .first()."""
+    import keel.core.ai_key_refresh as refresh_mod
+    no_key = _make_account(keel_user, present=False, uid='sub-dokadmin')
+    has_key = _make_account(keel_user, present=False, uid='sub-dok')  # stale False
+
+    # Keel reports a key only for the 'dok' identity.
+    monkeypatch.setattr(refresh_mod, '_query_ai_key_present',
+                        lambda issuer, sub: sub == 'sub-dok')
+
+    assert refresh_mod.refresh_ai_key_claim(keel_user) is True
+    no_key.refresh_from_db()
+    has_key.refresh_from_db()
+    assert has_key.extra_data['userinfo']['ai_key_present'] is True
+    assert no_key.extra_data['userinfo']['ai_key_present'] is False  # untouched
 
 
 @override_settings(
