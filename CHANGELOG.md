@@ -5,6 +5,13 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.7 — 2026-07-18
+
+**AI-key detection handles users linked to multiple Keel identities (dok/dokadmin).**
+
+### Fixed
+- **AI-key detection now handles users linked to multiple Keel identities.** `_oidc_ai_key_present` used `SocialAccount…filter(user, provider='keel').first()`, reading one arbitrary account. A local user OIDC-linked to two Keel identities (the dok/dokadmin duplicate-identity case) — one holding the Anthropic key, one not — would get a false "you have not yet put in your API key" prompt whenever `.first()` returned the keyless identity, even though the user has a key on the other. It now returns True if **any** linked keel SocialAccount reports a key, and `AIKeyClaimRefreshMiddleware`'s self-heal checks every linked identity rather than just the first.
+
 ## 0.57.6 — 2026-07-17
 
 **AI-key claim self-heal now works without stored OIDC tokens (new /oauth/ai-key-status/ endpoint).**
