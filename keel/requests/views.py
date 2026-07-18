@@ -28,6 +28,53 @@ from .models import Category, ChangeRequest, Priority, Status
 
 logger = logging.getLogger(__name__)
 
+# Submitter names used by unattended, high-volume creators (the nightly test
+# harness). Submissions carrying one of these markers are BULK/automated and
+# must NOT fire a per-item admin email — they either arrive through the batch
+# endpoint (one digest for the whole run) or, if an old client still POSTs them
+# one at a time to ``api_ingest``, we suppress the per-item email here so the
+# 2am run can't flood the inbox again. Human widget submissions carry a real
+# person's name and keep their per-item notification.
+AUTOMATED_SUBMITTER_NAMES = frozenset({
+    'nightly test bot',
+    'nightly security audit',
+})
+
+
+def _is_automated_submission(submitted_by_name):
+    """True if this submission came from an unattended bulk creator."""
+    return (submitted_by_name or '').strip().lower() in AUTOMATED_SUBMITTER_NAMES
+
+
+def _verify_api_key(request):
+    """Validate the ``Authorization: Bearer`` key on an ingest request.
+
+    Accepts either a per-product key (``KEEL_PRODUCT_API_KEYS`` mapping,
+    preferred) or the shared ``KEEL_API_KEY`` (legacy). Returns ``None`` when
+    the key is valid, or a ``JsonResponse`` describing the failure otherwise.
+    Comparison is constant-time and never short-circuits across keys, so
+    iterating doesn't leak which product key matched via timing.
+    """
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer '):
+        return JsonResponse({'error': 'Invalid API key.'}, status=401)
+    presented = auth_header[7:].strip()
+    if not presented:
+        return JsonResponse({'error': 'Invalid API key.'}, status=401)
+
+    per_product = getattr(settings, 'KEEL_PRODUCT_API_KEYS', {}) or {}
+    shared_key = getattr(settings, 'KEEL_API_KEY', '') or ''
+    if not per_product and not shared_key:
+        return JsonResponse({'error': 'API ingest not configured.'}, status=503)
+
+    valid = False
+    for configured in list(per_product.values()) + ([shared_key] if shared_key else []):
+        if configured and hmac.compare_digest(presented, configured):
+            valid = True
+    if not valid:
+        return JsonResponse({'error': 'Invalid API key.'}, status=401)
+    return None
+
 
 def _admin_check(user):
     """Check if user is a Keel admin for the CURRENT product.
@@ -146,32 +193,12 @@ def api_ingest(request):
     This is the primary path for change requests to reach Keel's database.
     The widget in each product uses fetch() to call this endpoint.
     """
-    # Verify API key. Accept either a per-product key (preferred) via the
-    # ``KEEL_PRODUCT_API_KEYS`` mapping, or the shared ``KEEL_API_KEY``
-    # (legacy). Per-product keys let an operator rotate one product's key
-    # without forcing a fleet-wide rotation, and limit the blast radius
-    # if any single product container is compromised.
-    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-    if not auth_header.startswith('Bearer '):
-        return JsonResponse({'error': 'Invalid API key.'}, status=401)
-    presented = auth_header[7:].strip()
-    if not presented:
-        return JsonResponse({'error': 'Invalid API key.'}, status=401)
-
-    per_product = getattr(settings, 'KEEL_PRODUCT_API_KEYS', {}) or {}
-    shared_key = getattr(settings, 'KEEL_API_KEY', '') or ''
-    if not per_product and not shared_key:
-        return JsonResponse({'error': 'API ingest not configured.'}, status=503)
-
-    valid = False
-    # Constant-time compare against every configured key. compare_digest
-    # never short-circuits, so iterating doesn't leak which product key
-    # matched via timing.
-    for configured in list(per_product.values()) + ([shared_key] if shared_key else []):
-        if configured and hmac.compare_digest(presented, configured):
-            valid = True
-    if not valid:
-        return JsonResponse({'error': 'Invalid API key.'}, status=401)
+    # Verify API key. Per-product keys (preferred) let an operator rotate one
+    # product's key without a fleet-wide rotation and limit the blast radius if
+    # any single product container is compromised.
+    key_error = _verify_api_key(request)
+    if key_error is not None:
+        return key_error
 
     # Parse JSON body
     try:
@@ -201,19 +228,86 @@ def api_ingest(request):
         cr.title, cr.submitted_by_name, cr.product,
     )
 
-    # Return success immediately — notify admins in background thread
-    # so SMTP timeouts don't block the API response.
-    import threading
-    threading.Thread(
-        target=_notify_admins_api,
-        args=(cr,),
-        daemon=True,
-    ).start()
+    # Human widget submissions notify admins per item (low volume, Dan wants
+    # each one). Unattended bulk creators (the nightly harness) are suppressed
+    # here — they aggregate through /api/ingest/batch/ into a single digest, so
+    # a per-item email per failure would just re-create the 2am flood. Return
+    # success immediately either way; notify in a background thread so SMTP
+    # timeouts don't block the API response.
+    if not _is_automated_submission(cr.submitted_by_name):
+        import threading
+        threading.Thread(
+            target=_notify_admins_api,
+            args=(cr,),
+            daemon=True,
+        ).start()
 
     return JsonResponse({
         'id': str(cr.id),
         'status': 'pending',
         'message': 'Your request has been submitted for review.',
+    }, status=201)
+
+
+@csrf_exempt
+@require_POST
+def api_ingest_batch(request):
+    """Receive MANY change requests in one POST and send ONE digest.
+
+    The batch counterpart to :func:`api_ingest`. The nightly test harness
+    (``keel/scripts/nightly.sh`` Phase 3) posts a whole run's unfixable
+    failures here in a single request instead of one-at-a-time, so a bad night
+    produces a single "N new failures" email instead of N near-identical ones.
+
+    POST JSON to ``https://keel.docklabs.ai/api/requests/ingest/batch/`` with
+    header ``Authorization: Bearer <KEEL_API_KEY>`` and body::
+
+        {
+          "items": [{"title": ..., "description": ..., "product": ...,
+                     "category": "bug", "priority": "high"}, ...],
+          "summary_title": "Nightly tests: {count} new failure(s)",
+          "submitted_by_name": "Nightly Test Bot"
+        }
+
+    Dedupe against currently-open requests is applied (see
+    ``services.bulk_ingest_change_requests``), so re-posting the same failure
+    on a later run does not pile up duplicates.
+    """
+    key_error = _verify_api_key(request)
+    if key_error is not None:
+        return key_error
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON.'}, status=400)
+
+    items = data.get('items')
+    if not isinstance(items, list):
+        return JsonResponse({'error': '"items" must be a list.'}, status=400)
+
+    from .services import bulk_ingest_change_requests
+
+    result = bulk_ingest_change_requests(
+        items,
+        summary_title=(data.get('summary_title') or None),
+        default_submitted_by_name=(data.get('submitted_by_name') or 'Automated'),
+        default_submitted_by_email=(data.get('submitted_by_email') or ''),
+    )
+
+    logger.info(
+        'API batch ingest: %d created, %d skipped (from %d items)',
+        result['created'], result['skipped'], len(items),
+    )
+
+    return JsonResponse({
+        'created': result['created'],
+        'skipped': result['skipped'],
+        'ids': result['ids'],
+        'message': (
+            f"{result['created']} request(s) created, "
+            f"{result['skipped']} skipped (duplicate or incomplete)."
+        ),
     }, status=201)
 
 

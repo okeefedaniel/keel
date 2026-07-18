@@ -28,4 +28,6 @@ urlpatterns = [
 
     # Cross-origin API ingest (products → Keel over HTTPS)
     path('api/ingest/', views.api_ingest, name='api_ingest'),
+    # Bulk ingest — many failures in one POST, one aggregated digest.
+    path('api/ingest/batch/', views.api_ingest_batch, name='api_ingest_batch'),
 ]

@@ -62,6 +62,7 @@ export DEBUG="${DEBUG:-True}"
 export SECRET_KEY="${SECRET_KEY:-nightly-test-key-not-for-production}"
 
 KEEL_API_URL="https://keel.docklabs.ai/api/requests/ingest/"
+KEEL_API_BATCH_URL="https://keel.docklabs.ai/api/requests/ingest/batch/"
 
 # Load KEEL_API_KEY from .env or .zshrc
 if [ -f "${KEEL_DIR}/.env" ]; then
@@ -277,6 +278,12 @@ elif [ ${TEST_EXIT} -ne 0 ] && [ -f "${JSON_FILE}" ]; then
     #
     # The ledger keys on (product, section, label) — not the detail string,
     # which carries counts and timings that churn between runs.
+    # One POST for the whole run, not one per failure. Each individual POST
+    # to /api/requests/ingest/ fired a separate admin email; a 98-failure
+    # night buried the inbox under 98 near-identical 'New Bug Report' emails
+    # in a single minute. The batch endpoint creates every row and sends ONE
+    # digest ('N new failures'). The ledger / cap / dedupe logic below is
+    # unchanged — only the transport (N requests -> 1 request) differs.
     python3 -c "
 import hashlib, json, sys, urllib.request, urllib.error, os
 
@@ -288,7 +295,7 @@ if not failures:
     print('No failures to report.')
     sys.exit(0)
 
-api_url = '${KEEL_API_URL}'
+batch_url = '${KEEL_API_BATCH_URL}'
 api_key = os.environ['KEEL_API_KEY']
 ledger_path = '${KEEL_DIR}/reports/.reported-failures'
 max_posts = int(os.environ.get('NIGHTLY_MAX_POSTS', '25'))
@@ -303,10 +310,11 @@ try:
 except FileNotFoundError:
     seen = set()
 
-fresh = [f for f in failures if key(f) not in seen]
+# Drop already-reported and auto-fixed failures before capping.
+fresh = [f for f in failures if key(f) not in seen and not f.get('auto_fixed', False)]
 already = len(failures) - len(fresh)
 if already:
-    print(f'  {already} failure(s) already reported in a previous run — not re-posting.')
+    print(f'  {already} failure(s) already reported or auto-fixed — not re-posting.')
 
 # Cap loudly. A silent truncation reads as 'that was everything'.
 if len(fresh) > max_posts:
@@ -319,65 +327,55 @@ if not fresh:
     print('  Nothing new to report.')
     sys.exit(0)
 
-failures = fresh
-newly_posted = []
-posted = 0
-skipped = 0
-
-for f in failures:
+items = []
+for f in fresh:
     section = f.get('section', '')
     label = f.get('label', 'Unknown test')
     detail = f.get('detail', '')
     product = f.get('product', 'Beacon')
     severity = f.get('severity', 'medium')
-
-    # Skip if auto-fixed
-    if f.get('auto_fixed', False):
-        skipped += 1
-        continue
-
     is_security = 'security' in section.lower() or severity.upper() in ('CRITICAL', 'HIGH')
     priority = 'high' if is_security else 'medium'
-
-    payload = json.dumps({
+    items.append({
         'title': f'Nightly Test Failure: {label}',
         'description': f'**Section:** {section}\n**Product:** {product}\n**Severity:** {severity}\n\n{detail}',
         'category': 'bug',
         'priority': priority,
         'product': product.lower(),
-        'submitted_by_name': 'Nightly Test Bot',
-        'submitted_by_email': 'info@docklabs.ai',
-    }).encode()
+    })
 
-    req = urllib.request.Request(
-        api_url,
-        data=payload,
-        headers={
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-        },
-        method='POST',
-    )
+payload = json.dumps({
+    'items': items,
+    'summary_title': 'Nightly tests: {count} new failure(s) reported',
+    'submitted_by_name': 'Nightly Test Bot',
+    'submitted_by_email': 'info@docklabs.ai',
+}).encode()
 
-    try:
-        resp = urllib.request.urlopen(req, timeout=30)
-        posted += 1
-        # Ledger only on success, so a 502 retries next run instead of being
-        # marked reported and lost. The dashboard 502'd on 7 of 107 posts the
-        # first time this ran.
-        newly_posted.append(key(f))
-        print(f'  Posted: {label} ({priority} priority)')
-    except urllib.error.HTTPError as e:
-        print(f'  FAILED to post {label}: HTTP {e.code} - {e.read().decode()[:200]}', file=sys.stderr)
-    except Exception as e:
-        print(f'  FAILED to post {label}: {e}', file=sys.stderr)
+req = urllib.request.Request(
+    batch_url,
+    data=payload,
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    },
+    method='POST',
+)
 
-if newly_posted:
+try:
+    resp = urllib.request.urlopen(req, timeout=60)
+    body = json.loads(resp.read().decode() or '{}')
+    # Ledger only on success, so a 5xx retries next run instead of being
+    # marked reported and lost. Every fresh key is now handled by the server
+    # (created OR deduped as already-open), so record them all.
     os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
     with open(ledger_path, 'a') as fh:
-        fh.write('\n'.join(newly_posted) + '\n')
-
-print(f'\n{posted} failure(s) posted, {skipped} auto-fixed (skipped).')
+        fh.write('\n'.join(key(f) for f in fresh) + '\n')
+    print(f\"  Posted {len(items)} failure(s) in one batch: \"
+          f\"{body.get('created', '?')} created, {body.get('skipped', '?')} skipped.\")
+except urllib.error.HTTPError as e:
+    print(f'  FAILED to post batch: HTTP {e.code} - {e.read().decode()[:300]}', file=sys.stderr)
+except Exception as e:
+    print(f'  FAILED to post batch: {e}', file=sys.stderr)
 "
 else
     echo "All tests passed — nothing to report."

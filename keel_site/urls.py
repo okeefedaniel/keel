@@ -14,7 +14,7 @@ from keel.core.demo import demo_login_view
 from keel.core.views import favicon_view, robots_txt, suite_logout_endpoint
 from keel.oidc.views import ai_key_status as oidc_ai_key_status
 from keel.oidc.views import session_status as oidc_session_status
-from keel.requests.views import api_ingest
+from keel.requests.views import api_ingest, api_ingest_batch
 from . import dashboard, notifications_admin, tools
 from .audit.views import AuditLogListView
 from .ops.views import OpsConsoleView
@@ -36,6 +36,7 @@ urlpatterns = [
 
     # Public API (cross-origin, API-key authenticated)
     path('api/requests/ingest/', api_ingest, name='api_ingest'),
+    path('api/requests/ingest/batch/', api_ingest_batch, name='api_ingest_batch'),
     path('api/notifications/config/', notifications_admin.api_notification_config, name='api_notification_config'),
 
     # Auth

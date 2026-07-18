@@ -51,8 +51,12 @@ from .workflows import run_workflow_tests
 def _notify_keel_dashboard(critical_findings):
     """Create ChangeRequests in the keel dashboard for critical findings.
 
-    This is best-effort — if the DB isn't available, findings are logged to
-    stderr instead.
+    Routes through ``keel.requests.services.bulk_ingest_change_requests`` so
+    the whole run produces exactly ONE aggregated admin notification, not one
+    per finding — the same flood-avoidance the batch ingest endpoint gives the
+    nightly ``failures`` path. Dedupe against currently-open requests is
+    preserved by the service. Best-effort: if the DB isn't available, findings
+    are logged to stderr instead.
     """
     if not critical_findings:
         return
@@ -63,32 +67,37 @@ def _notify_keel_dashboard(critical_findings):
         os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'keel_site.settings')
         django.setup()
 
-        from keel.requests.models import ChangeRequest
+        from keel.requests.models import Category, Priority
+        from keel.requests.services import bulk_ingest_change_requests
 
-        for finding in critical_findings:
-            # Avoid duplicates — check if an open request already exists
-            existing = ChangeRequest.objects.filter(
-                title__icontains=finding['finding'][:80],
-                status__in=('pending', 'approved', 'implementing'),
-            ).exists()
-            if existing:
-                continue
-
-            ChangeRequest.objects.create(
-                title=f"[SECURITY] {finding['finding'][:80]}",
-                description=(
+        items = [
+            {
+                'title': f"[SECURITY] {finding['finding'][:80]}",
+                'description': (
                     f"**Product:** {finding['product']}\n"
                     f"**Severity:** {finding['severity']}\n"
                     f"**Finding:** {finding['finding']}\n"
                     f"**Recommendation:** {finding['recommendation']}\n\n"
                     f"_Auto-reported by the nightly security audit._"
                 ),
-                product=_map_product_name(finding['product']),
-                category='BUG',
-                priority='CRITICAL' if finding['severity'] == 'CRITICAL' else 'HIGH',
-            )
+                'product': _map_product_name(finding['product']),
+                'category': Category.BUG,
+                'priority': (
+                    Priority.CRITICAL if finding['severity'] == 'CRITICAL'
+                    else Priority.HIGH
+                ),
+                'submitted_by_name': 'Nightly Security Audit',
+            }
+            for finding in critical_findings
+        ]
+
+        result = bulk_ingest_change_requests(
+            items,
+            summary_title='Nightly security audit: {count} new critical finding(s)',
+        )
         print(
-            f'\n{len(critical_findings)} critical finding(s) reported to Keel dashboard.',
+            f"\n{result['created']} critical finding(s) reported to Keel dashboard "
+            f"({result['skipped']} already open or incomplete).",
             file=sys.stderr,
         )
     except Exception as e:
