@@ -280,9 +280,12 @@ def _ai_settings_url():
     """
     from django.conf import settings as django_settings
     from django.urls import NoReverseMatch, reverse
-    from keel.core.utils import is_suite_mode
+    from keel.core.utils import is_suite_mode, local_ai_key_enabled
 
-    if is_suite_mode():
+    # Suite-mode products that store the key in their OWN db
+    # (KEEL_LOCAL_AI_KEY) keep the user in-product — Keel stays invisible.
+    # Every other suite-mode product still links out to the IdP.
+    if is_suite_mode() and not local_ai_key_enabled():
         issuer = (getattr(django_settings, 'KEEL_OIDC_ISSUER', '') or '').rstrip('/')
         if issuer:
             return f'{issuer}/settings/ai/'

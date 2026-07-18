@@ -62,6 +62,32 @@ def is_suite_mode():
     return bool(getattr(settings, 'KEEL_OIDC_CLIENT_ID', ''))
 
 
+def local_ai_key_enabled():
+    """True when this product stores the Anthropic key in its OWN database.
+
+    Opt-in via ``KEEL_LOCAL_AI_KEY = True``. Off by default so that bumping
+    the keel pin never silently changes AI-key behavior across all 10
+    products at once (the DX footgun called out in the design review): a
+    product only gets the in-product, local-first AI key experience once it
+    explicitly sets the flag.
+
+    When on, in suite mode:
+    - keel's ``AIPanel`` renders the editable form (not the "manage on
+      DockLabs" click-out) and writes to the product-local
+      ``anthropic_api_key_encrypted`` field;
+    - the "add your API key" prompt (``ai_key_prompt``) links to the
+      in-product ``/settings/ai/`` instead of ``KEEL_OIDC_ISSUER``;
+    - the AI gate reads the local field as the sole source of truth (the
+      ``ai_key_present`` OIDC claim, which mirrors the *Keel identity's*
+      key, is ignored because the product can't use that key without a
+      local copy — see ``keel.core.ai_access._user_has_key``).
+
+    Standalone products are unaffected: they're already editable +
+    local-first regardless of this flag.
+    """
+    return bool(getattr(settings, 'KEEL_LOCAL_AI_KEY', False))
+
+
 def safe_redirect_url(request, url, fallback='/dashboard/'):
     """Return *url* only if it points to an allowed host, otherwise *fallback*."""
     if url and url_has_allowed_host_and_scheme(

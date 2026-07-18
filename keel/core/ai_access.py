@@ -147,12 +147,23 @@ def _user_has_key(user) -> bool:
     Checks the local encrypted field first (fast, no network). Falls back to
     the OIDC ai_key_present claim for suite-mode products where the key lives
     in Keel's database and the local field is always empty.
+
+    Products that store the key in their OWN database
+    (``KEEL_LOCAL_AI_KEY``) do NOT trust the claim: it mirrors the Keel
+    identity's key, which those products can't actually call Anthropic with
+    unless they hold a local copy. There, the local field — hydrated at
+    login by the SSO adapter (Phase B) or entered in-product — is the sole
+    source of truth, so an empty local field correctly reads as "needs key"
+    and drives the user to the in-product settings panel.
     """
     if user is None or not getattr(user, 'is_authenticated', False):
         return False
     method = getattr(user, 'has_anthropic_key', None)
     if callable(method) and method():
         return True
+    from keel.core.utils import local_ai_key_enabled
+    if local_ai_key_enabled():
+        return False
     return _oidc_ai_key_present(user)
 
 

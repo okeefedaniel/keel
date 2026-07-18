@@ -29,7 +29,7 @@ from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 
-from keel.core.utils import is_keel_idp, is_suite_mode
+from keel.core.utils import is_keel_idp, is_suite_mode, local_ai_key_enabled
 
 from .base import SettingsPanel
 
@@ -39,11 +39,25 @@ logger = logging.getLogger(__name__)
 def _identity_is_editable() -> bool:
     """Identity edits are allowed on standalone products and on Keel itself.
 
-    Gates AccountPanel (username / email / password) and AIPanel. Profile
-    fields are gated separately by _profile_is_editable() so they can be
-    edited everywhere without changing the credential-change rules.
+    Gates AccountPanel (username / email / password). Profile fields are
+    gated separately by _profile_is_editable() so they can be edited
+    everywhere without changing the credential-change rules; the AI key is
+    gated by _ai_key_is_editable() so a product can opt into local AI-key
+    storage without unlocking credential edits.
     """
     return is_keel_idp() or not is_suite_mode()
+
+
+def _ai_key_is_editable() -> bool:
+    """The Anthropic-key panel is editable wherever the key is stored locally.
+
+    That's standalone products and Keel itself (``_identity_is_editable``),
+    PLUS suite-mode products that opted into local AI-key storage via
+    ``KEEL_LOCAL_AI_KEY`` — those store the key in their own DB and render
+    the editable form in-product (Keel invisible) instead of the
+    "manage on DockLabs" click-out.
+    """
+    return _identity_is_editable() or local_ai_key_enabled()
 
 
 def _profile_is_editable() -> bool:
@@ -326,9 +340,11 @@ class AIPanel(SettingsPanel):
     the user has no AI-eligible products, the panel is hidden — adding
     a key would be pointless.
 
-    On suite-mode products: the panel redirects to Keel
-    (``KEEL_OIDC_ISSUER/settings/ai/``) — the key lives on the IdP.
-    On Keel itself or on standalone products: the panel is editable.
+    On Keel itself and on standalone products the panel is editable. On
+    suite-mode products it renders an informational mirror linking to Keel
+    (``KEEL_OIDC_ISSUER/settings/ai/``) — UNLESS the product opts into
+    local AI-key storage with ``KEEL_LOCAL_AI_KEY=True``, in which case the
+    panel is editable in-product and the key lives in the product's own DB.
     """
 
     slug = 'ai'
@@ -358,13 +374,19 @@ class AIPanel(SettingsPanel):
     def get_context(self, request, *, error: str | None = None):
         from keel.core.ai_access import _user_has_key, ai_enabled_products_for_user
 
-        editable = _identity_is_editable()
+        editable = _ai_key_is_editable()
         user = request.user
-        # Use _user_has_key instead of user.has_anthropic_key() so that
-        # suite-mode products (where the key lives in Keel's DB, not locally)
-        # read the ai_key_present claim from stored OIDC extra_data rather
-        # than always showing "Not set".
-        has_key = _user_has_key(user)
+        # When the panel is editable it manages the product-LOCAL encrypted
+        # field, so reflect exactly that field — not the ai_key_present OIDC
+        # claim, which mirrors the Keel identity's key and can read True while
+        # the local field is empty (e.g. before Phase B login-hydration). A
+        # False-positive "configured" here would hide the entry form the user
+        # actually needs. On non-editable suite panels keep the claim fallback
+        # via _user_has_key so the mirror card still shows "set".
+        if editable and hasattr(user, 'has_anthropic_key'):
+            has_key = user.has_anthropic_key()
+        else:
+            has_key = _user_has_key(user)
         # key_hint requires the local plaintext — only available when the key
         # is stored locally (Keel itself or standalone mode). In suite mode
         # has_anthropic_key() returns False so the hint is empty anyway.
@@ -385,7 +407,7 @@ class AIPanel(SettingsPanel):
         }
 
     def post(self, request):
-        if not _identity_is_editable():
+        if not _ai_key_is_editable():
             messages.error(
                 request,
                 'AI key edits live on DockLabs. Use the link to update.',
