@@ -204,3 +204,117 @@ def test_aipanel_post_blocked_suite_flag_off(db, user, settings):
     assert result is not None
     user.refresh_from_db()
     assert user.has_anthropic_key() is False
+
+
+# ---------------------------------------------------------------------------
+# Unconfigured encryption — the panel must degrade, not 500
+# ---------------------------------------------------------------------------
+# EncryptedTextField.get_db_prep_save raises ImproperlyConfigured when
+# neither KEEL_ENCRYPTION_KEYS nor KEEL_ENCRYPTION_KEY is set. Beacon prod
+# 500'd on the first in-product key save (2026-07-22) because the env var
+# had never been needed before the page shipped. The panel now probes the
+# key config up front and renders an admin-facing fix-it message instead.
+
+def _unset_encryption(settings, monkeypatch):
+    settings.KEEL_ENCRYPTION_KEYS = ''
+    settings.KEEL_ENCRYPTION_KEY = ''
+    monkeypatch.delenv('KEEL_ENCRYPTION_KEYS', raising=False)
+    monkeypatch.delenv('KEEL_ENCRYPTION_KEY', raising=False)
+
+
+# Full-page tests render the shared chrome; use plain staticfiles storage so
+# the manifest (built by collectstatic, absent in test runs) isn't required.
+_STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+}
+
+
+def test_encryption_configured_helper_truth_table(settings, monkeypatch):
+    from keel.settings.builtin_panels import _encryption_configured
+    _unset_encryption(settings, monkeypatch)
+    assert _encryption_configured() is False
+    settings.KEEL_ENCRYPTION_KEYS = _gen_key()
+    assert _encryption_configured() is True
+
+
+def test_aipanel_get_context_encryption_unconfigured(db, user, settings, monkeypatch):
+    """GET with no encryption key: no exception, context flags the gap."""
+    from keel.settings.builtin_panels import AIPanel
+    _unset_encryption(settings, monkeypatch)
+    with override_settings(**SUITE, KEEL_LOCAL_AI_KEY=True):
+        ctx = AIPanel().get_context(_get_request(user))
+    assert ctx['editable'] is True
+    assert ctx['encryption_configured'] is False
+    assert 'KEEL_ENCRYPTION_KEYS' in ctx['encryption_unconfigured_message']
+
+
+def test_aipanel_get_context_encryption_configured(db, user, settings):
+    from keel.settings.builtin_panels import AIPanel
+    settings.KEEL_ENCRYPTION_KEYS = _gen_key()
+    with override_settings(**SUITE, KEEL_LOCAL_AI_KEY=True):
+        ctx = AIPanel().get_context(_get_request(user))
+    assert ctx['encryption_configured'] is True
+
+
+def test_aipanel_post_encryption_unconfigured_no_500(db, user, settings, monkeypatch):
+    """POST with no encryption key: re-renders (no ImproperlyConfigured), writes nothing."""
+    from keel.settings.builtin_panels import AIPanel
+    _unset_encryption(settings, monkeypatch)
+    with override_settings(**SUITE, KEEL_LOCAL_AI_KEY=True):
+        result = AIPanel().post(_post_request(user, {
+            '_action': 'set',
+            'anthropic_api_key': 'sk-ant-would-500-1234567890abcdefghij',
+        }))
+    assert result is not None  # re-render, not the success/PRG path
+    assert result['encryption_configured'] is False
+    user.refresh_from_db()
+    assert user.has_anthropic_key() is False
+
+
+def test_ai_panel_template_hides_form_when_unconfigured(db, user, settings, monkeypatch):
+    """Rendered panel shows the admin message and no key-entry form."""
+    from django.template.loader import render_to_string
+    from keel.settings.builtin_panels import AIPanel
+    _unset_encryption(settings, monkeypatch)
+    with override_settings(**SUITE, KEEL_LOCAL_AI_KEY=True):
+        ctx = AIPanel().get_context(_get_request(user))
+        html = render_to_string('keel/settings/panels/ai.html', ctx)
+    assert 'KEEL_ENCRYPTION_KEYS' in html
+    assert 'generate_key()' in html
+    assert 'name="anthropic_api_key"' not in html  # form hidden
+
+
+def test_settings_ai_page_get_200_when_unconfigured(db, user, settings, monkeypatch, client):
+    """Full-stack GET /settings/ai/ → 200 with the message, no 500."""
+    from keel.settings import builtin_panels
+    _unset_encryption(settings, monkeypatch)
+    # Make the panel visible without wiring org subscriptions + ProductAccess.
+    monkeypatch.setattr(
+        builtin_panels.AIPanel, 'is_visible', lambda self, u: True,
+    )
+    client.force_login(user)
+    with override_settings(KEEL_OIDC_CLIENT_ID='', KEEL_IS_IDP=False, STORAGES=_STORAGES):
+        resp = client.get('/settings/ai/')
+    assert resp.status_code == 200
+    assert 'KEEL_ENCRYPTION_KEYS' in resp.content.decode()
+
+
+def test_settings_ai_page_post_no_500_when_unconfigured(db, user, settings, monkeypatch, client):
+    """Full-stack POST: re-renders the panel with the message, never raises."""
+    from keel.settings import builtin_panels
+    _unset_encryption(settings, monkeypatch)
+    monkeypatch.setattr(
+        builtin_panels.AIPanel, 'is_visible', lambda self, u: True,
+    )
+    client.force_login(user)
+    with override_settings(KEEL_OIDC_CLIENT_ID='', KEEL_IS_IDP=False, STORAGES=_STORAGES):
+        resp = client.post('/settings/ai/', {
+            'panel': 'ai', '_action': 'set',
+            'anthropic_api_key': 'sk-ant-would-500-1234567890abcdefghij',
+        })
+    # Error re-render path (panel.post returned context), not a 500.
+    assert resp.status_code in (200, 400)
+    assert 'KEEL_ENCRYPTION_KEYS' in resp.content.decode()
+    user.refresh_from_db()
+    assert user.has_anthropic_key() is False

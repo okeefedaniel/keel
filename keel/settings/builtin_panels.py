@@ -356,6 +356,16 @@ class AIPanel(SettingsPanel):
     # Where users go to get a key. Linked from the help text.
     ANTHROPIC_CONSOLE_URL = 'https://console.anthropic.com/settings/keys'
 
+    # Admin-facing message rendered (and used as the POST error) when the
+    # deployment has no encryption key configured. Saving would otherwise
+    # 500 at EncryptedTextField.get_db_prep_save — happened on Beacon prod
+    # 2026-07-22, the first save after the in-product page shipped.
+    ENCRYPTION_UNCONFIGURED_MESSAGE = (
+        "This product isn't configured for encrypted key storage yet — "
+        'set KEEL_ENCRYPTION_KEYS on the service. Generate one with '
+        'keel.security.encryption.generate_key().'
+    )
+
     def is_visible(self, user) -> bool:
         if not super().is_visible(user):
             return False
@@ -375,6 +385,10 @@ class AIPanel(SettingsPanel):
         from keel.core.ai_access import _user_has_key, ai_enabled_products_for_user
 
         editable = _ai_key_is_editable()
+        # Only relevant when the panel manages the product-LOCAL encrypted
+        # field; the suite-mode mirror never touches local storage, so
+        # report "configured" there to keep the template branch simple.
+        encryption_configured = _encryption_configured() if editable else True
         user = request.user
         # When the panel is editable it manages the product-LOCAL encrypted
         # field, so reflect exactly that field — not the ai_key_present OIDC
@@ -397,6 +411,8 @@ class AIPanel(SettingsPanel):
         )
         return {
             'editable': editable,
+            'encryption_configured': encryption_configured,
+            'encryption_unconfigured_message': self.ENCRYPTION_UNCONFIGURED_MESSAGE,
             'keel_settings_url': _keel_ai_url(),
             'user': user,
             'has_key': has_key,
@@ -412,6 +428,14 @@ class AIPanel(SettingsPanel):
                 request,
                 'AI key edits live on DockLabs. Use the link to update.',
             )
+            return self.get_context(request)
+
+        if not _encryption_configured():
+            # Saving would 500 at EncryptedTextField.get_db_prep_save
+            # (ImproperlyConfigured — no KEEL_ENCRYPTION_KEYS). The form
+            # is hidden in this state, but guard the POST path too so a
+            # stale tab or direct POST re-renders the admin-facing
+            # message instead of crashing.
             return self.get_context(request)
 
         action = (request.POST.get('_action') or 'set').strip()
@@ -450,6 +474,25 @@ class AIPanel(SettingsPanel):
                 error='This deployment does not store the Anthropic key locally. Set it on DockLabs.',
             )
         return None
+
+
+def _encryption_configured() -> bool:
+    """Whether encrypted-at-rest storage is available on this deployment.
+
+    ``KeelUser.anthropic_api_key_encrypted`` is an ``EncryptedTextField``;
+    saving a non-empty value raises ``ImproperlyConfigured`` at
+    ``get_db_prep_save`` time when neither ``KEEL_ENCRYPTION_KEYS`` nor
+    ``KEEL_ENCRYPTION_KEY`` is set. Probe up front so the panel can render
+    an admin-facing fix-it message instead of 500ing on the first save.
+    """
+    from django.core.exceptions import ImproperlyConfigured
+
+    try:
+        from keel.security.encryption import get_fernet
+        get_fernet()
+        return True
+    except ImproperlyConfigured:
+        return False
 
 
 def _keel_ai_url() -> str:

@@ -35,6 +35,17 @@
     {% endif %}
   </dl>
 
+{% elif not encryption_configured %}
+  {# Editable, but the deployment can't encrypt at rest — saving would 500. #}
+  {# Admin-facing: this is a deploy-config gap, not something the user can fix. #}
+  <div class="alert alert-warning d-flex align-items-start mb-0" role="alert">
+    <i class="bi bi-shield-exclamation me-2 mt-1"></i>
+    <div>
+      <strong>Encrypted key storage isn't configured on this deployment.</strong>
+      <div class="small mb-0">{{ encryption_unconfigured_message }}</div>
+    </div>
+  </div>
+
 {% else %}
   {# Standalone or Keel IdP: editable form. #}
 
