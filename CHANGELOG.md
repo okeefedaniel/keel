@@ -5,6 +5,35 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.10 — 2026-07-22
+
+**AIPanel survives a missing KEEL_ENCRYPTION_KEYS; nightly-test bug reports collapse into one digest email.**
+
+### Added
+- **`keel.notifications.digest.notify_batch`** — a context manager that collapses many same-run `notify()` calls into ONE aggregated notification (count + a truncated item list). For bulk / automated paths only (nightly ingestion, security-audit ingestion, bulk imports); low-volume human actions keep notifying per item.
+- **`keel.requests.services.bulk_ingest_change_requests`** — the single entry point for automated, high-volume ChangeRequest creation. Creates N rows, preserves dedupe against currently-open requests, and sends exactly one admin digest. Used by `keel.testing`'s `_notify_keel_dashboard` and the new `/api/requests/ingest/batch/` endpoint.
+
+### Fixed
+- **`AIPanel`** no longer 500s when the deployment has no encryption key
+  configured. Saving a key writes `KeelUser.anthropic_api_key_encrypted`
+  (an `EncryptedTextField`), which raises `ImproperlyConfigured` at
+  `get_db_prep_save` when neither `KEEL_ENCRYPTION_KEYS` nor
+  `KEEL_ENCRYPTION_KEY` is set — this hit Beacon prod on 2026-07-22 on the
+  first in-product key save. The panel now probes `get_fernet()` up front
+  (GET and POST), hides the key form, and renders an admin-facing fix-it
+  message ("set `KEEL_ENCRYPTION_KEYS` on the service; generate one with
+  `keel.security.encryption.generate_key()`") instead of crashing.
+- **Nightly-test email flood** stopped. `scripts/nightly.sh` Phase 3 posted each unfixable failure one at a time to `/api/requests/ingest/`, and every POST fired a separate admin email — a 98-failure night buried the inbox under 98 near-identical "New Bug Report" emails in one minute. Phase 3 now posts the whole run in one request to the new `/api/requests/ingest/batch/` endpoint, which creates every row and sends **one** digest ("N new failures"). Human widget submissions to `/api/requests/ingest/` still notify per item; automated submissions (`submitted_by_name` = "Nightly Test Bot" / "Nightly Security Audit") are suppressed on the per-item path so the flood can't recur even before the new client ships.
+
+### Consumer note
+- **Deploy prerequisite for the in-product AI-key page:** every product that
+  enables it (`KEEL_LOCAL_AI_KEY=True`, or any standalone deployment showing
+  the editable AI panel) must set `KEEL_ENCRYPTION_KEYS` on the service
+  **before** rollout. Without it the panel now degrades to an admin-facing
+  "not configured" message instead of 500ing — but users still can't save a
+  key until the env var is set. Generate a key with
+  `python -c "from keel.security.encryption import generate_key; print(generate_key())"`.
+
 ## 0.57.9 — 2026-07-18
 
 **Login-time one-shot AI-key hydration (enter once, see everywhere).**
