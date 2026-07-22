@@ -16,7 +16,7 @@ nh3>=0.3.5
 resend>=2.32.2
 
 # OIDC identity provider — Keel as IdP for the DockLabs suite (Phase 2b)
-django-oauth-toolkit>=2.4
+django-oauth-toolkit>=3.3.0
 
 # Avatar storage (Phase 2 of suite-wide profile, keel >= 0.27.0)
 # Pillow processes uploads; django-storages[s3] writes to docklabs-avatars
