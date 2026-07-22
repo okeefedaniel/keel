@@ -18,7 +18,7 @@ dependencies = [
     # major lands, test keel against it rather than re-adding a ceiling.
     "Django>=5.2",
     "django-oauth-toolkit>=2.4",
-    "nh3>=0.3.5",  # parser-based HTML sanitizer (keel.comms)
+    "nh3>=0.3.6",  # parser-based HTML sanitizer (keel.comms)
     "Pillow>=12.2.0",  # avatar image processing (resize, EXIF strip, WebP encode)
 ]
 
