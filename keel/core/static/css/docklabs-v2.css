@@ -126,7 +126,7 @@
     /* Text */
     --text-primary: #1A1A1A;      /* 16.8:1 on paper */
     --text-secondary: #5B5348;    /* 6.14:1 on paper — AA everywhere */
-    --text-tertiary: #8A8275;     /* lighter — for de-emphasized metadata */
+    --text-tertiary: #736B5E;     /* de-emphasized metadata — 4.92:1 on paper / 5.26:1 on white, AA */
     --text-on-blue: #FFFFFF;
 
     /* Semantic — institutional, not alarm */
@@ -200,6 +200,14 @@
    success/danger stay white, matching Bootstrap. Mirrors the .pill.bg-*
    correction in section 21. */
 .text-bg-info { color: #fff !important; }
+
+/* Bootstrap `.text-warning` foreground correction. --bs-warning-rgb is brass
+   (#B8860B = 3.05:1 on paper) — fine as a graphic/icon fill (3:1 bar) but a
+   WCAG 1.4.3 fail as normal-size text. Remap the text-color utility to the
+   darker --brass-text (#7A5A07 = 5.97:1 on paper) so every `.text-warning`
+   label across the suite passes AA; icons ride along and only gain contrast.
+   Backgrounds/borders/dots keep brass via --bs-warning-rgb / --warning above. */
+.text-warning { color: var(--brass-text) !important; }
 
 .btn-primary {
     background-color: var(--ct-blue);
@@ -2219,7 +2227,7 @@ summary:focus-visible,
     padding: 1.15rem 0 0 52px;
     font-family: var(--font-display);
     font-weight: 600;
-    color: var(--brass);
+    color: var(--brass-text);   /* 0.85rem = normal text; brass fails AA, brass-text = 5.97:1 */
     font-size: 0.85rem;
     letter-spacing: 0.12em;
     font-variant-numeric: tabular-nums;
