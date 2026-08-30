@@ -1,18 +1,33 @@
 """UI consistency audit across all DockLabs products.
 
-Scans templates, CSS, JS, and static assets across Beacon, Harbor, Lookout,
-and their sub-products (Admiralty, Manifest) to detect inconsistencies in:
+Scans templates, CSS, JS, and static assets across all nine products to detect
+drift from the shared design system in:
 
 - CDN/library versions (Bootstrap, htmx, Bootstrap Icons)
-- CSS custom properties and color palette adherence
-- Template structure (block names, base template patterns)
-- Component patterns (cards, tables, buttons, forms, navigation)
-- Accessibility patterns (skip links, ARIA, focus styles)
+- CSS custom properties and the v3 "Civic Institution" token palette
+- Layout contract (blocks, shared CSS/JS, Bootstrap, a11y landmarks)
+- Component patterns (Bootstrap 3/4 remnants)
+- Accessibility patterns (skip links, viewport, lang, focus styles)
 - Font stack and typography consistency
 - Responsive breakpoints
 - Print stylesheet coverage
 - Icon library usage
 - Hard-coded colors vs design tokens
+
+Two structural rules keep this honest, both learned the hard way:
+
+1. **Follow ``{% extends %}``.** Every product's ``base.html`` inherits from
+   ``keel/layouts/app.html``, which supplies the blocks, Bootstrap, the shared
+   CSS/JS, the skip link, the viewport tag and the lang attribute. Grepping a
+   product's ``base.html`` in isolation reports the shared layout working as
+   designed as if it were 28 defects. Assertions run against the *resolved
+   chain*, so a product that genuinely ships a bare base is still caught.
+
+2. **Assert what CLAUDE.md actually mandates.** This audit previously pinned
+   Poppins, Arial and the pre-v2 ``--ct-*`` hex palette — the exact design
+   system the suite deliberately migrated off in v0.56.3. A rule that fails
+   when the code is right is worse than no rule: it trains people to ignore
+   the report. See keel#65.
 
 Reports both PASS/FAIL checks and advisory recommendations.
 
@@ -20,7 +35,6 @@ Usage:
     python -m keel.testing --ui-only
     python -m keel.testing  # (includes UI audit automatically)
 """
-import os
 import re
 from pathlib import Path
 
@@ -28,55 +42,104 @@ from .config import BASE_DIR
 from .result import TestResult
 
 # ---------------------------------------------------------------------------
-# Canonical design tokens — the "source of truth" from docklabs.css
+# Shared design system — the source of truth lives in keel, not in products
+# ---------------------------------------------------------------------------
+KEEL_ROOT = BASE_DIR / 'keel' / 'keel'
+KEEL_TEMPLATE_ROOT = KEEL_ROOT / 'core' / 'templates'
+SHARED_LAYOUT = KEEL_TEMPLATE_ROOT / 'keel' / 'layouts' / 'app.html'
+SHARED_CSS = KEEL_ROOT / 'core' / 'static' / 'css' / 'docklabs-v2.css'
+SHARED_JS = KEEL_ROOT / 'core' / 'static' / 'js' / 'docklabs-v2.js'
+
+# ---------------------------------------------------------------------------
+# Canonical design tokens — the "source of truth" from docklabs-v2.css
 # ---------------------------------------------------------------------------
 CANONICAL = {
-    'bootstrap_css': 'bootstrap@5.3.3',
-    'bootstrap_js': 'bootstrap@5.3.3',
-    'bootstrap_icons': 'bootstrap-icons@1.11.3',
+    'bootstrap_css': '5.3.3',
+    'bootstrap_js': '5.3.3',
+    'bootstrap_icons': '1.11.3',
     'htmx_min': '2.0.0',
-    'google_fonts': 'Poppins',
-    'heading_font': 'Poppins',
-    'body_font': 'Arial',
+    # v3 "Civic Institution" editorial stack. Self-hosted WOFF2, declared via
+    # @font-face in docklabs-v2.css and exposed as the three vars below. Never
+    # hardcode a family — always reference the var (CLAUDE.md, Typography).
+    'fonts': {
+        '--font-display': 'Fraunces',        # serif display / headings
+        '--font-sans': 'Instrument Sans',    # body
+        '--font-mono': 'JetBrains Mono',     # data / labels / eyebrows
+    },
+    # The v3 palette. Values read from docklabs-v2.css :root — this is the
+    # subset that carries meaning (brand, surface, text, semantic), not every
+    # one of the 78 declared vars.
     'colors': {
-        '--ct-blue': '#1F64E5',
-        '--ct-dark-blue': '#00214D',
-        '--ct-bold-blue': '#003D9C',
-        '--ct-light-blue': '#C6D4FB',
-        '--ct-pale-blue': '#EBF0FF',
-        '--ct-orange': '#F27124',
-        '--ct-yellow': '#FAAA19',
-        '--ct-brown': '#BA5803',
-        '--ct-red': '#E91C1F',
-        '--ct-green': '#198754',
-        '--ct-dark-gray': '#333333',
-        '--ct-light-gray': '#F8F8F8',
+        '--ct-blue': '#0A2B4E',
+        '--ct-blue-hover': '#12395F',
+        '--brass': '#B8860B',
+        '--brass-soft': '#F5EAD0',
+        '--brass-text': '#7A5A07',
+        '--bg-page': '#FAF7F2',
+        '--bg-sidebar': '#FCFAF5',
+        '--bg-card': '#FFFFFF',
+        '--bg-hover': '#F1ECE2',
+        '--bg-warm': '#F7F3EA',
+        '--border': '#E8E3D9',
+        '--border-light': '#F0EDE8',
+        '--border-strong': '#D8D2C4',
+        '--text-primary': '#1A1A1A',
+        '--text-secondary': '#5B5348',
+        '--text-tertiary': '#8A8275',
+        '--success': '#2D5F3F',
+        '--warning': '#B8860B',
+        '--error': '#8B2E2A',
+        '--info': '#2C5F8D',
     },
 }
 
-# Products and their template/static roots
+# Brand hexes that should be referenced through a token, never inlined.
+BRAND_HEX_RE = re.compile(
+    r'#0A2B4E|#12395F|#B8860B|#FAF7F2|#2D5F3F|#8B2E2A|#2C5F8D',
+    re.IGNORECASE,
+)
+TOKEN_REF_RE = re.compile(r'var\(\s*--[a-z0-9-]+', re.IGNORECASE)
+
+# Products and their template/static roots. Every DockLabs product is its own
+# repo — Admiralty and Manifest are NOT sub-products of Beacon and Harbor. That
+# assumption made this audit read stale, git-tracked legacy copies at
+# beacon/templates/admiralty/base.html and harbor/templates/manifest/base.html
+# instead of the real thing. Same root cause as keel#63.
 PRODUCT_ROOTS = {
-    'Beacon': {
-        'templates': BASE_DIR / 'beacon' / 'templates',
-        'static': BASE_DIR / 'beacon' / 'static',
-        'base_templates': ['base.html', 'admiralty/base.html'],
-    },
-    'Harbor': {
-        'templates': BASE_DIR / 'harbor' / 'templates',
-        'static': BASE_DIR / 'harbor' / 'static',
-        'base_templates': ['base.html', 'manifest/base.html'],
-    },
-    'Lookout': {
-        'templates': BASE_DIR / 'lookout' / 'templates',
-        'static': BASE_DIR / 'lookout' / 'static',
+    name: {
+        'templates': BASE_DIR / repo / 'templates',
+        'static': BASE_DIR / repo / 'static',
         'base_templates': ['base.html'],
-    },
+    }
+    for name, repo in (
+        ('Admiralty', 'admiralty'),
+        ('Beacon', 'beacon'),
+        ('Bounty', 'bounty'),
+        ('Harbor', 'harbor'),
+        ('Helm', 'helm'),
+        ('Lookout', 'lookout'),
+        ('Manifest', 'manifest'),
+        ('Purser', 'purser'),
+        ('Yeoman', 'yeoman'),
+    )
 }
 
-# Common template blocks that should be present in all base templates
-EXPECTED_BLOCKS = {'title', 'content', 'extra_css', 'extra_js'}
+# The contract an authenticated page must satisfy. Products inherit all of it
+# from keel/layouts/app.html; it is asserted against the *resolved* extends
+# chain, so a product that stops extending the shared layout without
+# reproducing the contract still fails.
+LAYOUT_CONTRACT = {
+    'block_content': (r'\{%\s*block\s+content\b', '{% block content %}'),
+    'block_title': (r'\{%\s*block\s+title\b', '{% block title %}'),
+    'block_extra_css': (r'\{%\s*block\s+extra_css\b', '{% block extra_css %}'),
+    'block_extra_js': (r'\{%\s*block\s+extra_js\b', '{% block extra_js %}'),
+    'shared_css': (r'docklabs-v2\.css', 'shared docklabs-v2.css'),
+    'shared_js': (r'docklabs-v2\.js', 'shared docklabs-v2.js'),
+    'bootstrap': (r'bootstrap@[\d.]+/dist/css/bootstrap', 'Bootstrap CSS'),
+    'bootstrap_icons': (r'bootstrap-icons@[\d.]+', 'Bootstrap Icons'),
+}
 
-# Required accessibility elements in base templates
+# Required accessibility elements — same inheritance story as LAYOUT_CONTRACT.
 A11Y_CHECKS = {
     'skip_link': (r'skip.*content|visually-hidden-focusable', 'Skip-to-content link'),
     'meta_viewport': (r'name=["\']viewport["\']', 'Viewport meta tag'),
@@ -89,7 +152,6 @@ CDN_PATTERNS = {
     'bootstrap_js': re.compile(r'bootstrap@([\d.]+)/dist/js/bootstrap'),
     'bootstrap_icons': re.compile(r'bootstrap-icons@([\d.]+)'),
     'htmx': re.compile(r'htmx\.org@([\d.]+)'),
-    'google_fonts': re.compile(r'fonts\.googleapis\.com/css2\?family=([^&"\']+)'),
 }
 
 # Hard-coded color patterns that should use CSS variables instead
@@ -106,6 +168,94 @@ PRODUCT_SPECIFIC_COLORS = {
     # Harbor signatures
 }
 
+# Poppins is retained *intentionally* on the public/marketing layout and the
+# HTML email templates (CLAUDE.md, Typography). Product CSS that styles those
+# surfaces is therefore exempt from the "headings use var(--font-display)" rule.
+PUBLIC_SURFACE_SELECTORS = ('hero-section', 'stats-bar', 'landing-section')
+
+# A heading rule and the font-family it declares, with the selector captured so
+# public/marketing surfaces can be exempted.
+HEADING_FONT_RE = re.compile(
+    r'([^{}]*\bh[1-6]\b[^{}]*)\{([^}]*?font-family\s*:\s*([^;]+);)',
+    re.DOTALL,
+)
+
+EXTENDS_RE = re.compile(r'\{%\s*extends\s+["\']([^"\']+)["\']\s*%\}')
+
+
+# ---------------------------------------------------------------------------
+# Template inheritance
+# ---------------------------------------------------------------------------
+def _find_template(name, search_roots):
+    """Resolve a Django template name against an ordered list of roots."""
+    for root in search_roots:
+        candidate = root / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _resolve_chain(path, search_roots):
+    """Return every template in ``path``'s ``{% extends %}`` chain.
+
+    Products' base.html is a thin override of ``keel/layouts/app.html``; the
+    markup that satisfies the layout contract lives in the parent. Asserting
+    against the leaf alone reports the shared layout doing its job as a defect.
+    """
+    chain = []
+    seen = set()
+    current = path
+    while current is not None and current.exists() and current not in seen:
+        seen.add(current)
+        chain.append(current)
+        match = EXTENDS_RE.search(current.read_text(errors='replace'))
+        if not match:
+            break
+        current = _find_template(match.group(1), search_roots)
+    return chain
+
+
+def _chain_content(path, search_roots):
+    """Concatenated source of ``path`` and everything it extends."""
+    return '\n'.join(
+        p.read_text(errors='replace') for p in _resolve_chain(path, search_roots)
+    )
+
+
+def _search_roots(info):
+    """Template search path for a product: its own templates, then keel's."""
+    return [info['templates'], KEEL_TEMPLATE_ROOT]
+
+
+def _iter_base_templates(products):
+    """Yield (name, info, base_name, path, resolved_content) per base template."""
+    for name in products:
+        info = PRODUCT_ROOTS.get(name)
+        if not info:
+            continue
+        for base_name in info['base_templates']:
+            base_path = info['templates'] / base_name
+            if not base_path.exists():
+                continue
+            yield (
+                name, info, base_name, base_path,
+                _chain_content(base_path, _search_roots(info)),
+            )
+
+
+def _class_token_re(token):
+    """Match ``token`` as a standalone class name, not as a substring.
+
+    ``class="[^"]*\\bpanel\\b`` matches ``sig-panel`` and ``wizard-panel``
+    because ``-`` is a word boundary — which is how Harbor's two product-specific
+    panel classes got reported as Bootstrap 3 remnants. Require the token to
+    *start* at a class-name boundary, while still catching real BS3 subclasses
+    like ``panel-heading``.
+    """
+    return re.compile(
+        r'class="[^"]*(?<![\w-])' + re.escape(token) + r'(?![\w])',
+    )
+
 
 # ---------------------------------------------------------------------------
 # Main entry point
@@ -121,7 +271,7 @@ def run_ui_audit(T: TestResult, product_names=None):
 
     T.product('UI Audit')
 
-    # Cross-product checks
+    _check_shared_layout(T)
     _check_cdn_versions(T, products)
     _check_css_variables(T, products)
     _check_template_structure(T, products)
@@ -136,6 +286,43 @@ def run_ui_audit(T: TestResult, product_names=None):
 
 
 # ---------------------------------------------------------------------------
+# Shared layout — the contract lives here now, so check it here
+# ---------------------------------------------------------------------------
+def _check_shared_layout(T):
+    """Assert keel's own app layout satisfies the contract it promises."""
+    T.section('Shared Layout')
+
+    if not SHARED_LAYOUT.exists():
+        T.fail('Shared app layout exists', str(SHARED_LAYOUT))
+        return
+    T.ok('Shared app layout exists')
+
+    content = SHARED_LAYOUT.read_text(errors='replace')
+
+    for _key, (pattern, description) in LAYOUT_CONTRACT.items():
+        T.check(
+            bool(re.search(pattern, content)),
+            f'keel/layouts/app.html provides {description}',
+        )
+
+    for _key, (pattern, description) in A11Y_CHECKS.items():
+        T.check(
+            bool(re.search(pattern, content, re.IGNORECASE)),
+            f'keel/layouts/app.html provides {description}',
+        )
+
+    # v3 fonts are self-hosted; the layout preloads the latin subsets so the
+    # first paint isn't a FOUT. Poppins must not come back to app chrome.
+    T.check(
+        'fraunces' in content.lower() and 'instrument-sans' in content.lower(),
+        'keel/layouts/app.html preloads self-hosted v3 fonts',
+    )
+
+    T.check(SHARED_CSS.exists(), 'Shared docklabs-v2.css exists')
+    T.check(SHARED_JS.exists(), 'Shared docklabs-v2.js exists')
+
+
+# ---------------------------------------------------------------------------
 # CDN & library version consistency
 # ---------------------------------------------------------------------------
 def _check_cdn_versions(T, products):
@@ -144,36 +331,25 @@ def _check_cdn_versions(T, products):
 
     versions = {}  # {library: {product: version}}
 
-    for name in products:
-        info = PRODUCT_ROOTS.get(name)
-        if not info:
-            continue
-
-        for base_name in info['base_templates']:
-            base_path = info['templates'] / base_name
-            if not base_path.exists():
-                T.fail(f'{name}: base template exists', f'Missing {base_path}')
-                continue
-
-            content = base_path.read_text(errors='replace')
-
-            for lib, pattern in CDN_PATTERNS.items():
-                match = pattern.search(content)
-                if match:
-                    ver = match.group(1)
-                    versions.setdefault(lib, {})[f'{name}/{base_name}'] = ver
+    for name, _info, base_name, _path, content in _iter_base_templates(products):
+        for lib, pattern in CDN_PATTERNS.items():
+            match = pattern.search(content)
+            if match:
+                versions.setdefault(lib, {})[f'{name}/{base_name}'] = match.group(1)
 
     # Check each library for version consistency
     for lib, product_versions in versions.items():
         unique_versions = set(product_versions.values())
         if len(unique_versions) == 1:
             ver = unique_versions.pop()
-            # Check against canonical
             canonical = CANONICAL.get(lib, '')
-            if canonical and ver not in canonical:
+            # Previously `ver not in canonical`, which is backwards: it asked
+            # whether the found version contains the canonical string, so an
+            # exact match on a longer string always failed.
+            if canonical and canonical not in ver:
                 T.fail(
                     f'{lib} version matches canonical',
-                    f'Found {ver}, expected to contain {canonical}',
+                    f'Found {ver}, expected {canonical}',
                 )
             else:
                 T.ok(f'{lib} version consistent', f'All products use {ver}')
@@ -183,21 +359,20 @@ def _check_cdn_versions(T, products):
 
     # Check htmx specifically — it may appear in base templates
     htmx_versions = versions.get('htmx', {})
-    if htmx_versions:
-        for product_tpl, ver in htmx_versions.items():
-            # Compare major.minor against minimum
-            try:
-                parts = [int(x) for x in ver.split('.')]
-                canonical_parts = [int(x) for x in CANONICAL['htmx_min'].split('.')]
-                if parts[:2] >= canonical_parts[:2]:
-                    T.ok(f'htmx version adequate ({product_tpl})', f'v{ver}')
-                else:
-                    T.fail(
-                        f'htmx version adequate ({product_tpl})',
-                        f'v{ver} < minimum v{CANONICAL["htmx_min"]}',
-                    )
-            except (ValueError, IndexError):
-                T.fail(f'htmx version parseable ({product_tpl})', f'Got: {ver}')
+    for product_tpl, ver in htmx_versions.items():
+        # Compare major.minor against minimum
+        try:
+            parts = [int(x) for x in ver.split('.')]
+            canonical_parts = [int(x) for x in CANONICAL['htmx_min'].split('.')]
+            if parts[:2] >= canonical_parts[:2]:
+                T.ok(f'htmx version adequate ({product_tpl})', f'v{ver}')
+            else:
+                T.fail(
+                    f'htmx version adequate ({product_tpl})',
+                    f'v{ver} < minimum v{CANONICAL["htmx_min"]}',
+                )
+        except (ValueError, IndexError):
+            T.fail(f'htmx version parseable ({product_tpl})', f'Got: {ver}')
 
 
 # ---------------------------------------------------------------------------
@@ -207,16 +382,13 @@ def _check_css_variables(T, products):
     """Verify shared CSS variables are defined and used consistently."""
     T.section('CSS Design Tokens')
 
-    # Check that docklabs.css exists and contains all canonical variables
-    shared_css = BASE_DIR / 'keel' / 'keel' / 'core' / 'static' / 'css' / 'docklabs.css'
-    if not shared_css.exists():
-        T.fail('Shared docklabs.css exists', str(shared_css))
+    if not SHARED_CSS.exists():
+        T.fail('Shared docklabs-v2.css exists', str(SHARED_CSS))
         return
 
-    shared_content = shared_css.read_text(errors='replace')
+    shared_content = SHARED_CSS.read_text(errors='replace')
 
     for var_name, expected_value in CANONICAL['colors'].items():
-        # Check variable is defined
         pattern = re.compile(re.escape(var_name) + r'\s*:\s*([^;]+);')
         match = pattern.search(shared_content)
         if match:
@@ -228,7 +400,19 @@ def _check_css_variables(T, products):
                 f'Expected {expected}, got {actual}' if actual != expected else '',
             )
         else:
-            T.fail(f'{var_name} defined in docklabs.css')
+            T.fail(f'{var_name} defined in docklabs-v2.css')
+
+    for var_name, family in CANONICAL['fonts'].items():
+        pattern = re.compile(re.escape(var_name) + r'\s*:\s*([^;]+);')
+        match = pattern.search(shared_content)
+        if match:
+            T.check(
+                family.lower() in match.group(1).lower(),
+                f'{var_name} resolves to {family}',
+                f'Got: {match.group(1).strip()}' if family.lower() not in match.group(1).lower() else '',
+            )
+        else:
+            T.fail(f'{var_name} defined in docklabs-v2.css')
 
     # Check each product's CSS uses variables, not raw hex for brand colors
     for name in products:
@@ -240,11 +424,10 @@ def _check_css_variables(T, products):
         if not css_dir.exists():
             continue
 
-        for css_file in css_dir.glob('*.css'):
+        for css_file in sorted(css_dir.glob('*.css')):
             content = css_file.read_text(errors='replace')
-            # Check if product CSS references the shared variables
-            var_refs = re.findall(r'var\(--ct-[a-z-]+\)', content)
-            raw_brand = re.findall(r'#1F64E5|#00214D|#003D9C|#F27124|#FAAA19', content, re.IGNORECASE)
+            var_refs = TOKEN_REF_RE.findall(content)
+            raw_brand = BRAND_HEX_RE.findall(content)
 
             if raw_brand and not var_refs:
                 T.fail(
@@ -264,71 +447,30 @@ def _check_css_variables(T, products):
 # Template structure consistency
 # ---------------------------------------------------------------------------
 def _check_template_structure(T, products):
-    """Verify consistent template block structure across products."""
+    """Verify each product's base template satisfies the layout contract.
+
+    Asserted against the resolved ``{% extends %}`` chain — a product inheriting
+    the contract from ``keel/layouts/app.html`` passes without repeating it,
+    which is the entire point of the shared layout.
+    """
     T.section('Template Structure')
 
-    for name in products:
-        info = PRODUCT_ROOTS.get(name)
-        if not info or not info['templates'].exists():
-            continue
+    for name, info, base_name, base_path, content in _iter_base_templates(products):
+        chain = _resolve_chain(base_path, _search_roots(info))
+        extends_shared = SHARED_LAYOUT in chain
 
-        for base_name in info['base_templates']:
-            base_path = info['templates'] / base_name
-            if not base_path.exists():
-                continue
+        T.check(
+            extends_shared,
+            f'{name}/{base_name} extends the shared keel layout',
+            '' if extends_shared else 'Does not resolve to keel/layouts/app.html',
+        )
 
-            content = base_path.read_text(errors='replace')
-
-            # Check for expected blocks
-            defined_blocks = set(re.findall(r'\{%\s*block\s+(\w+)', content))
-            for block in EXPECTED_BLOCKS:
-                T.check(
-                    block in defined_blocks,
-                    f'{name}/{base_name} defines {{% block {block} %}}',
-                )
-
-            # Check docklabs.css is loaded
+        for _key, (pattern, description) in LAYOUT_CONTRACT.items():
             T.check(
-                'docklabs.css' in content or 'docklabs' in content,
-                f'{name}/{base_name} loads shared docklabs.css',
+                bool(re.search(pattern, content)),
+                f'{name}/{base_name} provides {description}',
+                '' if extends_shared else 'Not inherited and not defined locally',
             )
-
-            # Check docklabs.js is loaded
-            T.check(
-                'docklabs.js' in content or 'docklabs' in content,
-                f'{name}/{base_name} loads shared docklabs.js',
-            )
-
-            # Check Bootstrap CSS loaded
-            T.check(
-                'bootstrap' in content.lower(),
-                f'{name}/{base_name} loads Bootstrap',
-            )
-
-            # Check Bootstrap Icons loaded
-            T.check(
-                'bootstrap-icons' in content,
-                f'{name}/{base_name} loads Bootstrap Icons',
-            )
-
-        # Check child templates extend base
-        template_dir = info['templates']
-        for tpl_path in template_dir.rglob('*.html'):
-            # Skip base templates and partials
-            rel = tpl_path.relative_to(template_dir)
-            if str(rel) in info['base_templates']:
-                continue
-            if 'email' in str(rel) or 'partial' in str(rel):
-                continue
-
-            content = tpl_path.read_text(errors='replace')
-            if '{%' in content:  # It's a Django template
-                has_extends = '{% extends' in content or '{%extends' in content
-                is_include = '{% include' not in content and '{%' in content
-                # Fragments/includes don't need extends
-                if not has_extends and '{% block' in content:
-                    # Has blocks but no extends — likely a standalone fragment, skip
-                    pass
 
 
 # ---------------------------------------------------------------------------
@@ -338,82 +480,87 @@ def _check_accessibility(T, products):
     """Check for WCAG 2.1 AA compliance patterns in base templates."""
     T.section('Accessibility')
 
-    for name in products:
-        info = PRODUCT_ROOTS.get(name)
-        if not info:
-            continue
+    for name, info, base_name, _path, content in _iter_base_templates(products):
+        for _check_id, (pattern, description) in A11Y_CHECKS.items():
+            T.check(
+                bool(re.search(pattern, content, re.IGNORECASE)),
+                f'{name}/{base_name}: {description}',
+            )
 
-        for base_name in info['base_templates']:
-            base_path = info['templates'] / base_name
-            if not base_path.exists():
-                continue
+        # Check for focus styles in CSS
+        css_dir = info['static'] / 'css'
+        all_css = ''
+        if css_dir.exists():
+            for css_file in sorted(css_dir.glob('*.css')):
+                all_css += css_file.read_text(errors='replace')
+        if SHARED_CSS.exists():
+            all_css += SHARED_CSS.read_text(errors='replace')
 
-            content = base_path.read_text(errors='replace')
-
-            for check_id, (pattern, description) in A11Y_CHECKS.items():
-                found = bool(re.search(pattern, content, re.IGNORECASE))
-                T.check(
-                    found,
-                    f'{name}/{base_name}: {description}',
-                )
-
-            # Check for focus styles in CSS
-            css_dir = info['static'] / 'css'
-            if css_dir.exists():
-                all_css = ''
-                for css_file in css_dir.glob('*.css'):
-                    all_css += css_file.read_text(errors='replace')
-
-                # Also check shared CSS
-                shared_css = BASE_DIR / 'keel' / 'keel' / 'core' / 'static' / 'css' / 'docklabs.css'
-                if shared_css.exists():
-                    all_css += shared_css.read_text(errors='replace')
-
-                T.check(
-                    ':focus-visible' in all_css or ':focus' in all_css,
-                    f'{name}: Custom focus styles defined',
-                )
+        T.check(
+            ':focus-visible' in all_css or ':focus' in all_css,
+            f'{name}: Custom focus styles defined',
+        )
 
 
 # ---------------------------------------------------------------------------
 # Typography
 # ---------------------------------------------------------------------------
 def _check_typography(T, products):
-    """Verify consistent font stack and heading hierarchy."""
+    """Verify the v3 editorial stack, and that nothing hardcodes a family.
+
+    The old rule asserted ``Poppins`` was loaded. v0.56.3 removed Poppins from
+    authenticated chrome in favour of self-hosted Fraunces / Instrument Sans /
+    JetBrains Mono, so that rule failed precisely when a product was correct.
+    Assert the inverse: app chrome must be free of Poppins, and heading rules
+    must reference ``var(--font-display)`` rather than naming a family.
+    """
     T.section('Typography')
+
+    for name, _info, base_name, _path, content in _iter_base_templates(products):
+        # Poppins survives only on public.html + email templates. base.html is
+        # the authenticated base by convention (CLAUDE.md, UI & Frontend).
+        has_poppins = 'poppins' in content.lower()
+        T.check(
+            not has_poppins,
+            f'{name}/{base_name}: authenticated chrome free of Poppins',
+            'Poppins was removed from app chrome in v0.56.3' if has_poppins else '',
+        )
+        uses_google_fonts = 'fonts.googleapis.com' in content
+        T.check(
+            not uses_google_fonts,
+            f'{name}/{base_name}: fonts self-hosted, not from Google Fonts',
+            'v3 fonts ship as WOFF2 via docklabs-v2.css' if uses_google_fonts else '',
+        )
 
     for name in products:
         info = PRODUCT_ROOTS.get(name)
         if not info:
             continue
 
-        for base_name in info['base_templates']:
-            base_path = info['templates'] / base_name
-            if not base_path.exists():
-                continue
-
-            content = base_path.read_text(errors='replace')
-
-            # Check Google Fonts loaded with Poppins
-            T.check(
-                'Poppins' in content,
-                f'{name}/{base_name}: Poppins font loaded',
-            )
-
-        # Check product CSS doesn't override heading font
         css_dir = info['static'] / 'css'
-        if css_dir.exists():
-            for css_file in css_dir.glob('*.css'):
-                content = css_file.read_text(errors='replace')
-                # Look for font-family overrides on headings
-                heading_font_override = re.search(
-                    r'h[1-6]\s*\{[^}]*font-family\s*:', content,
+        if not css_dir.exists():
+            continue
+
+        for css_file in sorted(css_dir.glob('*.css')):
+            content = css_file.read_text(errors='replace')
+
+            offenders = []
+            for match in HEADING_FONT_RE.finditer(content):
+                selector, _body, family = match.groups()
+                if any(s in selector for s in PUBLIC_SURFACE_SELECTORS):
+                    continue  # public/marketing surface — Poppins is intentional
+                if 'var(--font-' in family:
+                    continue  # references the shared token, which is the rule
+                offenders.append(family.strip())
+
+            if offenders:
+                T.fail(
+                    f'{name}/{css_file.name}: Heading fonts use var(--font-display)',
+                    f'{len(offenders)} heading rule(s) hardcode a family: '
+                    f'{"; ".join(sorted(set(offenders))[:3])}',
                 )
-                if heading_font_override:
-                    T.fail(
-                        f'{name}/{css_file.name}: No heading font override',
-                        'Product CSS overrides heading font-family (should use shared)',
-                    )
+            else:
+                T.ok(f'{name}/{css_file.name}: Heading fonts use var(--font-display)')
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +627,7 @@ def _check_hardcoded_colors(T, products):
         if not css_dir.exists():
             continue
 
-        for css_file in css_dir.glob('*.css'):
+        for css_file in sorted(css_dir.glob('*.css')):
             content = css_file.read_text(errors='replace')
             matches = HARDCODED_COLOR_RE.findall(content)
 
@@ -504,56 +651,24 @@ def _check_hardcoded_colors(T, products):
 # Component patterns
 # ---------------------------------------------------------------------------
 def _check_component_patterns(T, products):
-    """Check for consistent component markup patterns across templates."""
+    """Flag Bootstrap 3/4 markup remnants.
+
+    The old "all products use the navbar / breadcrumb / form_control / badge
+    pattern" checks are gone. They grepped each product's templates for a class
+    name and failed any product that didn't use it — but the suite is on a
+    shared *sidebar* layout (so no product has a navbar of its own), Lookout
+    applies ``form-control`` via widget attrs in forms.py rather than in markup,
+    and Harbor's only "badge" hits are a comment, a CSS selector and a JS query.
+    A vocabulary grep can't tell "styled elsewhere" from "broken", so the rule
+    had no true-positive mode.
+    """
     T.section('Component Patterns')
 
-    patterns = {
-        'navbar': re.compile(r'navbar-dark|navbar-light|class="[^"]*navbar\b'),
-        'card': re.compile(r'class="[^"]*\bcard\b'),
-        'table_hover': re.compile(r'class="[^"]*table-hover'),
-        'table_light_head': re.compile(r'class="[^"]*table-light'),
-        'btn_primary': re.compile(r'class="[^"]*btn-primary'),
-        'form_control': re.compile(r'class="[^"]*form-control'),
-        'breadcrumb': re.compile(r'class="[^"]*breadcrumb'),
-        'badge': re.compile(r'class="[^"]*\bbadge\b'),
-    }
-
-    component_usage = {}  # {product: {pattern_name: count}}
-
-    for name in products:
-        info = PRODUCT_ROOTS.get(name)
-        if not info or not info['templates'].exists():
-            continue
-
-        counts = {p: 0 for p in patterns}
-        template_dir = info['templates']
-
-        for tpl_path in template_dir.rglob('*.html'):
-            content = tpl_path.read_text(errors='replace')
-            for pat_name, pat in patterns.items():
-                counts[pat_name] += len(pat.findall(content))
-
-        component_usage[name] = counts
-
-    # Report: check that all products use similar component vocabulary
-    for pat_name in patterns:
-        using = [name for name in component_usage if component_usage[name][pat_name] > 0]
-        not_using = [name for name in component_usage if component_usage[name][pat_name] == 0]
-
-        if not_using and using:
-            T.fail(
-                f'All products use {pat_name} pattern',
-                f'Missing in: {", ".join(not_using)}. Used by: {", ".join(using)}',
-            )
-        elif using:
-            T.ok(f'All products use {pat_name} pattern')
-
-    # Check for Bootstrap 4 leftovers (e.g., btn-default, panel, well)
-    bs4_patterns = {
-        'btn-default': re.compile(r'btn-default'),
-        'panel': re.compile(r'class="[^"]*\bpanel\b'),
-        'well': re.compile(r'class="[^"]*\bwell\b'),
-        'label-': re.compile(r'class="[^"]*label-(primary|success|danger|warning|info)'),
+    bs_remnants = {
+        'btn-default': _class_token_re('btn-default'),
+        'panel': _class_token_re('panel'),
+        'well': _class_token_re('well'),
+        'label-': re.compile(r'class="[^"]*(?<![\w-])label-(primary|success|danger|warning|info)'),
     }
 
     for name in products:
@@ -561,16 +676,21 @@ def _check_component_patterns(T, products):
         if not info or not info['templates'].exists():
             continue
 
-        for tpl_path in info['templates'].rglob('*.html'):
+        flagged = False
+        for tpl_path in sorted(info['templates'].rglob('*.html')):
             content = tpl_path.read_text(errors='replace')
             rel = tpl_path.relative_to(info['templates'])
 
-            for bs4_name, bs4_pat in bs4_patterns.items():
-                if bs4_pat.search(content):
+            for bs_name, bs_pat in bs_remnants.items():
+                if bs_pat.search(content):
+                    flagged = True
                     T.fail(
-                        f'{name}/{rel}: No Bootstrap 4 remnants',
-                        f'Found deprecated "{bs4_name}" class',
+                        f'{name}/{rel}: No Bootstrap 3/4 remnants',
+                        f'Found deprecated "{bs_name}" class',
                     )
+
+        if not flagged:
+            T.ok(f'{name}: No Bootstrap 3/4 remnants')
 
 
 # ---------------------------------------------------------------------------
@@ -580,9 +700,8 @@ def _check_responsive_patterns(T, products):
     """Check for consistent responsive breakpoints."""
     T.section('Responsive Design')
 
-    shared_css = BASE_DIR / 'keel' / 'keel' / 'core' / 'static' / 'css' / 'docklabs.css'
-    if shared_css.exists():
-        content = shared_css.read_text(errors='replace')
+    if SHARED_CSS.exists():
+        content = SHARED_CSS.read_text(errors='replace')
         # Check standard Bootstrap breakpoints are used
         breakpoints = re.findall(r'@media\s*\([^)]*max-width:\s*([\d.]+)px', content)
         T.check(
@@ -600,7 +719,7 @@ def _check_responsive_patterns(T, products):
         if not css_dir.exists():
             continue
 
-        for css_file in css_dir.glob('*.css'):
+        for css_file in sorted(css_dir.glob('*.css')):
             content = css_file.read_text(errors='replace')
 
             # Check for non-standard breakpoints
@@ -623,10 +742,8 @@ def _check_print_styles(T, products):
     """Check for print stylesheet coverage."""
     T.section('Print Styles')
 
-    # Check shared CSS has print styles
-    shared_css = BASE_DIR / 'keel' / 'keel' / 'core' / 'static' / 'css' / 'docklabs.css'
-    if shared_css.exists():
-        content = shared_css.read_text(errors='replace')
+    if SHARED_CSS.exists():
+        content = SHARED_CSS.read_text(errors='replace')
         T.check(
             '@media print' in content,
             'Shared CSS includes print styles',
@@ -636,30 +753,19 @@ def _check_print_styles(T, products):
             'Shared CSS provides .no-print utility class',
         )
 
-    for name in products:
-        info = PRODUCT_ROOTS.get(name)
-        if not info:
-            continue
-
-        # Check base template for print considerations
-        for base_name in info['base_templates']:
-            base_path = info['templates'] / base_name
-            if not base_path.exists():
-                continue
-
-            content = base_path.read_text(errors='replace')
-            # Check for print-specific stylesheet or media query
-            has_print = (
-                '@media print' in content
-                or 'media="print"' in content
-                or 'no-print' in content
+    for name, _info, base_name, _path, content in _iter_base_templates(products):
+        # Check for print-specific stylesheet or media query
+        has_print = (
+            '@media print' in content
+            or 'media="print"' in content
+            or 'no-print' in content
+        )
+        # This is advisory, not a hard fail
+        if not has_print:
+            T.ok(
+                f'{name}/{base_name}: Print styles via shared CSS',
+                'Relies on docklabs-v2.css print rules',
             )
-            # This is advisory, not a hard fail
-            if not has_print:
-                T.ok(
-                    f'{name}/{base_name}: Print styles via shared CSS',
-                    'Relies on docklabs.css print rules',
-                )
 
 
 # ---------------------------------------------------------------------------
@@ -669,39 +775,33 @@ def _check_js_patterns(T, products):
     """Check JavaScript for consistency and shared utility usage."""
     T.section('JavaScript Patterns')
 
-    # Check shared docklabs.js exists
-    shared_js = BASE_DIR / 'keel' / 'keel' / 'core' / 'static' / 'js' / 'docklabs.js'
-    T.check(shared_js.exists(), 'Shared docklabs.js exists')
-
     for name in products:
         info = PRODUCT_ROOTS.get(name)
         if not info:
             continue
 
         js_dir = info['static'] / 'js'
-        if not js_dir.exists():
-            continue
+        if js_dir.exists():
+            for js_file in sorted(js_dir.glob('*.js')):
+                content = js_file.read_text(errors='replace')
 
-        for js_file in js_dir.glob('*.js'):
-            content = js_file.read_text(errors='replace')
+                # Check for jQuery usage (should use vanilla JS or htmx)
+                jquery_refs = len(re.findall(r'\$\(|jQuery\(|jQuery\.', content))
+                if jquery_refs > 0:
+                    T.fail(
+                        f'{name}/{js_file.name}: No jQuery dependency',
+                        f'Found {jquery_refs} jQuery references (use vanilla JS or htmx)',
+                    )
 
-            # Check for jQuery usage (should use vanilla JS or htmx)
-            jquery_refs = len(re.findall(r'\$\(|jQuery\(|jQuery\.', content))
-            if jquery_refs > 0:
-                T.fail(
-                    f'{name}/{js_file.name}: No jQuery dependency',
-                    f'Found {jquery_refs} jQuery references (use vanilla JS or htmx)',
-                )
+                # Check for console.log statements (should be removed in prod)
+                console_logs = len(re.findall(r'console\.(log|debug)\(', content))
+                if console_logs > 0:
+                    T.fail(
+                        f'{name}/{js_file.name}: No console.log statements',
+                        f'Found {console_logs} console.log/debug calls',
+                    )
 
-            # Check for console.log statements (should be removed in prod)
-            console_logs = len(re.findall(r'console\.(log|debug)\(', content))
-            if console_logs > 0:
-                T.fail(
-                    f'{name}/{js_file.name}: No console.log statements',
-                    f'Found {console_logs} console.log/debug calls',
-                )
-
-            # Check for inline event handlers in templates
+        # Check for inline event handlers in templates
         template_dir = info['templates']
         if template_dir.exists():
             inline_handlers = 0
