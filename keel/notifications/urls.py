@@ -11,6 +11,7 @@ app_name = 'keel_notifications'
 
 urlpatterns = [
     path('', views.notification_list, name='list'),
+    path('<uuid:pk>/open/', views.open_notification, name='open'),
     path('<uuid:pk>/read/', views.mark_read, name='mark_read'),
     path('mark-all-read/', views.mark_all_read, name='mark_all_read'),
     path('preferences/', views.preferences, name='preferences'),
