@@ -5,6 +5,38 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.57.11 — 2026-09-04
+
+**Notification inbox rows are clickable again suite-wide; shared redirect guard gains fleet-host support.**
+
+### Added
+- **`keel_notifications:open`** (`/<pk>/open/`) — marks a notification read and
+  forwards to its target. A notification with a blank `link` falls back to the
+  inbox. Note this is a GET that mutates state (it marks the row read), which is
+  deliberate: the alternative reintroduces the JavaScript dependency whose
+  failure caused the bug above. `read_at` is therefore evidence of delivery, not
+  proof of attention — a prefetching browser can set it slightly early.
+- **`keel.core.utils.fleet_product_hosts()`** returns the hosts of every peer in
+  `KEEL_FLEET_PRODUCTS`, skipping malformed entries rather than raising.
+- **`safe_redirect_url()` gained an optional `extra_hosts` argument** so a
+  legitimate cross-product deep link can be allowed without a second copy of the
+  open-redirect check. Backwards compatible — existing callers are unaffected.
+  The notification click-through route uses it rather than carrying its own guard.
+
+### Fixed
+- **Notification inbox rows are clickable again (suite-wide).** The row anchor
+  carried both `href` and `hx-post`, and htmx cancels the default action of any
+  anchor it handles (`shouldCancel()` returns true for an `<a href>` whose href
+  isn't a bare fragment). Every click fired the mark-read POST and called
+  `preventDefault()`, so clicking a notification silently went nowhere. Rows now
+  link at the new `keel_notifications:open` route, which marks the row read
+  server-side and 302s to `notification.link`. Works without JS; the separate
+  "mark as read" check button is unchanged.
+**`scripts/sync_venvs.py --check`** now verifies a venv is genuinely healthy, not merely version-matched. It resolved keel by importing it with the product dir on `sys.path`, so a venv holding an editable keel that points at the live source tree — harbor's did, with nothing else installed — reported the checkout's version and could never show drift. `--check` now runs the probe with `cwd` set to the product, classifies each venv as `ok` / `DRIFT` / `EDITABLE` / `INCOMPLETE` (keel on pin but required distributions missing, e.g. `drf_spectacular`) / `MISMATCH` (import version disagrees with pip metadata, the admiralty case) / `BROKEN`, and exits non-zero on anything but `ok`. It also checks **both** `venv/` and `.venv/` — `keel.testing` runs every product's Django suite in `venv/`, which the script never looked at — and honours `DOCKLABS_BASE_DIR` so it runs correctly from a worktree.
+**`keel.testing.ui_audit`** now audits against the v3 "Civic Institution" design system instead of the retired pre-v0.56.3 one. It asserted Poppins, the `--ct-*` palette, and `docklabs.css` — so it reported the *intended* state (Poppins removed from authenticated chrome in v0.56.3) as failures. `CANONICAL` now carries the Fraunces / Instrument Sans / JetBrains Mono stack and the real `docklabs-v2.css` `:root` palette. It also resolves each product's `{% extends %}` chain before asserting the layout contract, so markup that lives in the shared `keel/layouts/app.html` (skip link, viewport, `lang`, Bootstrap, blocks) no longer reports the shared layout doing its job as 28 per-product defects; and the Bootstrap-3-remnant matcher now requires `panel` to be a whole class token, so product classes like `sig-panel` / `wizard-panel` are no longer flagged. Coverage extended to all nine products. The audit drops from 46 failures to 7, and the 7 that remain are genuine hardcoded colors / fonts in product CSS. Closes #65.
+- **`--text-tertiary`** darkened `#8A8275` → `#736B5E` so de-emphasized body text (metadata, timestamps, captions) passes WCAG 2.1 AA SC 1.4.3 — now **4.92:1** on `--bg-page` and **5.26:1** on white cards (was 3.55:1 / 3.80:1, a fail). Still visibly lighter than `--text-secondary`.
+- **`.text-warning`** foreground remapped to `--brass-text` (`#7A5A07`, 5.97:1 on paper) so brass-colored *labels* pass AA as normal-size text. Brass (`#B8860B`, 3.05:1) remains on backgrounds, borders, status dots, and icon fills, where the 3:1 non-text bar applies. This propagates the fix to every product's Bootstrap `text-warning` usage. `.how-it-works .how-num` (the landing step numerals) is switched to `--brass-text` for the same reason.
+
 ## 0.57.10 — 2026-07-22
 
 **AIPanel survives a missing KEEL_ENCRYPTION_KEYS; nightly-test bug reports collapse into one digest email.**
