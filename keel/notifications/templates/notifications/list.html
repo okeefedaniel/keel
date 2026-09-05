@@ -135,9 +135,14 @@
         <!-- Content -->
         <div class="flex-grow-1 min-width-0">
           {% if notification.link %}
-          <a href="{{ notification.link }}" class="text-decoration-none stretched-link"
-             hx-post="{% url 'keel_notifications:mark_read' notification.pk %}"
-             hx-swap="none">
+          {% comment %}
+          Link at the `open` route, not straight at notification.link: it marks
+          the row read server-side and then 302s to the record. Do NOT put
+          hx-post back on this anchor — htmx cancels the default action of any
+          anchor it handles, which is what made these clicks do nothing.
+          {% endcomment %}
+          <a href="{% url 'keel_notifications:open' notification.pk %}"
+             class="text-decoration-none stretched-link">
             <span class="keel-notif__title d-block mb-0">
               {% notification_priority_icon notification.priority %}
               {{ notification.title }}

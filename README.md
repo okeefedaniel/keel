@@ -21,7 +21,7 @@ git+https://github.com/okeefedaniel/keel.git
 - **AuditMiddleware** — Request IP extraction + login audit logging
 - **ZoneFormMixin** — FOIA zone-aware form field filtering
 - **SortableListMixin, AgencyObjectMixin** — Reusable view mixins
-- **safe_redirect_url, rate_limit** — Security utilities
+- **safe_redirect_url, fleet_product_hosts, rate_limit** — Security utilities
 - **KeelSSOAdapter** — Configurable Microsoft Entra ID SSO adapter
 
 ### keel.security

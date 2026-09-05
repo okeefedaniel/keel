@@ -5,6 +5,7 @@ Usage in urls.py:
 
 This provides:
     /notifications/                 — list all notifications
+    /notifications/<pk>/open/       — mark read, then forward to the record (GET)
     /notifications/<pk>/read/       — mark one as read (POST)
     /notifications/mark-all-read/   — mark all as read (POST)
     /notifications/preferences/     — manage notification preferences
@@ -20,6 +21,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.views.decorators.http import require_POST
+
+from keel.core.utils import fleet_product_hosts, safe_redirect_url
 
 from .registry import get_types_by_category
 
@@ -113,6 +116,71 @@ def notification_list(request):
 
 
 # ---------------------------------------------------------------------------
+# Open (click-through)
+# ---------------------------------------------------------------------------
+
+def _resolve_notification_target(request, notification):
+    """Return a safe URL for *notification*, or '' when there isn't one.
+
+    Delegates the allow-list check to ``keel.core.utils.safe_redirect_url``
+    so redirect safety lives in exactly one place, widened with the fleet
+    peers so a cross-product deep link still resolves.
+    """
+    target = (getattr(notification, 'link', '') or '').strip()
+    if not target:
+        return ''
+    safe = safe_redirect_url(
+        request, target, fallback='', extra_hosts=fleet_product_hosts(),
+    )
+    if not safe:
+        logger.warning(
+            'Refusing to redirect notification %s to disallowed link %r',
+            notification.pk, target,
+        )
+    return safe
+
+
+def _mark_read(notification):
+    """Idempotently mark *notification* read. Shared by the open + mark_read views."""
+    if notification.is_read:
+        return False
+    notification.is_read = True
+    notification.read_at = timezone.now()
+    notification.save(update_fields=['is_read', 'read_at'])
+    return True
+
+
+@login_required
+def open_notification(request, pk):
+    """Mark a notification read, then forward to the record it is about.
+
+    Inbox rows link here rather than straight at ``notification.link`` so a
+    click both records the read and navigates. The previous markup put
+    ``href`` and ``hx-post`` on the same anchor, and htmx cancels the default
+    action of any anchor it handles (``shouldCancel()`` in htmx 2.x returns
+    true for an ``<a href>`` whose href isn't a bare fragment) — so clicking
+    a notification fired the mark-read POST and went nowhere.
+
+    This is a GET that mutates state: it marks the row read. That is
+    deliberate and matches how notification inboxes generally behave. The
+    CSRF surface is a read flag on a row whose UUID an attacker has no way
+    to obtain, and the cost of the alternative is reintroducing the
+    JavaScript dependency whose failure caused this bug. Consequence worth
+    knowing: a browser that prefetches the link can mark a row read slightly
+    before a human looks at it, so ``read_at`` is evidence of delivery, not
+    proof of attention.
+    """
+    Notification = _get_notification_model()
+    notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
+    _mark_read(notification)
+
+    target = _resolve_notification_target(request, notification)
+    if target:
+        return redirect(target)
+    return redirect('keel_notifications:list')
+
+
+# ---------------------------------------------------------------------------
 # Mark as Read
 # ---------------------------------------------------------------------------
 
@@ -124,10 +192,7 @@ def mark_read(request, pk):
     notification = get_object_or_404(
         Notification, pk=pk, recipient=request.user,
     )
-    if not notification.is_read:
-        notification.is_read = True
-        notification.read_at = timezone.now()
-        notification.save(update_fields=['is_read', 'read_at'])
+    _mark_read(notification)
 
     if request.headers.get('HX-Request'):
         return JsonResponse({'status': 'ok'})

@@ -2,6 +2,7 @@
 import functools
 import hashlib
 import time
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.cache import cache
@@ -88,11 +89,39 @@ def local_ai_key_enabled():
     return bool(getattr(settings, 'KEEL_LOCAL_AI_KEY', False))
 
 
-def safe_redirect_url(request, url, fallback='/dashboard/'):
-    """Return *url* only if it points to an allowed host, otherwise *fallback*."""
+def fleet_product_hosts():
+    """Hosts of every peer declared in ``KEEL_FLEET_PRODUCTS``.
+
+    Used to widen a redirect allow-list when a cross-product deep link is
+    legitimate (Helm -> Harbor, a notification pointing at a peer record).
+    Malformed entries are skipped rather than raising — a junk row in one
+    product's fleet list must never 500 a redirect.
+    """
+    hosts = set()
+    for product in getattr(settings, 'KEEL_FLEET_PRODUCTS', None) or []:
+        try:
+            netloc = urlparse((product or {}).get('url') or '').netloc
+        except (AttributeError, ValueError):
+            continue
+        if netloc:
+            hosts.add(netloc)
+    return hosts
+
+
+def safe_redirect_url(request, url, fallback='/dashboard/', extra_hosts=None):
+    """Return *url* only if it points to an allowed host, otherwise *fallback*.
+
+    The current host is always allowed. ``extra_hosts`` widens the allow-list
+    — pass ``fleet_product_hosts()`` when a cross-product deep link is
+    legitimate. ``require_https`` tracks ``request.is_secure()``, so a secure
+    request is never redirected to a plain-http target.
+    """
+    allowed = {request.get_host()}
+    if extra_hosts:
+        allowed |= set(extra_hosts)
     if url and url_has_allowed_host_and_scheme(
         url,
-        allowed_hosts={request.get_host()},
+        allowed_hosts=allowed,
         require_https=request.is_secure(),
     ):
         return url
