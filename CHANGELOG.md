@@ -5,6 +5,77 @@ as fragments under `changes.d/`; `scripts/release.py cut` collates them into a
 new section here and bumps + tags the version. See `changes.d/README.md` and the
 "Keel releases" section in `CLAUDE.md`.
 
+## 0.58.0 — 2026-09-05
+
+**Calendar connection and delegation abstracts, hold fields, and the status -> sync_status rename.**
+
+### Added
+- **`AbstractCalendarConnection`** — a user's OAuth connection to one calendar
+  provider. Access and refresh tokens are `EncryptedTextField` (a refresh token is
+  a long-lived read/write key to a real person's calendar and never sits in the
+  database as plain text). Carries the delta `sync_token`, a `last_sync_at`
+  (attempt) and a separate `last_successful_sync_at` — the staleness canary that
+  distinguishes a healthy sync from a green cron running over one that silently
+  stopped. One active connection per user per provider.
+- **`AbstractCalendarDelegation`** — a standing grant letting one user act on
+  another's calendar, at `view_free_busy` / `view_details` / `edit`. This is a
+  **security boundary, not sharing UX**: a delegate's write authenticates as the
+  GRANTOR using the grantor's own token, so the provider performs no check of its
+  own and this row is the only gate. Uniqueness is a **partial** constraint on
+  active grants (`revoked_at IS NULL`), not `unique_together`, so revocations stay
+  auditable. `view_free_busy` is required to SHAPE the response, not merely gate
+  it — returning title, location, attendees or external ids at that level is a
+  privacy leak.
+- **`AbstractCalendarEvent` gains five fields** so a row can represent a calendar
+  hold, not only a synced event: `hold_status` (tentative / confirmed / cancelled),
+  `provider_uid` (client-generated idempotency key, so a retry or double-submit
+  converges on one provider event instead of two), `external_etag` +
+  `external_updated_at` (external-wins comparison), `revision` (bumped per local
+  edit and checked on save, rejecting a stale tab rather than silently
+  overwriting), and `attendees`.
+- **`event_type` now defaults to `'calendar_hold'`** — it was a required registry
+  key, which a free-standing hold does not have.
+
+### Changed
+- **BREAKING: `AbstractCalendarEvent.status` is renamed to `sync_status`**, and the
+  inner `Status` choices class to `SyncStatus`. The field always meant "has this
+  reached the provider yet", but sitting beside the new `hold_status` (the domain
+  state a human reads) it looked like one concept spelled two ways. Both names are
+  now self-describing.
+
+  The rename is deliberate rather than adding an alias: a stale `event.status`
+  reference now raises instead of silently comparing a provider-delivery value
+  against hold vocabulary. Nothing in keel or any product referenced the inner
+  `Status` class, and the only in-tree readers were `keel.calendar.service` and
+  Yeoman's admin, both updated.
+
+### Consumer note
+- **Products with a concrete `CalendarEvent` need a HAND-WRITTEN migration for this
+  release.** `AbstractCalendarEvent` gained five fields, `event_type` gained a
+  default, and **`status` was renamed to `sync_status`**. Affected today: **yeoman**
+  (`core.CalendarEvent`) and **beacon** (`core.CalendarEvent` — beacon does not use
+  the calendar feature but does subclass the abstract).
+
+  **`makemigrations` will not detect the rename, and never prompts for it.** The
+  autodetector compares a removed field against added ones using the full
+  `deconstruct()` signature, and `sync_status` carries a `help_text` the old
+  `status` did not — so it reads as two unrelated fields and emits `AddField` +
+  `RemoveField`, which **drops the column and its data**. This is true with or
+  without `--noinput`; there is no interactive answer that fixes it.
+
+  Write the operation explicitly instead, ordered before the index work:
+
+      migrations.RenameField('calendarevent', 'status', 'sync_status'),
+      migrations.AlterField('calendarevent', 'sync_status', ...),
+
+  Everything else in the migration is additive or defaulted and is a runtime
+  no-op. Also update any admin referencing `status` — Django's system checks
+  (admin.E035 / E108 / E116) will refuse to start until you do, which is the
+  rename failing loudly by design.
+
+  Ship it in the same wave as the keel bump, or the next deploy fails that
+  product's `makemigrations --check --dry-run` gate.
+
 ## 0.57.11 — 2026-09-04
 
 **Notification inbox rows are clickable again suite-wide; shared redirect guard gains fleet-host support.**
