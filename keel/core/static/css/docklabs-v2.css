@@ -2736,3 +2736,169 @@ summary:focus-visible,
 /* Chart canvas wrapper — height is set per-instance via a nonce'd <style>
    element in chart.html (the height is caller-supplied / dynamic). */
 .dl-chart-canvas { position: relative; }
+
+/* ===========================================================================
+   CALENDAR
+   ---------------------------------------------------------------------------
+   Shared calendar chrome for any product consuming keel.calendar. Yeoman is
+   the reference consumer; the components live here so the second adopter does
+   not redraw the chip.
+
+   The load-bearing idea is the event chip. A calendar grid has to carry four
+   dimensions at once — what kind of thing this is, its status, where it came
+   from, and whose calendar it sits on — in a cell about 125px wide with a
+   title already competing for room. So:
+
+       type    -> left-edge STYLE   (solid = invitation, dashed = tentative)
+       status  -> left-edge COLOR   (info / brass / success / navy / error)
+       origin  -> trailing GLYPH    (Google, Outlook, or absent = made here)
+       owner   -> WEIGHT            (delegated reads recessive + italic)
+
+   Color rides a 3px rule rather than filling the chip. Filling it would break
+   the suite status-dot rule and, worse, make every row shout so the one that
+   needs action stops standing out. Exactly one filled pill is permitted, for
+   exception states (NEEDS INFO, OVERDUE).
+   =========================================================================== */
+
+/* --- page header ---------------------------------------------------------- */
+.cal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 20px; }
+.cal-title { font-family: var(--font-display); font-size: 2rem; font-weight: 600; letter-spacing: -.01em; margin: 0 0 4px; }
+.cal-sub { font-size: .82rem; color: var(--text-secondary); margin: 0; }
+.cal-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Sync freshness. Quiet by design — it is orientation, not an alert, until
+   it goes stale. */
+.cal-sync { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono);
+  font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); padding-right: 4px; }
+.cal-sync .cal-sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.cal-sync.is-stale .cal-sync-dot { background: var(--warning); }
+.cal-sync.is-disconnected .cal-sync-dot { background: var(--error); }
+
+/* --- toolbar -------------------------------------------------------------- */
+.cal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.cal-nav { display: flex; align-items: center; gap: 4px; }
+.cal-navbtn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong); background: var(--surface); border-radius: 6px;
+  color: var(--text-secondary); font-size: .9rem; line-height: 1; cursor: pointer; }
+.cal-navbtn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.cal-today { margin-left: 6px; font-family: var(--font-mono); font-size: .66rem; letter-spacing: .07em;
+  text-transform: uppercase; padding: 6px 11px; border: 1px solid var(--border-strong);
+  background: var(--surface); border-radius: 6px; color: var(--text-secondary); cursor: pointer; }
+.cal-today:hover { background: var(--bg-hover); }
+.cal-month { font-family: var(--font-display); font-size: 1.22rem; font-weight: 600; letter-spacing: -.005em; }
+/* Segmented view switch. Flat, not a dark pill group. */
+.cal-views { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 7px; overflow: hidden; }
+.cal-views button { font-family: var(--font-mono); font-size: .64rem; letter-spacing: .07em;
+  text-transform: uppercase; padding: 6px 13px; border: 0; background: var(--surface);
+  color: var(--text-secondary); cursor: pointer; border-right: 1px solid var(--border); }
+.cal-views button:last-child { border-right: 0; }
+.cal-views button[aria-pressed="true"] { background: var(--ct-blue); color: #fff; }
+
+/* --- grid surface --------------------------------------------------------- */
+.cal-surface { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cal-surface .fc { --fc-border-color: var(--border); --fc-today-bg-color: transparent; --fc-page-bg-color: var(--surface); }
+.cal-surface .fc .fc-scrollgrid { border-left: 0; border-top: 0; }
+.cal-surface .fc-theme-standard td,
+.cal-surface .fc-theme-standard th { border-color: var(--border); }
+.cal-surface .fc-col-header-cell { background: var(--bg-warm); padding: 9px 0; }
+.cal-surface .fc-col-header-cell-cushion { font-family: var(--font-mono); font-size: .6rem; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--text-tertiary); text-decoration: none; }
+.cal-surface .fc-daygrid-day-number { font-family: var(--font-mono); font-size: .7rem;
+  color: var(--text-secondary); text-decoration: none; padding: 7px 9px 3px; }
+.cal-surface .fc-day-other .fc-daygrid-day-number { color: var(--text-tertiary); opacity: .5; }
+/* Today is a brass underline on the numeral, not a yellow wash over the cell. */
+.cal-surface .fc-day-today { background: transparent !important; }
+.cal-surface .fc-day-today .fc-daygrid-day-number { color: var(--brass-text); font-weight: 600; position: relative; }
+.cal-surface .fc-day-today .fc-daygrid-day-number::after { content: ""; position: absolute; left: 9px; right: 9px;
+  bottom: 0; height: 2px; background: var(--brass); border-radius: 1px; }
+.cal-surface .fc-daygrid-day-frame { min-height: 104px; }
+.cal-surface .fc-daygrid-day.fc-day-sat,
+.cal-surface .fc-daygrid-day.fc-day-sun { background: var(--bg-warm); }
+.cal-surface .fc-daygrid-day-events { margin-bottom: 6px; }
+
+/* FullCalendar paints its own event chrome — a blue fill and white text — over
+   whatever eventContent returns. Neutralise it or the chip below never shows. */
+.cal-surface .fc-event,
+.cal-surface .fc-daygrid-event,
+.cal-surface .fc-daygrid-dot-event {
+  background: transparent !important; border: 0 !important; box-shadow: none !important;
+  padding: 0 !important; margin: 0 !important; color: inherit !important; }
+.cal-surface .fc-daygrid-event-harness { margin-bottom: 2px !important; }
+.cal-surface .fc-event-main { padding: 0 !important; color: inherit !important; }
+
+/* --- the chip ------------------------------------------------------------- */
+.cal-ev { display: flex; align-items: center; gap: 6px; padding: 3px 7px 3px 6px; margin: 1px 5px;
+  border-radius: 4px; font-size: .72rem; line-height: 1.35; cursor: pointer;
+  border-left: 3px solid var(--ct-blue); background: transparent; color: var(--text-primary); }
+.cal-ev:hover { background: var(--bg-hover); }
+.cal-ev:focus-visible { outline: 2px solid var(--ct-blue); outline-offset: 1px; }
+.cal-ev-time { font-family: var(--font-mono); font-size: .62rem; color: var(--text-tertiary); flex-shrink: 0; }
+.cal-ev-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-ev-src { flex-shrink: 0; font-size: .62rem; color: var(--text-tertiary); opacity: .75; }
+
+/* status -> left-edge colour */
+.cal-ev.is-received { border-left-color: var(--info); }
+.cal-ev.is-review { border-left-color: var(--brass); }
+.cal-ev.is-accepted { border-left-color: var(--success); }
+.cal-ev.is-scheduled { border-left-color: var(--ct-blue); }
+.cal-ev.is-needsinfo { border-left-color: var(--error); }
+.cal-ev.is-hold { border-left-color: var(--text-tertiary); }
+.cal-ev.is-confirmed { border-left-color: var(--text-primary); }
+
+/* A tentative hold reads provisional: dashed edge over a hatched ground. */
+.cal-ev.is-tentative { border-left-style: dashed; border-left-color: var(--text-tertiary);
+  background: repeating-linear-gradient(135deg, transparent, transparent 5px,
+    rgba(115,107,94,.07) 5px, rgba(115,107,94,.07) 10px); }
+
+/* Saved locally but not yet on the provider. Same hatch vocabulary as
+   tentative, in brass, so "not settled" reads consistently. */
+.cal-ev.is-unsynced { background: repeating-linear-gradient(135deg, transparent, transparent 5px,
+    rgba(184,134,11,.10) 5px, rgba(184,134,11,.10) 10px); }
+
+/* Someone else's calendar reads recessive without disappearing. */
+.cal-ev.is-delegated { opacity: .72; }
+.cal-ev.is-delegated .cal-ev-title { font-style: italic; }
+
+/* The one permitted filled pill: an exception state needing action. */
+.cal-ev-flag { font-family: var(--font-mono); font-size: .55rem; letter-spacing: .06em;
+  text-transform: uppercase; background: var(--error-bg); color: var(--error);
+  padding: 1px 5px; border-radius: 3px; flex-shrink: 0; font-weight: 600; }
+
+/* --- interaction states --------------------------------------------------- */
+.cal-ghost { margin: 1px 5px; padding: 3px 7px; border-radius: 4px; font-size: .72rem;
+  border: 1px dashed var(--ct-blue); color: var(--ct-blue); background: var(--ct-blue-light); }
+.cal-conflict { margin: 6px 5px 2px; padding: 7px 9px; border-radius: 5px; background: var(--error-bg);
+  border-left: 3px solid var(--error); font-size: .68rem; color: var(--error); display: flex; gap: 7px; }
+.cal-conflict strong { display: block; font-size: .72rem; }
+.cal-notice { margin: 6px 5px 2px; padding: 7px 9px; border-radius: 5px; background: var(--brass-soft);
+  border-left: 3px solid var(--brass); font-size: .68rem; color: var(--brass-text); display: flex; gap: 7px; }
+
+/* --- legend --------------------------------------------------------------- */
+.cal-legend { display: flex; flex-wrap: wrap; gap: 18px; padding: 12px 18px;
+  border-top: 1px solid var(--border); background: var(--bg-warm); }
+.cal-legend span { display: inline-flex; align-items: center; gap: 7px; font-size: .7rem; color: var(--text-secondary); }
+.cal-legend i.cal-key { width: 3px; height: 13px; border-radius: 2px; display: inline-block; }
+
+/* --- responsive ----------------------------------------------------------- */
+@media (max-width: 1199px) {
+  .cal-surface .fc-daygrid-day-frame { min-height: 88px; }
+}
+@media (max-width: 899px) {
+  .cal-ev-time { display: none; }
+}
+/* Below the tablet breakpoint the month grid stops being a calendar: seven
+   columns on a phone gives each day about 50px, which fits two characters of a
+   title. The agenda list is the mobile design, not a fallback — full titles,
+   44px touch targets, sticky day headers. */
+@media (max-width: 767px) {
+  .cal-toolbar { flex-wrap: wrap; gap: 10px; }
+  .cal-month { order: -1; width: 100%; }
+  .cal-views [data-view="dayGridMonth"] { display: none; }
+  .cal-surface .fc-list-day-cushion { background: var(--bg-warm); }
+  .cal-surface .fc-list-event { font-size: .82rem; }
+  .cal-surface .fc-list-event td { padding: 12px 14px; }
+  .cal-ev { padding: 12px 10px; font-size: .82rem; min-height: 44px; }
+  .cal-navbtn { width: 44px; height: 44px; }
+  .cal-today { min-height: 44px; }
+}
