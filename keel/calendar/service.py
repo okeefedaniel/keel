@@ -55,7 +55,7 @@ def _resolve_provider(provider=None, event_type_key=None):
 
 
 def _save_event(user, event_type, title, description, location,
-                start, end, all_day, provider_key, external_id, status,
+                start, end, all_day, provider_key, external_id, sync_status,
                 error, metadata, content_object, created_by):
     """Persist a CalendarEvent if the model is configured."""
     model_path = getattr(settings, 'KEEL_CALENDAR_EVENT_MODEL', None)
@@ -84,9 +84,9 @@ def _save_event(user, event_type, title, description, location,
             all_day=all_day,
             provider=provider_key,
             external_id=external_id or '',
-            status=status,
+            sync_status=sync_status,
             sync_error=error or '',
-            last_synced_at=timezone.now() if status == 'synced' else None,
+            last_synced_at=timezone.now() if sync_status == 'synced' else None,
             metadata=metadata or {},
             content_type=ct,
             object_id=obj_id,
@@ -183,7 +183,7 @@ def push_event(event_type, user, title, start, end=None,
         logger.exception("Calendar push failed for %s", event_type)
         external_id, error, success = '', str(e), False
 
-    status = 'synced' if success else 'failed'
+    sync_status = 'synced' if success else 'failed'
 
     # Persist
     event_id = _save_event(
@@ -191,7 +191,7 @@ def push_event(event_type, user, title, start, end=None,
         description=description, location=location,
         start=start, end=end, all_day=all_day,
         provider_key=provider_key, external_id=external_id,
-        status=status, error=error, metadata=context,
+        sync_status=sync_status, error=error, metadata=context,
         content_object=content_object, created_by=user,
     )
 
@@ -268,7 +268,7 @@ def update_event(calendar_event_id, title=None, start=None, end=None,
         event.sync_error = ''
     else:
         event.sync_error = error or ''
-        event.status = 'failed'
+        event.sync_status = 'failed'
     event.save()
 
     _log_sync(
@@ -311,7 +311,7 @@ def cancel_event(calendar_event_id):
         logger.exception("Calendar cancel failed for event %s", calendar_event_id)
         success, error = False, str(e)
 
-    event.status = 'cancelled' if success else 'failed'
+    event.sync_status = 'cancelled' if success else 'failed'
     event.sync_error = error or ''
     if success:
         event.last_synced_at = timezone.now()
