@@ -2865,6 +2865,15 @@ summary:focus-visible,
   text-transform: uppercase; background: var(--error-bg); color: var(--error);
   padding: 1px 5px; border-radius: 3px; flex-shrink: 0; font-weight: 600; }
 
+/* The chip's ellipsis truncation is correct in a ~125px month cell and wrong in
+   an agenda row, where there is room to wrap. It also has a layout consequence:
+   a table's `width: 100%` loses to its own min-content width, and a nowrap title
+   makes min-content the full title — so the list table grows past its container
+   and the surface clips it. Let the title wrap in list view and the table fits. */
+.cal-surface .fc-list-event .cal-ev { white-space: normal; }
+.cal-surface .fc-list-event .cal-ev-title { white-space: normal; overflow: visible;
+  text-overflow: clip; word-break: break-word; }
+
 /* --- interaction states --------------------------------------------------- */
 .cal-ghost { margin: 1px 5px; padding: 3px 7px; border-radius: 4px; font-size: .72rem;
   border: 1px dashed var(--ct-blue); color: var(--ct-blue); background: var(--ct-blue-light); }
@@ -2898,6 +2907,8 @@ summary:focus-visible,
   .cal-surface .fc-list-day-cushion { background: var(--bg-warm); }
   .cal-surface .fc-list-event { font-size: .82rem; }
   .cal-surface .fc-list-event td { padding: 12px 14px; }
+  .cal-surface .fc-list-event-time { font-size: .74rem; padding-right: 4px; }
+  .cal-surface .fc-list-day-cushion { display: flex; justify-content: space-between; gap: 8px; }
   .cal-ev { padding: 12px 10px; font-size: .82rem; min-height: 44px; }
   .cal-navbtn { width: 44px; height: 44px; }
   .cal-today { min-height: 44px; }

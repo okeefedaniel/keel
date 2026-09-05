@@ -96,3 +96,25 @@ def test_calendar_rules_use_tokens_not_hardcoded_hex(hardcoded):
     token, and they are documented as such."""
     calendar_css = CSS[CSS.index('   CALENDAR'):]
     assert hardcoded not in calendar_css
+
+
+def test_list_view_lets_the_chip_title_wrap():
+    """The chip's nowrap ellipsis is right in a ~125px month cell and wrong in an
+    agenda row. It also has a layout consequence: a table's `width: 100%` loses
+    to its own min-content width, so a nowrap title made the list table grow past
+    its container and the surface clipped every title. Scoped override, verified
+    at 375px: table 315px inside a 319px surface, zero clipping."""
+    assert '.cal-surface .fc-list-event .cal-ev-title' in CSS
+    block = CSS[CSS.index('.cal-surface .fc-list-event .cal-ev-title'):]
+    block = block[:block.index('}')]
+    assert 'white-space: normal' in block
+    assert 'text-overflow: clip' in block
+
+
+def test_the_month_grid_keeps_its_ellipsis():
+    """The wrap is scoped to list view; a month cell still truncates, because
+    125px cannot hold a wrapped title without destroying the grid rhythm."""
+    block = CSS[CSS.index('.cal-ev-title {'):]
+    block = block[:block.index('}')]
+    assert 'white-space: nowrap' in block
+    assert 'text-overflow: ellipsis' in block
