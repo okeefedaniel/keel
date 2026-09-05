@@ -189,14 +189,28 @@ class TestAbstractCalendarEventAdditions:
             'tentative', 'confirmed', 'cancelled',
         ]
 
-    def test_status_and_hold_status_are_different_axes(self):
-        """`status` is sync state, `hold_status` is domain state. Same model,
-        similar word — the help_text on each has to say which."""
-        sync = _field(AbstractCalendarEvent, 'status')
+    def test_the_two_status_axes_are_named_apart(self):
+        """Both axes carry a qualified name. The field was originally `status`
+        (sync) beside `hold_status` (domain), which read as one concept spelled
+        two ways; renaming to `sync_status` makes each self-describing and makes
+        any stale `.status` reference fail loudly instead of comparing against
+        the wrong vocabulary."""
+        sync = _field(AbstractCalendarEvent, 'sync_status')
         hold = _field(AbstractCalendarEvent, 'hold_status')
-        assert 'SYNC' in sync.help_text
-        assert 'DOMAIN' in hold.help_text
         assert set(v for v, _ in sync.choices) != set(v for v, _ in hold.choices)
+
+        names = {f.name for f in AbstractCalendarEvent._meta.get_fields()}
+        assert 'status' not in names, (
+            'a bare `status` is back on the model — it is ambiguous beside '
+            'hold_status, which is why it was renamed to sync_status'
+        )
+
+    def test_sync_status_keeps_the_provider_delivery_vocabulary(self):
+        f = _field(AbstractCalendarEvent, 'sync_status')
+        assert [v for v, _ in AbstractCalendarEvent.SyncStatus.choices] == [
+            'pending', 'synced', 'failed', 'cancelled',
+        ]
+        assert f.default == AbstractCalendarEvent.SyncStatus.PENDING
 
     def test_event_type_defaults_so_a_free_standing_hold_can_omit_it(self):
         f = _field(AbstractCalendarEvent, 'event_type')

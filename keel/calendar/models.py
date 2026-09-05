@@ -34,7 +34,7 @@ class AbstractCalendarEvent(models.Model):
     etc.) can be linked without Keel knowing about product-specific models.
     """
 
-    class Status(models.TextChoices):
+    class SyncStatus(models.TextChoices):
         PENDING = 'pending', _('Pending')
         SYNCED = 'synced', _('Synced')
         FAILED = 'failed', _('Failed')
@@ -80,19 +80,13 @@ class AbstractCalendarEvent(models.Model):
         max_length=500, blank=True,
         help_text='ID returned by the external calendar API.',
     )
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.PENDING,
-        help_text=(
-            'SYNC state — has this reached the provider yet. Not to be confused '
-            'with hold_status, which is the domain state a human sees.'
-        ),
+    sync_status = models.CharField(
+        max_length=20, choices=SyncStatus.choices, default=SyncStatus.PENDING,
+        help_text='Has this event reached the external provider yet.',
     )
     hold_status = models.CharField(
         max_length=20, choices=HoldStatus.choices, default=HoldStatus.TENTATIVE,
-        help_text=(
-            'DOMAIN state — is the time provisionally blocked or agreed. Not to '
-            'be confused with status, which is sync state.'
-        ),
+        help_text='Is the time provisionally blocked, agreed, or called off.',
     )
     provider_uid = models.CharField(
         max_length=255, blank=True,
@@ -150,11 +144,11 @@ class AbstractCalendarEvent(models.Model):
             models.Index(fields=['user', 'event_type']),
             models.Index(fields=['external_id']),
             models.Index(fields=['content_type', 'object_id']),
-            models.Index(fields=['status', 'last_synced_at']),
+            models.Index(fields=['sync_status', 'last_synced_at']),
         ]
 
     def __str__(self):
-        return f"{self.title} ({self.get_status_display()}) - {self.start_time:%Y-%m-%d %H:%M}"
+        return f"{self.title} ({self.get_hold_status_display()}) - {self.start_time:%Y-%m-%d %H:%M}"
 
 
 class AbstractCalendarConnection(models.Model):
