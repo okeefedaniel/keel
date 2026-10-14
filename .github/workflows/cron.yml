@@ -1,0 +1,97 @@
+name: Cron
+
+# Fires Keel's scheduled management commands. Each job uses the Railway CLI
+# to SSH into the running keel web container and exec the command there, so
+# it shares the production env (DATABASE_URL etc.) and the prod DB connection
+# without exposing either to the GitHub runner.
+#
+# Mirrors the suite-wide pattern in keel/CLAUDE.md §Scheduling. Reference
+# implementations: helm/.github/workflows/cron.yml (smallest) and
+# lookout/.github/workflows/cron.yml (9 jobs, full menagerie).
+#
+# Wired commands (must match @scheduled_job slugs in code):
+#   - reconcile_org_product_access  daily 04:00 UTC  (keel-reconcile-org-product-access)
+#     keel.accounts.management.commands.reconcile_org_product_access
+#     Deactivates ProductAccess rows for products the user's org no longer
+#     subscribes to — defense-in-depth for CSO finding S1 (privilege bleed
+#     on org reassignment) when the KeelUser.save() hook is bypassed.
+#     Idempotent; safe to re-run any time. Does NOT pass --force-logout, so
+#     a sweep never kicks every user out nightly.
+#
+# Required GitHub secret:
+#   RAILWAY_API_TOKEN — a Railway account-level API token (Account → Tokens).
+#   One token works across every project under the Railway account; the
+#   ssh step passes explicit --project + --environment UUIDs so `railway ssh`
+#   knows which project to bind to. Same shape as bounty / harbor / yeoman.
+#
+# Observability: every run writes a CommandRun row visible at /scheduling/
+# on keel.docklabs.ai (the Procfile runs sync_scheduled_jobs on boot so the
+# job row exists before the first tick).
+
+on:
+  schedule:
+    - cron: '0 4 * * *'      # reconcile_org_product_access — daily 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Which command to run'
+        required: true
+        default: reconcile_org_product_access
+        type: choice
+        options:
+          - reconcile_org_product_access
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    # Cap runner time so a wedged `railway ssh` can't hold the 360-min
+    # default and burn Actions minutes.
+    timeout-minutes: 30
+    env:
+      RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+    steps:
+      - name: Pick command from cron schedule
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "cmd=${{ github.event.inputs.command }}" >> "$GITHUB_OUTPUT"
+          else
+            # Only one scheduled command for now — keep an explicit fallthrough.
+            echo "cmd=reconcile_org_product_access" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Railway CLI
+        # Pinned to v4.36.1 — v4.44.0+ ships a broken `railway ssh` that
+        # returns Unauthorized for valid project tokens. `railway variables`
+        # and `railway status` work on the same version with the same token,
+        # so the regression is scoped to ssh. `install.sh` always grabs
+        # latest, so we bypass it and pull the x86_64 tarball directly.
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.railway/bin"
+          curl -fsSL -o /tmp/railway.tgz \
+            https://github.com/railwayapp/cli/releases/download/v4.36.1/railway-v4.36.1-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf /tmp/railway.tgz -C "$HOME/.railway/bin"
+          chmod +x "$HOME/.railway/bin/railway"
+          echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
+
+      - name: Generate ephemeral SSH key for railway ssh
+        # `railway ssh` requires an SSH keypair under ~/.ssh; the GH Actions
+        # runner ships without one, which would make every cron run fail with
+        # "No SSH keys found in ~/.ssh/". Generate a throwaway ed25519 key
+        # per run for the control-plane handshake.
+        run: |
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          ssh-keygen -t ed25519 -N '' -f "$HOME/.ssh/id_ed25519" -q
+
+      - name: Run management command in production container
+        # --project + --environment UUIDs are required because RAILWAY_API_TOKEN
+        # is account-scoped (covers every project under the account). These are
+        # the keel project / production environment IDs (not secrets).
+        run: |
+          railway ssh \
+            --project 02c9d5ea-9fa0-4400-b3c9-7cfe19e111d8 \
+            --environment 1840aa79-0ddc-4a2c-9f2a-d46f94d6dca4 \
+            --service keel \
+            "cd /app && python manage.py ${{ steps.pick.outputs.cmd }}"
