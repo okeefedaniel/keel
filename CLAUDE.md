@@ -552,10 +552,10 @@ Each product's `.github/workflows/cron.yml` follows this shape. Reference implem
 4. **Ephemeral SSH key** — `ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -q`. `railway ssh` requires an SSH keypair under `~/.ssh`; the GitHub runner ships without one, so every run must generate a throwaway key first. Without it, `railway ssh` fails with "No SSH keys found in ~/.ssh/", every cron run silently fails, and `flags.cron_silent_24h` trips the canary 24h later.
 5. **The actual command** — `railway ssh --service <product> "cd /app && /opt/venv/bin/python manage.py <cmd>"`. Runs inside the production container, so the command inherits prod env (DATABASE_URL, API keys, etc.) and the prod DB connection without exposing either to the GitHub runner.
 
-**Required GitHub secret per product repo: a Railway token, one of two shapes.** Both work — pick based on what Railway's current dashboard surfaces on your account.
+**Required GitHub secret per product repo: `RAILWAY_API_TOKEN`, the account-level shape.** As of 2026-10-14 one account token is set on all ten DockLabs repos and every `cron.yml` passes explicit `--project` / `--environment` UUIDs; helm and lookout were converted from the older project-scoped shape in the same pass so there is one value to rotate (mint at Account → Tokens, then `printf '%s' "$T" | gh secret set RAILWAY_API_TOKEN --repo okeefedaniel/<repo>` per repo). The two shapes, for reference:
 
-- **Project-scoped token** (older shape; secret name: `RAILWAY_TOKEN`). Created via Project → Settings → Tokens, bound to one project + one environment. Auto-binds at runtime, so `railway ssh --service <product>` works with NO `--project` / `--environment` flags. Reference: [`helm/.github/workflows/cron.yml`](../helm/.github/workflows/cron.yml).
-- **Account-level API token** (current shape; secret name: `RAILWAY_API_TOKEN`). Created via Account → Tokens, one token covers every project under the account. Does NOT auto-bind, so `railway ssh` MUST be passed explicit `--project <uuid> --environment <uuid>` flags. Reference: [`harbor/.github/workflows/cron.yml`](../harbor/.github/workflows/cron.yml).
+- **Project-scoped token** (retired shape; secret name: `RAILWAY_TOKEN`). Created via Project → Settings → Tokens, bound to one project + one environment. Auto-binds at runtime, so `railway ssh --service <product>` works with NO `--project` / `--environment` flags. No repo uses it any more.
+- **Account-level API token** (the standard; secret name: `RAILWAY_API_TOKEN`). Created via Account → Tokens, one token covers every project under the account. Does NOT auto-bind, so `railway ssh` MUST be passed explicit `--project <uuid> --environment <uuid>` flags (project / environment IDs are not secrets; `railway status --json` after `railway link` prints them). Reference: [`harbor/.github/workflows/cron.yml`](../harbor/.github/workflows/cron.yml).
 
 The CLI distinguishes the two by env var name: `RAILWAY_TOKEN` is validated as a project token (rejected as "Invalid RAILWAY_TOKEN" if it's actually an account token); `RAILWAY_API_TOKEN` is validated as an account token (then needs project flags to disambiguate). Don't try to cross-feed them — the CLI's error message points the wrong direction if you do.
 
@@ -567,15 +567,17 @@ The CLI distinguishes the two by env var name: `RAILWAY_TOKEN` is validated as a
 
 ## Ops canary (keel.ops)
 
-Suite-wide JSON metrics endpoint + flag chip partial for detecting silent regressions (audit pipeline stopped writing, cron stopped firing, notifications stopped delivering). Designed to be polled by an external monitor (GitHub Actions, BetterUptime, Pingdom, etc.) on a 15-minute cadence and to render inline on staff dashboards.
+Suite-wide JSON metrics endpoint + flag chip partial for detecting silent regressions (audit pipeline stopped writing, cron stopped firing, notifications stopped delivering). Designed to be polled by an external monitor (GitHub Actions, BetterUptime, Pingdom, etc.) and to render inline on staff dashboards. The suite polls every 6 hours (see **Operating notes** below).
 
 **Three pieces:**
 
-1. **Payload builder** — `keel.ops.canary.build_canary_payload(extras_callable=None)` returns a dict of counters + four boolean `flags` + a top-level `healthy`. The four flags read entirely from keel-shipped tables:
+1. **Payload builder** — `keel.ops.canary.build_canary_payload(extras_callable=None)` returns a dict of counters + five boolean `flags` + a top-level `healthy`. The flags read entirely from keel-shipped tables:
    - `audit_silent_24h` — no rows in `settings.KEEL_AUDIT_LOG_MODEL` in 24h.
    - `cron_silent_24h` — no `keel_scheduling.CommandRun` rows in 24h.
    - `cron_failures_24h` — at least one `CommandRun(status='error')` in 24h.
    - `notifications_failing` — at least one `KEEL_NOTIFICATION_LOG_MODEL` row with `success=False` in 24h.
+   - `audit_constraint_missing` — the AuditLog `user_id` column is nullable again (the Approach D schema guarantee is gone).
+   **Only `cron_failures_24h`, `notifications_failing` and `audit_constraint_missing` gate `healthy`.** The two silence flags are advisory: an idle or pre-beta deployment with no traffic and no cron legitimately writes nothing in 24h, and they used to trip every canary on a quiet app. They still render as chips.
    A `None` counter (model not installed, table missing, query error) disables its flag — better to surface "not measured" than to false-positive.
 
 2. **View** — `keel.ops.views.canary_view(extras_callable=None)` returns a Django view. Auth: staff session OR `Authorization: Bearer $KEEL_METRICS_TOKEN`. Without the token, no external monitor can reach the canary. The bundled URL include is the no-extras path; products with product-specific gauges build their own thin wrapper:
@@ -625,7 +627,14 @@ Suite-wide JSON metrics endpoint + flag chip partial for detecting silent regres
 
 **Settings:** `KEEL_METRICS_TOKEN` (bearer-auth secret for external pollers). Products can wire their existing env var name into this setting — helm uses `KEEL_METRICS_TOKEN = os.environ.get('HELM_METRICS_TOKEN', '')` so its existing GH Actions secret keeps working without rotation. Reads `KEEL_AUDIT_LOG_MODEL`, `KEEL_NOTIFICATION_MODEL`, `KEEL_NOTIFICATION_LOG_MODEL` (the same standard keel settings used everywhere else) to resolve the canary tables — no new model settings to wire.
 
-**Reference implementation:** Helm's [`api/metrics.py`](../helm/api/metrics.py) is the first consumer — it adds project lifecycle gauges, task-bucket counts, and FOIA queue depth as extras, and is polled by GitHub Actions every 15min via [`.github/workflows/canary.yml`](../helm/.github/workflows/canary.yml) which opens a de-duped `canary`-labeled GitHub issue on failure.
+**Reference implementation:** Helm's [`api/metrics.py`](../helm/api/metrics.py) is the first consumer — it adds project lifecycle gauges, task-bucket counts, and FOIA queue depth as extras, and is polled by GitHub Actions every 6 hours via [`.github/workflows/canary.yml`](../helm/.github/workflows/canary.yml) which opens a de-duped `canary`-labeled GitHub issue on failure and closes it on the next healthy poll.
+
+**Operating notes (2026-10-14 re-enable):**
+- **Cadence is every 6 hours, staggered** (`M */6 * * *`, one minute offset per product). Every flag is a 24h window, so the only cost is detection latency; `*/15` across 8 private repos was ~23k Actions minutes/month, 6h is ~1k. Don't raise it without a minutes argument.
+- **Every canary.yml has three jobs:** `metrics` (poll, `continue-on-error`, `timeout-minutes: 5`), `notify` (open a de-duped `canary` issue when unhealthy) and `resolve` (close the open `canary` issue with a comment when healthy). The resolve job exists because the notify de-dupe is title-based: a stale open issue silently swallowed every later alert, and six repos sat that way from June to October.
+- **A 403 `canary access denied` is almost always secret drift, not code.** The GitHub `<PRODUCT>_METRICS_TOKEN` secret and the Railway env var are set by hand on two sides; five repos had GitHub secrets from 2026-06-07 while Railway held rotated values. Diagnose with `gh secret list --repo okeefedaniel/<p> --json name,updatedAt` and a curl using the Railway-side value; fix by piping `railway variable list --service <p> --kv` into `gh secret set` so the value is never printed.
+- **Lookout's `cadence_breach_present` reads the DECLARED cron** from the synced `ScheduledJob` row, so every `@scheduled_job(cron=...)` must match `cron.yml`, and the four session-gated sub-hourly jobs must be `enabled=False` on `/scheduling/` whenever `SESSION_ACTIVE=false`. Flip both together in January.
+- **Scheduled workflows auto-disable after 60 days without repo activity.** Renovate commits keep the repos warm; if a canary goes quiet, check the Actions tab for a "disabled" banner before anything else.
 
 **Why this exists:** Without an external poller hitting `flags.healthy`, a silent regression (audit pipeline broken, cron stopped firing) goes undetected for weeks — see [`incidents/2026-04-25-audit-gap.md`](../helm/incidents/2026-04-25-audit-gap.md), where the Helm audit log went 4 weeks with zero writes before anyone noticed. Centralizing the canary in keel means every product gets the same alert path for free by mounting one URL, and the in-dashboard chip rendering means staff don't need to leave their workflow to read the same state.
 
