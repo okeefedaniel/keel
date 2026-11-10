@@ -1,0 +1,1 @@
+- **`keel.geo` is opt-in.** Nothing changes for a product until it adds `keel.geo` to `INSTALLED_APPS`. A product that does must also run `load_ct_municipalities` after `migrate` in its startup. The `keel_geo` migration ships in keel, so it does not belong in a product's scoped `makemigrations --check` list.

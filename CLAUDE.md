@@ -685,6 +685,18 @@ Every product that exposes machine-callable endpoints follows the same shape so 
 
 **Why:** Multiple products need calendar features (hearings, deadlines, reviews). Centralizing prevents N provider integrations and ensures consistent event formatting.
 
+## Geography (keel.geo)
+
+- **Use `keel.geo.Municipality` for every Connecticut town reference.** Do not add another free-text `municipality` CharField or a product-local town table. The 169 towns, their county / planning region / council of governments / population, and the village-and-typo aliases ship in keel (added 0.59.0).
+- **`number` is the primary key and the only key that may cross a product boundary.** Each product database holds its own copy of the table, so a surrogate key would differ from one database to the next. Feeds, webhooks and cross-product payloads carry `number` and `slug`, never anything else. Inside one product a normal ForeignKey to `keel_geo.Municipality` is correct (same database); across products it is a number, per the no-cross-product-FK rule.
+- **`slug` is immutable once shipped.** Public URLs are built from it. `tests/snapshots/geo_number_slug.txt` pins every (number, slug) pair and the loader writes a slug on create only.
+- **Resolve free text with `Municipality.resolve(text)`**, which returns `(municipality, reason)`: `(m, None)` for a town name or single-town alias ("Dayville" resolves to Killingly), `(None, 'multi_town')` for a name that spans towns ("Mystic"), `(None, None)` for anything unrecognised so the caller decides whether that means blank, statewide or out of state. Matching ignores case and stray whitespace. For bulk work (an importer resolving thousands of rows) build `Municipality.objects.resolver()` once: two queries total instead of two per row.
+- **Per-product integration is 3 steps:** add `keel.geo` to `INSTALLED_APPS`; run `python manage.py load_ct_municipalities` in startup immediately after `migrate` (idempotent, safe on every boot); point your model at it with `models.ForeignKey('keel_geo.Municipality', null=True, blank=True, on_delete=models.PROTECT)`. Keep the text as imported in a separate `*_raw` column when the source is messy, so nothing is lost when a value does not resolve.
+- **Aliases have two owners.** Fixture aliases (`source='fixture'`) are upserted on every load and removed when a keel release drops them, so a correction propagates. Aliases an operator adds in the Django admin (`source='admin'`) are never overwritten or deleted, even when the fixture carries the same alias. Add an alias in the admin when an import report shows an unmatched village; send it upstream to the fixture when it is worth sharing.
+- **Rebuilding the fixture:** `scripts/build_geo_fixture.py` regenerates it from the CT DOT boundary geojson, the programs workbook's `CT Towns` tab and the population export. It documents the two places the fixture deliberately disagrees with the workbook (four alias rows shifted by one; two councils of governments sharing one abbreviation).
+
+**Why:** Harbor, Beacon, Purser and Yeoman each needed towns and each hacked it: a free-text column here, a geojson property there, no shared answer to what "Mystic" means. One reference table makes assistance-by-town, leaders-by-town and the public map join on the same key.
+
 ## Notifications
 
 - **Register notification types** using `keel.notifications.registry` for every significant event.

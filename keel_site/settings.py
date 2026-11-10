@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'keel.notifications',
     'keel.core',
     'keel.security',
+    'keel.geo',
     'keel.periods',
     'keel.reporting',
     'keel.compliance',
