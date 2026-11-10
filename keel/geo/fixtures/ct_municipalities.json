@@ -1,0 +1,2496 @@
+{
+ "municipalities": [
+  {
+   "number": 1,
+   "name": "Andover",
+   "slug": "andover",
+   "objectid": 1,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 15.71,
+   "population": 3144
+  },
+  {
+   "number": 2,
+   "name": "Ansonia",
+   "slug": "ansonia",
+   "objectid": 2,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 6.25,
+   "population": 19008
+  },
+  {
+   "number": 3,
+   "name": "Ashford",
+   "slug": "ashford",
+   "objectid": 3,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 39.81,
+   "population": 4229
+  },
+  {
+   "number": 4,
+   "name": "Avon",
+   "slug": "avon",
+   "objectid": 4,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 23.41,
+   "population": 18883
+  },
+  {
+   "number": 5,
+   "name": "Barkhamsted",
+   "slug": "barkhamsted",
+   "objectid": 5,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 38.71,
+   "population": 3677
+  },
+  {
+   "number": 6,
+   "name": "Beacon Falls",
+   "slug": "beacon-falls",
+   "objectid": 6,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 9.86,
+   "population": 6206
+  },
+  {
+   "number": 7,
+   "name": "Berlin",
+   "slug": "berlin",
+   "objectid": 7,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 27.12,
+   "population": 20429
+  },
+  {
+   "number": 8,
+   "name": "Bethany",
+   "slug": "bethany",
+   "objectid": 8,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 21.39,
+   "population": 5271
+  },
+  {
+   "number": 9,
+   "name": "Bethel",
+   "slug": "bethel",
+   "objectid": 9,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 16.94,
+   "population": 20678
+  },
+  {
+   "number": 10,
+   "name": "Bethlehem",
+   "slug": "bethlehem",
+   "objectid": 10,
+   "county": "Litchfield",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 19.64,
+   "population": 3421
+  },
+  {
+   "number": 11,
+   "name": "Bloomfield",
+   "slug": "bloomfield",
+   "objectid": 11,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 26.37,
+   "population": 21884
+  },
+  {
+   "number": 12,
+   "name": "Bolton",
+   "slug": "bolton",
+   "objectid": 12,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 14.74,
+   "population": 4834
+  },
+  {
+   "number": 13,
+   "name": "Bozrah",
+   "slug": "bozrah",
+   "objectid": 13,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 20.28,
+   "population": 2412
+  },
+  {
+   "number": 14,
+   "name": "Branford",
+   "slug": "branford",
+   "objectid": 14,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 21.97,
+   "population": 28031
+  },
+  {
+   "number": 15,
+   "name": "Bridgeport",
+   "slug": "bridgeport",
+   "objectid": 15,
+   "county": "Fairfield",
+   "planning_region": "Greater Bridgeport",
+   "council_of_governments": "CT Metropolitan",
+   "cog_abbr": "MetroCOG",
+   "square_miles": 16.36,
+   "population": 148028
+  },
+  {
+   "number": 16,
+   "name": "Bridgewater",
+   "slug": "bridgewater",
+   "objectid": 16,
+   "county": "Litchfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 17.36,
+   "population": 1646
+  },
+  {
+   "number": 17,
+   "name": "Bristol",
+   "slug": "bristol",
+   "objectid": 17,
+   "county": "Hartford",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 26.83,
+   "population": 61601
+  },
+  {
+   "number": 18,
+   "name": "Brookfield",
+   "slug": "brookfield",
+   "objectid": 18,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 20.36,
+   "population": 17489
+  },
+  {
+   "number": 19,
+   "name": "Brooklyn",
+   "slug": "brooklyn",
+   "objectid": 19,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 29.13,
+   "population": 8612
+  },
+  {
+   "number": 20,
+   "name": "Burlington",
+   "slug": "burlington",
+   "objectid": 20,
+   "county": "Hartford",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 30.46,
+   "population": 9746
+  },
+  {
+   "number": 21,
+   "name": "Canaan",
+   "slug": "canaan",
+   "objectid": 21,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 33.14,
+   "population": 1082
+  },
+  {
+   "number": 22,
+   "name": "Canterbury",
+   "slug": "canterbury",
+   "objectid": 22,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 40.25,
+   "population": 5140
+  },
+  {
+   "number": 23,
+   "name": "Canton",
+   "slug": "canton",
+   "objectid": 23,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 25.03,
+   "population": 10146
+  },
+  {
+   "number": 24,
+   "name": "Chaplin",
+   "slug": "chaplin",
+   "objectid": 24,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 19.71,
+   "population": 2157
+  },
+  {
+   "number": 25,
+   "name": "Cheshire",
+   "slug": "cheshire",
+   "objectid": 25,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 33.07,
+   "population": 29200
+  },
+  {
+   "number": 26,
+   "name": "Chester",
+   "slug": "chester",
+   "objectid": 26,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 16.82,
+   "population": 3761
+  },
+  {
+   "number": 27,
+   "name": "Clinton",
+   "slug": "clinton",
+   "objectid": 27,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 16.39,
+   "population": 13402
+  },
+  {
+   "number": 28,
+   "name": "Colchester",
+   "slug": "colchester",
+   "objectid": 28,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 49.63,
+   "population": 15504
+  },
+  {
+   "number": 29,
+   "name": "Colebrook",
+   "slug": "colebrook",
+   "objectid": 29,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 32.89,
+   "population": 1368
+  },
+  {
+   "number": 30,
+   "name": "Columbia",
+   "slug": "columbia",
+   "objectid": 30,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 21.94,
+   "population": 5268
+  },
+  {
+   "number": 31,
+   "name": "Cornwall",
+   "slug": "cornwall",
+   "objectid": 31,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 46.42,
+   "population": 1575
+  },
+  {
+   "number": 32,
+   "name": "Coventry",
+   "slug": "coventry",
+   "objectid": 32,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 38.26,
+   "population": 12308
+  },
+  {
+   "number": 33,
+   "name": "Cromwell",
+   "slug": "cromwell",
+   "objectid": 33,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 13.01,
+   "population": 14363
+  },
+  {
+   "number": 34,
+   "name": "Danbury",
+   "slug": "danbury",
+   "objectid": 34,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 43.94,
+   "population": 86124
+  },
+  {
+   "number": 35,
+   "name": "Darien",
+   "slug": "darien",
+   "objectid": 35,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 12.82,
+   "population": 22020
+  },
+  {
+   "number": 36,
+   "name": "Deep River",
+   "slug": "deep-river",
+   "objectid": 36,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 14.13,
+   "population": 4454
+  },
+  {
+   "number": 37,
+   "name": "Derby",
+   "slug": "derby",
+   "objectid": 37,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 5.42,
+   "population": 12406
+  },
+  {
+   "number": 38,
+   "name": "Durham",
+   "slug": "durham",
+   "objectid": 38,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 23.87,
+   "population": 7204
+  },
+  {
+   "number": 39,
+   "name": "Eastford",
+   "slug": "eastford",
+   "objectid": 46,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 28.81,
+   "population": 1689
+  },
+  {
+   "number": 40,
+   "name": "East Granby",
+   "slug": "east-granby",
+   "objectid": 39,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 17.53,
+   "population": 5218
+  },
+  {
+   "number": 41,
+   "name": "East Haddam",
+   "slug": "east-haddam",
+   "objectid": 40,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 56.64,
+   "population": 8987
+  },
+  {
+   "number": 42,
+   "name": "East Hampton",
+   "slug": "east-hampton",
+   "objectid": 41,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 37.05,
+   "population": 12989
+  },
+  {
+   "number": 43,
+   "name": "East Hartford",
+   "slug": "east-hartford",
+   "objectid": 42,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 18.79,
+   "population": 50654
+  },
+  {
+   "number": 44,
+   "name": "East Haven",
+   "slug": "east-haven",
+   "objectid": 43,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 12.6,
+   "population": 27533
+  },
+  {
+   "number": 45,
+   "name": "East Lyme",
+   "slug": "east-lyme",
+   "objectid": 44,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 35.28,
+   "population": 18929
+  },
+  {
+   "number": 46,
+   "name": "Easton",
+   "slug": "easton",
+   "objectid": 47,
+   "county": "Fairfield",
+   "planning_region": "Greater Bridgeport",
+   "council_of_governments": "CT Metropolitan",
+   "cog_abbr": "MetroCOG",
+   "square_miles": 28.61,
+   "population": 7636
+  },
+  {
+   "number": 47,
+   "name": "East Windsor",
+   "slug": "east-windsor",
+   "objectid": 45,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 26.73,
+   "population": 11170
+  },
+  {
+   "number": 48,
+   "name": "Ellington",
+   "slug": "ellington",
+   "objectid": 48,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 34.59,
+   "population": 16994
+  },
+  {
+   "number": 49,
+   "name": "Enfield",
+   "slug": "enfield",
+   "objectid": 49,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 34.2,
+   "population": 40792
+  },
+  {
+   "number": 50,
+   "name": "Essex",
+   "slug": "essex",
+   "objectid": 50,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 11.79,
+   "population": 6802
+  },
+  {
+   "number": 51,
+   "name": "Fairfield",
+   "slug": "fairfield",
+   "objectid": 51,
+   "county": "Fairfield",
+   "planning_region": "Greater Bridgeport",
+   "council_of_governments": "CT Metropolitan",
+   "cog_abbr": "MetroCOG",
+   "square_miles": 30.45,
+   "population": 63433
+  },
+  {
+   "number": 52,
+   "name": "Farmington",
+   "slug": "farmington",
+   "objectid": 52,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 28.73,
+   "population": 26798
+  },
+  {
+   "number": 53,
+   "name": "Franklin",
+   "slug": "franklin",
+   "objectid": 53,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 19.67,
+   "population": 1891
+  },
+  {
+   "number": 54,
+   "name": "Glastonbury",
+   "slug": "glastonbury",
+   "objectid": 54,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 52.19,
+   "population": 35204
+  },
+  {
+   "number": 55,
+   "name": "Goshen",
+   "slug": "goshen",
+   "objectid": 55,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 45.21,
+   "population": 3232
+  },
+  {
+   "number": 56,
+   "name": "Granby",
+   "slug": "granby",
+   "objectid": 56,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 41.1,
+   "population": 11249
+  },
+  {
+   "number": 57,
+   "name": "Greenwich",
+   "slug": "greenwich",
+   "objectid": 57,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 48.54,
+   "population": 63574
+  },
+  {
+   "number": 58,
+   "name": "Griswold",
+   "slug": "griswold",
+   "objectid": 58,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 36.97,
+   "population": 11624
+  },
+  {
+   "number": 59,
+   "name": "Groton",
+   "slug": "groton",
+   "objectid": 59,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 32.27,
+   "population": 37878
+  },
+  {
+   "number": 60,
+   "name": "Guilford",
+   "slug": "guilford",
+   "objectid": 60,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 47.29,
+   "population": 22020
+  },
+  {
+   "number": 61,
+   "name": "Haddam",
+   "slug": "haddam",
+   "objectid": 61,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 46.3,
+   "population": 8773
+  },
+  {
+   "number": 62,
+   "name": "Hamden",
+   "slug": "hamden",
+   "objectid": 62,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 33.25,
+   "population": 60014
+  },
+  {
+   "number": 63,
+   "name": "Hampton",
+   "slug": "hampton",
+   "objectid": 63,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 25.45,
+   "population": 1740
+  },
+  {
+   "number": 64,
+   "name": "Hartford",
+   "slug": "hartford",
+   "objectid": 64,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 18.09,
+   "population": 119669
+  },
+  {
+   "number": 65,
+   "name": "Hartland",
+   "slug": "hartland",
+   "objectid": 65,
+   "county": "Hartford",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 34.27,
+   "population": 1912
+  },
+  {
+   "number": 66,
+   "name": "Harwinton",
+   "slug": "harwinton",
+   "objectid": 66,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 31.11,
+   "population": 5612
+  },
+  {
+   "number": 67,
+   "name": "Hebron",
+   "slug": "hebron",
+   "objectid": 67,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 37.4,
+   "population": 9146
+  },
+  {
+   "number": 68,
+   "name": "Kent",
+   "slug": "kent",
+   "objectid": 68,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 49.69,
+   "population": 3066
+  },
+  {
+   "number": 69,
+   "name": "Killingly",
+   "slug": "killingly",
+   "objectid": 69,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 49.97,
+   "population": 17945
+  },
+  {
+   "number": 70,
+   "name": "Killingworth",
+   "slug": "killingworth",
+   "objectid": 70,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 35.88,
+   "population": 6254
+  },
+  {
+   "number": 71,
+   "name": "Lebanon",
+   "slug": "lebanon",
+   "objectid": 71,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 55.16,
+   "population": 7108
+  },
+  {
+   "number": 72,
+   "name": "Ledyard",
+   "slug": "ledyard",
+   "objectid": 72,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 39.91,
+   "population": 15459
+  },
+  {
+   "number": 73,
+   "name": "Lisbon",
+   "slug": "lisbon",
+   "objectid": 73,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 16.65,
+   "population": 4228
+  },
+  {
+   "number": 74,
+   "name": "Litchfield",
+   "slug": "litchfield",
+   "objectid": 74,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 56.93,
+   "population": 8293
+  },
+  {
+   "number": 75,
+   "name": "Lyme",
+   "slug": "lyme",
+   "objectid": 75,
+   "county": "New London",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 34.41,
+   "population": 2409
+  },
+  {
+   "number": 76,
+   "name": "Madison",
+   "slug": "madison",
+   "objectid": 76,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 36.74,
+   "population": 17498
+  },
+  {
+   "number": 77,
+   "name": "Manchester",
+   "slug": "manchester",
+   "objectid": 77,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 27.66,
+   "population": 59408
+  },
+  {
+   "number": 78,
+   "name": "Mansfield",
+   "slug": "mansfield",
+   "objectid": 78,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 45.58,
+   "population": 25401
+  },
+  {
+   "number": 79,
+   "name": "Marlborough",
+   "slug": "marlborough",
+   "objectid": 79,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 23.44,
+   "population": 6106
+  },
+  {
+   "number": 80,
+   "name": "Meriden",
+   "slug": "meriden",
+   "objectid": 80,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 23.93,
+   "population": 60111
+  },
+  {
+   "number": 81,
+   "name": "Middlebury",
+   "slug": "middlebury",
+   "objectid": 81,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 18.42,
+   "population": 7936
+  },
+  {
+   "number": 82,
+   "name": "Middlefield",
+   "slug": "middlefield",
+   "objectid": 82,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 13.09,
+   "population": 4257
+  },
+  {
+   "number": 83,
+   "name": "Middletown",
+   "slug": "middletown",
+   "objectid": 83,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 42.46,
+   "population": 47984
+  },
+  {
+   "number": 84,
+   "name": "Milford",
+   "slug": "milford",
+   "objectid": 84,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 22.23,
+   "population": 52793
+  },
+  {
+   "number": 85,
+   "name": "Monroe",
+   "slug": "monroe",
+   "objectid": 85,
+   "county": "Fairfield",
+   "planning_region": "Greater Bridgeport",
+   "council_of_governments": "CT Metropolitan",
+   "cog_abbr": "MetroCOG",
+   "square_miles": 26.28,
+   "population": 18831
+  },
+  {
+   "number": 86,
+   "name": "Montville",
+   "slug": "montville",
+   "objectid": 86,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 44.24,
+   "population": 17814
+  },
+  {
+   "number": 87,
+   "name": "Morris",
+   "slug": "morris",
+   "objectid": 87,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 18.69,
+   "population": 2272
+  },
+  {
+   "number": 88,
+   "name": "Naugatuck",
+   "slug": "naugatuck",
+   "objectid": 88,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 16.44,
+   "population": 31820
+  },
+  {
+   "number": 89,
+   "name": "New Britain",
+   "slug": "new-britain",
+   "objectid": 89,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 13.43,
+   "population": 74080
+  },
+  {
+   "number": 90,
+   "name": "New Canaan",
+   "slug": "new-canaan",
+   "objectid": 90,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 22.54,
+   "population": 20862
+  },
+  {
+   "number": 91,
+   "name": "New Fairfield",
+   "slug": "new-fairfield",
+   "objectid": 91,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 25.17,
+   "population": 13487
+  },
+  {
+   "number": 92,
+   "name": "New Hartford",
+   "slug": "new-hartford",
+   "objectid": 92,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 38.07,
+   "population": 6709
+  },
+  {
+   "number": 93,
+   "name": "New Haven",
+   "slug": "new-haven",
+   "objectid": 93,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 19.18,
+   "population": 135319
+  },
+  {
+   "number": 94,
+   "name": "Newington",
+   "slug": "newington",
+   "objectid": 96,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 13.11,
+   "population": 31227
+  },
+  {
+   "number": 95,
+   "name": "New London",
+   "slug": "new-london",
+   "objectid": 94,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 6.22,
+   "population": 27560
+  },
+  {
+   "number": 96,
+   "name": "New Milford",
+   "slug": "new-milford",
+   "objectid": 95,
+   "county": "Litchfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 63.88,
+   "population": 28276
+  },
+  {
+   "number": 97,
+   "name": "Newtown",
+   "slug": "newtown",
+   "objectid": 97,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 58.9,
+   "population": 27673
+  },
+  {
+   "number": 98,
+   "name": "Norfolk",
+   "slug": "norfolk",
+   "objectid": 98,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 46.35,
+   "population": 1596
+  },
+  {
+   "number": 99,
+   "name": "North Branford",
+   "slug": "north-branford",
+   "objectid": 99,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 26.92,
+   "population": 13415
+  },
+  {
+   "number": 100,
+   "name": "North Canaan",
+   "slug": "north-canaan",
+   "objectid": 100,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 19.52,
+   "population": 3204
+  },
+  {
+   "number": 101,
+   "name": "North Haven",
+   "slug": "north-haven",
+   "objectid": 101,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 21.11,
+   "population": 24295
+  },
+  {
+   "number": 102,
+   "name": "North Stonington",
+   "slug": "north-stonington",
+   "objectid": 102,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 54.94,
+   "population": 5165
+  },
+  {
+   "number": 103,
+   "name": "Norwalk",
+   "slug": "norwalk",
+   "objectid": 103,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 22.88,
+   "population": 92458
+  },
+  {
+   "number": 104,
+   "name": "Norwich",
+   "slug": "norwich",
+   "objectid": 104,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 29.34,
+   "population": 39881
+  },
+  {
+   "number": 105,
+   "name": "Old Lyme",
+   "slug": "old-lyme",
+   "objectid": 105,
+   "county": "New London",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 24.51,
+   "population": 7696
+  },
+  {
+   "number": 106,
+   "name": "Old Saybrook",
+   "slug": "old-saybrook",
+   "objectid": 106,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 15.9,
+   "population": 10571
+  },
+  {
+   "number": 107,
+   "name": "Orange",
+   "slug": "orange",
+   "objectid": 107,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 17.4,
+   "population": 14322
+  },
+  {
+   "number": 108,
+   "name": "Oxford",
+   "slug": "oxford",
+   "objectid": 108,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 33.33,
+   "population": 13125
+  },
+  {
+   "number": 109,
+   "name": "Plainfield",
+   "slug": "plainfield",
+   "objectid": 109,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 43.08,
+   "population": 15193
+  },
+  {
+   "number": 110,
+   "name": "Plainville",
+   "slug": "plainville",
+   "objectid": 110,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 9.86,
+   "population": 17491
+  },
+  {
+   "number": 111,
+   "name": "Plymouth",
+   "slug": "plymouth",
+   "objectid": 111,
+   "county": "Litchfield",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 22.32,
+   "population": 11766
+  },
+  {
+   "number": 112,
+   "name": "Pomfret",
+   "slug": "pomfret",
+   "objectid": 112,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 40.78,
+   "population": 4313
+  },
+  {
+   "number": 113,
+   "name": "Portland",
+   "slug": "portland",
+   "objectid": 113,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 24.68,
+   "population": 9428
+  },
+  {
+   "number": 114,
+   "name": "Preston",
+   "slug": "preston",
+   "objectid": 114,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 31.75,
+   "population": 4829
+  },
+  {
+   "number": 115,
+   "name": "Prospect",
+   "slug": "prospect",
+   "objectid": 115,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 14.43,
+   "population": 9479
+  },
+  {
+   "number": 116,
+   "name": "Putnam",
+   "slug": "putnam",
+   "objectid": 116,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 20.37,
+   "population": 9312
+  },
+  {
+   "number": 117,
+   "name": "Redding",
+   "slug": "redding",
+   "objectid": 117,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 32.03,
+   "population": 8719
+  },
+  {
+   "number": 118,
+   "name": "Ridgefield",
+   "slug": "ridgefield",
+   "objectid": 118,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 34.86,
+   "population": 24931
+  },
+  {
+   "number": 119,
+   "name": "Rocky Hill",
+   "slug": "rocky-hill",
+   "objectid": 119,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 13.84,
+   "population": 20708
+  },
+  {
+   "number": 120,
+   "name": "Roxbury",
+   "slug": "roxbury",
+   "objectid": 120,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 26.29,
+   "population": 2297
+  },
+  {
+   "number": 121,
+   "name": "Salem",
+   "slug": "salem",
+   "objectid": 121,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 29.7,
+   "population": 4319
+  },
+  {
+   "number": 122,
+   "name": "Salisbury",
+   "slug": "salisbury",
+   "objectid": 122,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 60.17,
+   "population": 4240
+  },
+  {
+   "number": 123,
+   "name": "Scotland",
+   "slug": "scotland",
+   "objectid": 123,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 18.74,
+   "population": 1578
+  },
+  {
+   "number": 124,
+   "name": "Seymour",
+   "slug": "seymour",
+   "objectid": 124,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 14.95,
+   "population": 16953
+  },
+  {
+   "number": 125,
+   "name": "Sharon",
+   "slug": "sharon",
+   "objectid": 125,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 59.73,
+   "population": 2744
+  },
+  {
+   "number": 126,
+   "name": "Shelton",
+   "slug": "shelton",
+   "objectid": 126,
+   "county": "Fairfield",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 31.89,
+   "population": 42144
+  },
+  {
+   "number": 127,
+   "name": "Sherman",
+   "slug": "sherman",
+   "objectid": 127,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 23.39,
+   "population": 3530
+  },
+  {
+   "number": 128,
+   "name": "Simsbury",
+   "slug": "simsbury",
+   "objectid": 128,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 34.33,
+   "population": 24953
+  },
+  {
+   "number": 129,
+   "name": "Somers",
+   "slug": "somers",
+   "objectid": 129,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 28.62,
+   "population": 10725
+  },
+  {
+   "number": 130,
+   "name": "Southbury",
+   "slug": "southbury",
+   "objectid": 131,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 40.0,
+   "population": 20127
+  },
+  {
+   "number": 131,
+   "name": "Southington",
+   "slug": "southington",
+   "objectid": 132,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 36.53,
+   "population": 43743
+  },
+  {
+   "number": 132,
+   "name": "South Windsor",
+   "slug": "south-windsor",
+   "objectid": 130,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 28.7,
+   "population": 26773
+  },
+  {
+   "number": 133,
+   "name": "Sprague",
+   "slug": "sprague",
+   "objectid": 133,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 13.8,
+   "population": 2940
+  },
+  {
+   "number": 134,
+   "name": "Stafford",
+   "slug": "stafford",
+   "objectid": 134,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 58.88,
+   "population": 11567
+  },
+  {
+   "number": 135,
+   "name": "Stamford",
+   "slug": "stamford",
+   "objectid": 135,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 38.37,
+   "population": 136226
+  },
+  {
+   "number": 136,
+   "name": "Sterling",
+   "slug": "sterling",
+   "objectid": 136,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 27.26,
+   "population": 3644
+  },
+  {
+   "number": 137,
+   "name": "Stonington",
+   "slug": "stonington",
+   "objectid": 137,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 39.26,
+   "population": 18431
+  },
+  {
+   "number": 138,
+   "name": "Stratford",
+   "slug": "stratford",
+   "objectid": 138,
+   "county": "Fairfield",
+   "planning_region": "Greater Bridgeport",
+   "council_of_governments": "CT Metropolitan",
+   "cog_abbr": "MetroCOG",
+   "square_miles": 17.4,
+   "population": 52454
+  },
+  {
+   "number": 139,
+   "name": "Suffield",
+   "slug": "suffield",
+   "objectid": 139,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 43.03,
+   "population": 15650
+  },
+  {
+   "number": 140,
+   "name": "Thomaston",
+   "slug": "thomaston",
+   "objectid": 140,
+   "county": "Litchfield",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 12.14,
+   "population": 7501
+  },
+  {
+   "number": 141,
+   "name": "Thompson",
+   "slug": "thompson",
+   "objectid": 141,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 48.85,
+   "population": 9385
+  },
+  {
+   "number": 142,
+   "name": "Tolland",
+   "slug": "tolland",
+   "objectid": 142,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 40.22,
+   "population": 14574
+  },
+  {
+   "number": 143,
+   "name": "Torrington",
+   "slug": "torrington",
+   "objectid": 143,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 40.3,
+   "population": 35550
+  },
+  {
+   "number": 144,
+   "name": "Trumbull",
+   "slug": "trumbull",
+   "objectid": 144,
+   "county": "Fairfield",
+   "planning_region": "Greater Bridgeport",
+   "council_of_governments": "CT Metropolitan",
+   "cog_abbr": "MetroCOG",
+   "square_miles": 23.59,
+   "population": 37269
+  },
+  {
+   "number": 145,
+   "name": "Union",
+   "slug": "union",
+   "objectid": 145,
+   "county": "Tolland",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 29.61,
+   "population": 797
+  },
+  {
+   "number": 146,
+   "name": "Vernon",
+   "slug": "vernon",
+   "objectid": 146,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 18.13,
+   "population": 30596
+  },
+  {
+   "number": 147,
+   "name": "Voluntown",
+   "slug": "voluntown",
+   "objectid": 147,
+   "county": "New London",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 39.77,
+   "population": 2612
+  },
+  {
+   "number": 148,
+   "name": "Wallingford",
+   "slug": "wallingford",
+   "objectid": 148,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 40.31,
+   "population": 43725
+  },
+  {
+   "number": 149,
+   "name": "Warren",
+   "slug": "warren",
+   "objectid": 149,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 27.49,
+   "population": 1367
+  },
+  {
+   "number": 150,
+   "name": "Washington",
+   "slug": "washington",
+   "objectid": 150,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 38.64,
+   "population": 3685
+  },
+  {
+   "number": 151,
+   "name": "Waterbury",
+   "slug": "waterbury",
+   "objectid": 151,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 28.99,
+   "population": 114990
+  },
+  {
+   "number": 152,
+   "name": "Waterford",
+   "slug": "waterford",
+   "objectid": 152,
+   "county": "New London",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 34.95,
+   "population": 19829
+  },
+  {
+   "number": 153,
+   "name": "Watertown",
+   "slug": "watertown",
+   "objectid": 153,
+   "county": "Litchfield",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 29.63,
+   "population": 22274
+  },
+  {
+   "number": 154,
+   "name": "Westbrook",
+   "slug": "westbrook",
+   "objectid": 156,
+   "county": "Middlesex",
+   "planning_region": "Lower Connecticut River Valley",
+   "council_of_governments": "Lower CT River Valley",
+   "cog_abbr": "RiverCOG",
+   "square_miles": 16.08,
+   "population": 6881
+  },
+  {
+   "number": 155,
+   "name": "West Hartford",
+   "slug": "west-hartford",
+   "objectid": 154,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 22.37,
+   "population": 63969
+  },
+  {
+   "number": 156,
+   "name": "West Haven",
+   "slug": "west-haven",
+   "objectid": 155,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 10.92,
+   "population": 54790
+  },
+  {
+   "number": 157,
+   "name": "Weston",
+   "slug": "weston",
+   "objectid": 157,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 20.66,
+   "population": 10344
+  },
+  {
+   "number": 158,
+   "name": "Westport",
+   "slug": "westport",
+   "objectid": 158,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 20.24,
+   "population": 27470
+  },
+  {
+   "number": 159,
+   "name": "Wethersfield",
+   "slug": "wethersfield",
+   "objectid": 159,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 13.17,
+   "population": 27114
+  },
+  {
+   "number": 160,
+   "name": "Willington",
+   "slug": "willington",
+   "objectid": 160,
+   "county": "Tolland",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 33.66,
+   "population": 5552
+  },
+  {
+   "number": 161,
+   "name": "Wilton",
+   "slug": "wilton",
+   "objectid": 161,
+   "county": "Fairfield",
+   "planning_region": "Western Connecticut",
+   "council_of_governments": "Western CT",
+   "cog_abbr": "WestCOG",
+   "square_miles": 27.34,
+   "population": 18400
+  },
+  {
+   "number": 162,
+   "name": "Winchester",
+   "slug": "winchester",
+   "objectid": 162,
+   "county": "Litchfield",
+   "planning_region": "Northwest Hills",
+   "council_of_governments": "Northwest Hills",
+   "cog_abbr": "NHCOG",
+   "square_miles": 33.87,
+   "population": 10236
+  },
+  {
+   "number": 163,
+   "name": "Windham",
+   "slug": "windham",
+   "objectid": 163,
+   "county": "Windham",
+   "planning_region": "Southeastern Connecticut",
+   "council_of_governments": "Southeastern CT",
+   "cog_abbr": "SCCOG",
+   "square_miles": 27.77,
+   "population": 23833
+  },
+  {
+   "number": 164,
+   "name": "Windsor",
+   "slug": "windsor",
+   "objectid": 164,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 31.04,
+   "population": 29372
+  },
+  {
+   "number": 165,
+   "name": "Windsor Locks",
+   "slug": "windsor-locks",
+   "objectid": 165,
+   "county": "Hartford",
+   "planning_region": "Capital",
+   "council_of_governments": "Capital Region",
+   "cog_abbr": "CRCOG",
+   "square_miles": 9.34,
+   "population": 12529
+  },
+  {
+   "number": 166,
+   "name": "Wolcott",
+   "slug": "wolcott",
+   "objectid": 166,
+   "county": "New Haven",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 21.16,
+   "population": 16309
+  },
+  {
+   "number": 167,
+   "name": "Woodbridge",
+   "slug": "woodbridge",
+   "objectid": 167,
+   "county": "New Haven",
+   "planning_region": "South Central Connecticut",
+   "council_of_governments": "South Central Regional",
+   "cog_abbr": "SCRCOG",
+   "square_miles": 19.19,
+   "population": 9021
+  },
+  {
+   "number": 168,
+   "name": "Woodbury",
+   "slug": "woodbury",
+   "objectid": 168,
+   "county": "Litchfield",
+   "planning_region": "Naugatuck Valley",
+   "council_of_governments": "Naugatuck Valley",
+   "cog_abbr": "NVCOG",
+   "square_miles": 36.74,
+   "population": 9862
+  },
+  {
+   "number": 169,
+   "name": "Woodstock",
+   "slug": "woodstock",
+   "objectid": 169,
+   "county": "Windham",
+   "planning_region": "Northeastern Connecticut",
+   "council_of_governments": "Northeastern CT",
+   "cog_abbr": "NECCOG",
+   "square_miles": 61.47,
+   "population": 8346
+  }
+ ],
+ "aliases": [
+  {
+   "alias": "Amston",
+   "municipality": 67,
+   "town": "Hebron",
+   "multi_town": false
+  },
+  {
+   "alias": "Baltic",
+   "municipality": 133,
+   "town": "Sprague",
+   "multi_town": false
+  },
+  {
+   "alias": "Broad Brook",
+   "municipality": 47,
+   "town": "East Windsor",
+   "multi_town": false
+  },
+  {
+   "alias": "Centerbrook",
+   "municipality": 50,
+   "town": "Essex",
+   "multi_town": false
+  },
+  {
+   "alias": "Central Village",
+   "municipality": 109,
+   "town": "Plainfield",
+   "multi_town": false
+  },
+  {
+   "alias": "Cornwall Bridge",
+   "municipality": 31,
+   "town": "Cornwall",
+   "multi_town": false
+  },
+  {
+   "alias": "Cos Cob",
+   "municipality": 57,
+   "town": "Greenwich",
+   "multi_town": false
+  },
+  {
+   "alias": "Danielson",
+   "municipality": 69,
+   "town": "Killingly",
+   "multi_town": false
+  },
+  {
+   "alias": "Dayville",
+   "municipality": 69,
+   "town": "Killingly",
+   "multi_town": false
+  },
+  {
+   "alias": "East Berlin",
+   "municipality": 7,
+   "town": "Berlin",
+   "multi_town": false
+  },
+  {
+   "alias": "East Canaan",
+   "municipality": 100,
+   "town": "North Canaan",
+   "multi_town": false
+  },
+  {
+   "alias": "Essx",
+   "municipality": 50,
+   "town": "Essex",
+   "multi_town": false
+  },
+  {
+   "alias": "Falls Vilage",
+   "municipality": 21,
+   "town": "Canaan",
+   "multi_town": false
+  },
+  {
+   "alias": "Falls Village",
+   "municipality": 21,
+   "town": "Canaan",
+   "multi_town": false
+  },
+  {
+   "alias": "Gales Ferry",
+   "municipality": 72,
+   "town": "Ledyard",
+   "multi_town": false
+  },
+  {
+   "alias": "Georgetown",
+   "municipality": 117,
+   "town": "Redding",
+   "multi_town": false
+  },
+  {
+   "alias": "Gilman",
+   "municipality": 13,
+   "town": "Bozrah",
+   "multi_town": false
+  },
+  {
+   "alias": "Glenville",
+   "municipality": 57,
+   "town": "Greenwich",
+   "multi_town": false
+  },
+  {
+   "alias": "Goshn",
+   "municipality": 55,
+   "town": "Goshen",
+   "multi_town": false
+  },
+  {
+   "alias": "Greens Farm",
+   "municipality": 158,
+   "town": "Westport",
+   "multi_town": false
+  },
+  {
+   "alias": "Higganum",
+   "municipality": 61,
+   "town": "Haddam",
+   "multi_town": false
+  },
+  {
+   "alias": "Hudson",
+   "municipality": 14,
+   "town": "Branford",
+   "multi_town": false
+  },
+  {
+   "alias": "Huntington",
+   "municipality": 126,
+   "town": "Shelton",
+   "multi_town": false
+  },
+  {
+   "alias": "Ivoryton",
+   "municipality": 50,
+   "town": "Essex",
+   "multi_town": false
+  },
+  {
+   "alias": "Jewett City",
+   "municipality": 58,
+   "town": "Griswold",
+   "multi_town": false
+  },
+  {
+   "alias": "Kensington",
+   "municipality": 7,
+   "town": "Berlin",
+   "multi_town": false
+  },
+  {
+   "alias": "Lakeville",
+   "municipality": 122,
+   "town": "Salisbury",
+   "multi_town": false
+  },
+  {
+   "alias": "Mansfield Center",
+   "municipality": 78,
+   "town": "Mansfield",
+   "multi_town": false
+  },
+  {
+   "alias": "Middle Haddam",
+   "municipality": 42,
+   "town": "East Hampton",
+   "multi_town": false
+  },
+  {
+   "alias": "Milldale",
+   "municipality": 131,
+   "town": "Southington",
+   "multi_town": false
+  },
+  {
+   "alias": "Moodus",
+   "municipality": 41,
+   "town": "East Haddam",
+   "multi_town": false
+  },
+  {
+   "alias": "Moosup",
+   "municipality": 109,
+   "town": "Plainfield",
+   "multi_town": false
+  },
+  {
+   "alias": "Mystic",
+   "municipality": null,
+   "town": "Groton/Stonington",
+   "multi_town": true
+  },
+  {
+   "alias": "New Preston",
+   "municipality": 150,
+   "town": "Washington",
+   "multi_town": false
+  },
+  {
+   "alias": "Niantic",
+   "municipality": 45,
+   "town": "East Lyme",
+   "multi_town": false
+  },
+  {
+   "alias": "Noank",
+   "municipality": 59,
+   "town": "Groton",
+   "multi_town": false
+  },
+  {
+   "alias": "North Grosvenordale",
+   "municipality": 141,
+   "town": "Thompson",
+   "multi_town": false
+  },
+  {
+   "alias": "North Windham",
+   "municipality": 163,
+   "town": "Windham",
+   "multi_town": false
+  },
+  {
+   "alias": "Northford",
+   "municipality": 99,
+   "town": "North Branford",
+   "multi_town": false
+  },
+  {
+   "alias": "Oakdale",
+   "municipality": 86,
+   "town": "Montville",
+   "multi_town": false
+  },
+  {
+   "alias": "Oakville",
+   "municipality": 153,
+   "town": "Watertown",
+   "multi_town": false
+  },
+  {
+   "alias": "Old Greenwich",
+   "municipality": 57,
+   "town": "Greenwich",
+   "multi_town": false
+  },
+  {
+   "alias": "Pawcatuck",
+   "municipality": 137,
+   "town": "Stonington",
+   "multi_town": false
+  },
+  {
+   "alias": "Peters House",
+   "municipality": 67,
+   "town": "Hebron",
+   "multi_town": false
+  },
+  {
+   "alias": "Plantsville",
+   "municipality": 131,
+   "town": "Southington",
+   "multi_town": false
+  },
+  {
+   "alias": "Pomfret Center",
+   "municipality": 112,
+   "town": "Pomfret",
+   "multi_town": false
+  },
+  {
+   "alias": "Quaker Hill",
+   "municipality": 152,
+   "town": "Waterford",
+   "multi_town": false
+  },
+  {
+   "alias": "Riverside",
+   "municipality": 57,
+   "town": "Greenwich",
+   "multi_town": false
+  },
+  {
+   "alias": "Rockville",
+   "municipality": 146,
+   "town": "Vernon",
+   "multi_town": false
+  },
+  {
+   "alias": "Rowayton",
+   "municipality": 103,
+   "town": "Norwalk",
+   "multi_town": false
+  },
+  {
+   "alias": "Sandy Hook",
+   "municipality": 97,
+   "town": "Newtown",
+   "multi_town": false
+  },
+  {
+   "alias": "South Glastonbury",
+   "municipality": 54,
+   "town": "Glastonbury",
+   "multi_town": false
+  },
+  {
+   "alias": "South Norwalk",
+   "municipality": 103,
+   "town": "Norwalk",
+   "multi_town": false
+  },
+  {
+   "alias": "Southport",
+   "municipality": 51,
+   "town": "Fairfield",
+   "multi_town": false
+  },
+  {
+   "alias": "Stafford Springs",
+   "municipality": 134,
+   "town": "Stafford",
+   "multi_town": false
+  },
+  {
+   "alias": "Stony Creek",
+   "municipality": 14,
+   "town": "Branford",
+   "multi_town": false
+  },
+  {
+   "alias": "Storrs",
+   "municipality": 78,
+   "town": "Mansfield",
+   "multi_town": false
+  },
+  {
+   "alias": "Storrs Mansfield",
+   "municipality": 78,
+   "town": "Mansfield",
+   "multi_town": false
+  },
+  {
+   "alias": "Stratord",
+   "municipality": 138,
+   "town": "Stratford",
+   "multi_town": false
+  },
+  {
+   "alias": "Taftville",
+   "municipality": 104,
+   "town": "Norwich",
+   "multi_town": false
+  },
+  {
+   "alias": "Tariffville",
+   "municipality": 128,
+   "town": "Simsbury",
+   "multi_town": false
+  },
+  {
+   "alias": "Tariffvillle",
+   "municipality": 128,
+   "town": "Simsbury",
+   "multi_town": false
+  },
+  {
+   "alias": "Terryville",
+   "municipality": 111,
+   "town": "Plymouth",
+   "multi_town": false
+  },
+  {
+   "alias": "Uncasville",
+   "municipality": 86,
+   "town": "Montville",
+   "multi_town": false
+  },
+  {
+   "alias": "Unionville",
+   "municipality": 52,
+   "town": "Farmington",
+   "multi_town": false
+  },
+  {
+   "alias": "Vernon Rockville",
+   "municipality": 146,
+   "town": "Vernon",
+   "multi_town": false
+  },
+  {
+   "alias": "Washington Depot",
+   "municipality": 150,
+   "town": "Washington",
+   "multi_town": false
+  },
+  {
+   "alias": "Weatogue",
+   "municipality": 128,
+   "town": "Simsbury",
+   "multi_town": false
+  },
+  {
+   "alias": "West Cornwall",
+   "municipality": 31,
+   "town": "Cornwall",
+   "multi_town": false
+  },
+  {
+   "alias": "West Granby",
+   "municipality": 56,
+   "town": "Granby",
+   "multi_town": false
+  },
+  {
+   "alias": "West Mystic",
+   "municipality": 59,
+   "town": "Groton",
+   "multi_town": false
+  },
+  {
+   "alias": "West Redding",
+   "municipality": 117,
+   "town": "Redding",
+   "multi_town": false
+  },
+  {
+   "alias": "West Simsbury",
+   "municipality": 128,
+   "town": "Simsbury",
+   "multi_town": false
+  },
+  {
+   "alias": "Willimantic",
+   "municipality": 163,
+   "town": "Windham",
+   "multi_town": false
+  },
+  {
+   "alias": "Winsted",
+   "municipality": 162,
+   "town": "Winchester",
+   "multi_town": false
+  },
+  {
+   "alias": "Woodstock Valley",
+   "municipality": 169,
+   "town": "Woodstock",
+   "multi_town": false
+  },
+  {
+   "alias": "Wst Cornwall",
+   "municipality": 31,
+   "town": "Cornwall",
+   "multi_town": false
+  }
+ ]
+}
